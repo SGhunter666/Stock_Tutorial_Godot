@@ -74,12 +74,27 @@ func run() -> void:
 	check(daily["candles"].size() >= 20, "daily candles include warm-up history")
 	var last_daily: Dictionary = daily["candles"][-1]
 	eq(String(last_daily["d"]), String(quotes["date"]), "last candle is the current day")
-	var intraday := SmaHistoryService.history_candles(dataset, symbol,
+	var unsupported := SmaHistoryService.history_candles(dataset, symbol,
 		int(service.run("2008-crisis")["dayIndex"]), 0, "5m", float(quotes["last"]))
-	eq(intraday["candles"].size(), 1, "tick zero exposes only the first 5m bar")
-	var hourly := SmaHistoryService.history_candles(dataset, symbol,
-		int(service.run("2008-crisis")["dayIndex"]), 7, "1h", float(quotes["last"]))
-	check(hourly["candles"].size() >= 1, "hourly candles aggregate")
+	eq(unsupported["candles"].size(), 0, "simulated intraday timeframes are not exposed")
+	var weekly := SmaHistoryService.history_candles(dataset, symbol,
+		int(service.run("2008-crisis")["dayIndex"]), 0, "1w", float(quotes["last"]))
+	check(weekly["candles"].size() >= 1, "weekly candles aggregate from real daily bars")
+
+	describe("history-daily-mode")
+	var daily_service := SmaHistoryService.new()
+	var daily_dataset := daily_service.load_dataset("2008-crisis")
+	var daily_symbol := String(daily_dataset["tickers"][0]["symbol"])
+	daily_service.create_run("2008-crisis")
+	daily_service.advance_day("2008-crisis", daily_dataset, true)
+	var daily_run := daily_service.run("2008-crisis")
+	eq(int(daily_run["tick"]), 7, "daily mode uses the real daily close")
+	var daily_quote := SmaHistoryService.quote_at_tick(daily_dataset, daily_symbol,
+		int(daily_run["dayIndex"]), 7)
+	var daily_bar: Array = SmaHistoryService.bars_for(daily_dataset, daily_symbol)[
+		int(daily_run["dayIndex"])]
+	approx(float(daily_quote["last"]), float(daily_bar[4]), 0.0001,
+		"daily mode quote equals the real daily close")
 
 	describe("history-events")
 	var event_result := service.advance_to_event("2008-crisis", dataset)

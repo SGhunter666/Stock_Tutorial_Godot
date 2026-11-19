@@ -3,7 +3,8 @@
 class_name SmaTradeScreen
 extends SmaScreen
 
-const TIMEFRAMES := ["1m", "5m", "15m", "1h", "1D"]
+const TIMEFRAMES := ["1m", "5m", "15m", "30m", "1h", "4h", "1D", "1W", "1M"]
+const RANGE_OPTIONS := [60, 120, 250]
 
 var _timeframe := "1m"
 var _side := "buy"
@@ -12,6 +13,8 @@ var _side_group := ButtonGroup.new()
 var _type_group := ButtonGroup.new()
 var _timeframe_group := ButtonGroup.new()
 var _timeframe_buttons: Dictionary = {}
+var _range_group := ButtonGroup.new()
+var _range_buttons: Dictionary = {}
 var _limit_type_button: Button
 var _limit_hint: Label
 var _stop_row: HBoxContainer
@@ -46,6 +49,10 @@ var _oco_tp: SpinBox
 var _oco_stop: SpinBox
 var _oco_submit: Button
 var _oco_feedback: Label
+var _lock_card: PanelContainer
+var _lock_title: Label
+var _lock_body: Label
+var _submit_button: Button
 var _oco_action := "closeLong"
 var _oco_key := ""
 var _position_box: VBoxContainer
@@ -99,9 +106,28 @@ func _build() -> void:
 	quote_card.add_child(quote_head)
 	root.add_child(quote_card)
 
+	_lock_card = SmaKit.card(10)
+	var lock_box := SmaKit.vbox(4)
+	_lock_card.add_child(lock_box)
+	_lock_title = SmaKit.label("", 14, SmaUiTheme.WARNING)
+	_lock_body = SmaKit.muted("", 11)
+	_lock_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lock_box.add_child(_lock_title)
+	lock_box.add_child(_lock_body)
+	var lock_actions := SmaKit.hbox(8)
+	lock_actions.add_child(SmaKit.hspacer())
+	lock_actions.add_child(SmaKit.button(I18n.t("trade.lockedGoAcademy"), _go_academy, true))
+	lock_box.add_child(lock_actions)
+	_lock_card.visible = false
+	root.add_child(_lock_card)
+
+	var body_scroll := SmaKit.scroll()
+	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(body_scroll)
 	var body := SmaKit.hbox(12)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(body)
+	body_scroll.add_child(body)
 
 	var left := SmaKit.vbox(12)
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -120,8 +146,22 @@ func _build() -> void:
 		_timeframe_buttons[timeframe] = button
 		chart_head.add_child(button)
 	chart_box.add_child(chart_head)
+	_range_group.allow_unpress = true
+	var range_row := SmaKit.hbox(6)
+	range_row.add_child(SmaKit.caption(I18n.t("chart.range")))
+	for count in RANGE_OPTIONS:
+		var range_button := SmaKit.toggle("%d" % int(count), _range_group)
+		range_button.custom_minimum_size.x = 38
+		range_button.add_theme_font_size_override("font_size", 10)
+		range_button.pressed.connect(_on_range.bind(int(count)))
+		_range_buttons[int(count)] = range_button
+		range_row.add_child(range_button)
+	range_row.add_child(SmaKit.hspacer())
+	range_row.add_child(SmaKit.caption(I18n.t("chart.hint")))
+	chart_box.add_child(range_row)
 	_chart = SmaCandleChart.new()
-	_chart.custom_minimum_size.y = 290
+	_chart.custom_minimum_size.y = 300
+	_chart.visible_count_changed.connect(_on_chart_range_changed)
 	chart_box.add_child(_chart)
 	left.add_child(chart_card)
 
@@ -279,9 +319,9 @@ func _build() -> void:
 	ticket.add_child(fee_row)
 	_available_label = SmaKit.caption("")
 	ticket.add_child(_available_label)
-	var submit := SmaKit.button(I18n.t("trade.submit"), _submit, true)
-	submit.custom_minimum_size.y = 38
-	ticket.add_child(submit)
+	_submit_button = SmaKit.button(I18n.t("trade.submit"), _submit, true)
+	_submit_button.custom_minimum_size.y = 38
+	ticket.add_child(_submit_button)
 	_feedback = SmaKit.muted("")
 	_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ticket.add_child(_feedback)
@@ -331,6 +371,12 @@ func _build() -> void:
 	refresh()
 
 
+func _go_academy() -> void:
+	var main := get_tree().get_first_node_in_group("main")
+	if main != null and main.has_method("navigate"):
+		main.navigate("academy")
+
+
 func _open_financials() -> void:
 	if game == null or not game.started or game.selected_ticker == "":
 		return
@@ -358,6 +404,8 @@ func _select_defaults() -> void:
 		button.button_pressed = button.text == I18n.t("trade.market")
 	for button in _timeframe_group.get_buttons():
 		button.button_pressed = button.text == "1m"
+	for button in _range_group.get_buttons():
+		button.button_pressed = button.text == "60"
 	if _limit_row != null:
 		_limit_row.visible = false
 	if _stop_row != null:
@@ -372,6 +420,15 @@ func refresh(reason: String = "") -> void:
 		return
 	_set_empty(false)
 	var ticker: String = game.selected_ticker
+	var lock: Dictionary = game.market_lock_info(ticker)
+	var locked := bool(lock.get("locked", false))
+	if _lock_card != null:
+		_lock_card.visible = locked
+		_lock_title.text = I18n.t("trade.lockedTitle")
+		_lock_body.text = I18n.t("trade.lockedBody", {
+			"ticker": ticker,
+			"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
+		})
 	var company: Dictionary = game.exchange.company(ticker)
 	var quote: Dictionary = game.exchange.quote(ticker)
 	var last := float(quote.get("last", 0.0))
@@ -491,6 +548,34 @@ func _update_chart(ticker: String) -> void:
 	var candles: Array = game.exchange.get_candles(ticker, _timeframe)
 	var title := "%s · %s" % [ticker, _timeframe]
 	_chart.set_candles(candles, _timeframe, title)
+	var account: Dictionary = game.exchange.state["account"]
+	var markers: Array = []
+	for trade in account.get("trades", []):
+		if String(trade.get("ticker", "")) == ticker:
+			markers.append(trade)
+	_chart.set_trade_markers(markers)
+	var long_cost := 0.0
+	var short_cost := 0.0
+	var position: Dictionary = account.get("positions", {}).get(ticker, {})
+	if int(position.get("qty", 0)) > 0:
+		long_cost = float(position.get("avgCost", 0.0))
+	var short_position: Dictionary = account.get("shorts", {}).get(ticker, {})
+	if int(short_position.get("qty", 0)) > 0:
+		short_cost = float(short_position.get("avgPrice", 0.0))
+	_chart.set_position_cost(long_cost, short_cost)
+
+
+func _on_range(count: int) -> void:
+	if _chart == null:
+		return
+	_chart.set_visible_count(count)
+	for value in _range_buttons.keys():
+		_range_buttons[value].button_pressed = int(value) == int(count)
+
+
+func _on_chart_range_changed(count: int) -> void:
+	for value in _range_buttons.keys():
+		_range_buttons[value].button_pressed = int(value) == int(count)
 
 
 func _update_indicators(ticker: String, last: float) -> void:

@@ -1,0 +1,160 @@
+{
+  "id": "client_trust",
+  "title": {
+    "zh_CN": "客户的信任",
+    "en": "The Client's Trust"
+  },
+  "start": "meeting",
+  "nodes": {
+    "meeting": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "王先生 · 退休教师",
+        "en": "Mr. Wang · Retired Teacher"
+      },
+      "text": {
+        "zh_CN": "经理，你好……我教了一辈子语文，真的不懂你们大屏幕上那些花花绿绿的指标和模型。这笔钱是我和老伴辛苦攒了一辈子的退休积蓄。学院推荐我找你……我就想知道，市场最坏最坏的时候，我还能剩下多少？",
+        "en": "Manager... hello. I taught literature all my life; I don't understand the charts, Greeks, or models. This is my wife's and my retirement savings. The academy sent me to you... I just need to know: in the worst case, how much would I have left?"
+      },
+      "next": "gu_yan_pitch"
+    },
+    "gu_yan_pitch": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "王老师，何必那么悲观！看看我们策略的回测，年化收益超过 35%！远望交易学院的量化动量系统全行业顶尖，只要大势在，跑赢通胀轻轻松松！放心把规模交给我们，绝不让您吃亏！",
+        "en": "Mr. Wang, why so gloomy? Look at the backtest of our strategy: over 35% annualized! Farview's quantitative momentum engine is industry-best. As long as macro trends hold, beating inflation is child's play! Trust us with full allocation; we'll treat you like royalty!"
+      },
+      "next": "su_he_intervene"
+    },
+    "su_he_intervene": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "顾言，立刻住口。远望的第一条底线是：永不向客户承诺收益。第二条是：绝不隐瞒风险。把别人的积蓄当成自己的赌资，是受托人最不能碰的红线。",
+        "en": "Gu Yan, stop. Farview's first rule: never promise returns. Second: never hide risk. Treating someone's savings as gambling capital is the one line a fiduciary must never cross."
+      },
+      "next": "lin_lan_anchor"
+    },
+    "lin_lan_anchor": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "从给自己下单，到替别人管理资金，这是业余散户和职业掌舵人的真正分界线。王先生问的是一个底线问题。你是远望一期的拟任经理，你给委托人什么承诺？",
+        "en": "Moving from trading your own account to managing other people's money is the real line between an amateur and a professional. Mr. Wang is asking about your bottom line. You're the proposed manager of Farview Fund I. What do you promise your client?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "向客户王先生进行风险沟通与路演承诺：",
+        "en": "Communicate risk boundaries and investor commitment to Mr. Wang:"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "据实说明最坏极端情景（回撤可能达 15%），降低客户预期，坚守诚实底线。",
+            "en": "Disclose worst-case drawdowns honestly (up to 15%); temper expectations and uphold fiduciary duty."
+          },
+          "next": "high_trust_reply",
+          "effects": [
+            {
+              "set_flag": "client_trust",
+              "value": "high"
+            },
+            {
+              "add_fund_client": {
+                "name": "王先生",
+                "principal": 50000
+              }
+            },
+            {
+              "toast": {
+                "zh_CN": "客户沟通：坦白风险底线，赢得王先生深度信任",
+                "en": "Client trust forged: Transparent risk disclosure"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "着重强调过往卓越回报与风控模型，弱化极端风险，以促成最大规模认购。",
+            "en": "Emphasize stellar historical gains and downplay tails to secure maximum AUM subscription."
+          },
+          "next": "low_trust_reply",
+          "effects": [
+            {
+              "set_flag": "client_trust",
+              "value": "low"
+            },
+            {
+              "add_fund_client": {
+                "name": "王先生",
+                "principal": 80000
+              }
+            },
+            {
+              "toast": {
+                "zh_CN": "客户沟通：过度渲染收益，客户对潜在回撤毫无准备",
+                "en": "Client communication: Overpromised return, disguised risk"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "high_trust_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "王先生 · 退休教师",
+        "en": "Mr. Wang · Retired Teacher"
+      },
+      "text": {
+        "zh_CN": "谢谢你……你是第一个愿意看着我的眼睛，跟我讲最坏会亏多少的人。知道最坏只有 15%，我心里就有数了。我信你，请替我们看好这笔钱。",
+        "en": "Thank you. You're the first manager willing to look me in the eye and state how much I could lose. Knowing the bottom line is 15% gives me peace of mind. I trust you. Please guard our nest egg."
+      },
+      "next": "wrap"
+    },
+    "low_trust_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "王先生满怀发财的憧憬签了字。但你记住：当你说出第一句好听的虚饰之词时，一旦风暴降临，你将失去所有退路。",
+        "en": "Mr. Wang signed with dreams of quick wealth. But remember: the first smooth reassurance you give him will leave you no honorable way out when the storm comes."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "去基金管理大厅查看远望一期的净值与客户份额。从今往后，每一个数字跳动，背后都连着一个家庭的期望与尊严。",
+        "en": "Review Farview Fund's NAV and client units on the Fund screen. Henceforth, every single basis point tick carries the livelihood and dignity of real families."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

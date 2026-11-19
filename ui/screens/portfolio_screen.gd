@@ -6,6 +6,8 @@ extends SmaScreen
 const REFRESH_INTERVAL_MS := 350
 
 var _stat_values: Dictionary = {}
+var _risk_values: Dictionary = {}
+var _risk_level_label: Label
 var _long_box: VBoxContainer
 var _short_box: VBoxContainer
 var _fills_box: VBoxContainer
@@ -16,14 +18,19 @@ var _last_rebuild := 0
 func _build() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var root := SmaKit.vbox(12)
+	var root := SmaKit.vbox(0)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
+	var scroll := SmaKit.scroll()
+	root.add_child(scroll)
+	var content := SmaKit.vbox(12)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(content)
 
 	var heading := SmaKit.vbox(2)
 	heading.add_child(SmaKit.title(I18n.t("portfolio.title"), 22))
 	heading.add_child(SmaKit.muted(I18n.t("portfolio.subtitle")))
-	root.add_child(heading)
+	content.add_child(heading)
 
 	var stats_card := SmaKit.card(12)
 	var grid := GridContainer.new()
@@ -40,21 +47,47 @@ func _build() -> void:
 		if key == "margin_status":
 			_status_label = value
 		grid.add_child(box)
-	root.add_child(stats_card)
+	content.add_child(stats_card)
+
+	var risk_card := SmaKit.card(12)
+	var risk_box := SmaKit.vbox(5)
+	risk_card.add_child(risk_box)
+	var risk_head := SmaKit.hbox(8)
+	risk_head.add_child(SmaKit.label(I18n.t("portfolio.riskTitle"), 13))
+	_risk_level_label = SmaKit.caption("")
+	risk_head.add_child(SmaKit.hspacer())
+	risk_head.add_child(_risk_level_label)
+	risk_box.add_child(risk_head)
+	var risk_grid := GridContainer.new()
+	risk_grid.columns = 5
+	risk_grid.add_theme_constant_override("h_separation", 18)
+	risk_grid.add_theme_constant_override("v_separation", 8)
+	for key in ["annualVol", "maxDrawdown", "exposure", "hhi", "largest"]:
+		var box := SmaKit.vbox(1)
+		box.add_child(SmaKit.caption(I18n.t("portfolio.%s" % key)))
+		var value := SmaKit.label("—", 15)
+		box.add_child(value)
+		_risk_values[key] = value
+		risk_grid.add_child(box)
+	risk_box.add_child(risk_grid)
+	var risk_note := SmaKit.muted(I18n.t("portfolio.riskNote"), 10)
+	risk_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	risk_box.add_child(risk_note)
+	content.add_child(risk_card)
 
 	var long_section := _table_section("portfolio.positions", ["market.ticker", "market.company",
 		"common.qty", "portfolio.avg_cost", "market.last", "portfolio.market_value",
 		"portfolio.unrealized"], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], true)
-	root.add_child(long_section["card"])
+	content.add_child(long_section["card"])
 	_long_box = long_section["body"]
 	var short_section := _table_section("portfolio.shorts", ["market.ticker", "market.company",
 		"common.qty", "portfolio.avg_price", "market.last", "portfolio.market_value",
 		"portfolio.unrealized"], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], false)
-	root.add_child(short_section["card"])
+	content.add_child(short_section["card"])
 	_short_box = short_section["body"]
 	var fills_section := _table_section("portfolio.trades", ["common.day", "market.ticker", "common.side",
 		"common.qty", "common.price", "portfolio.realized"], [0.9, 0.8, 0.9, 0.9, 0.9, 1.2], true)
-	root.add_child(fills_section["card"])
+	content.add_child(fills_section["card"])
 	_fills_box = fills_section["body"]
 
 
@@ -86,6 +119,7 @@ func refresh(reason: String = "") -> void:
 		return
 	_last_rebuild = Time.get_ticks_msec()
 	_update_stats()
+	_update_risk()
 	_update_long()
 	_update_short()
 	_update_fills()
@@ -120,6 +154,26 @@ func _update_stats() -> void:
 		_status_label.add_theme_color_override("font_color", SmaUiTheme.WARNING)
 	else:
 		_status_label.add_theme_color_override("font_color", SmaUiTheme.NEGATIVE)
+
+
+func _update_risk() -> void:
+	var risk: Dictionary = game.portfolio_risk()
+	if risk.is_empty():
+		return
+	_risk_values["annualVol"].text = SmaFormat.pct_plain(float(risk["annualVolPct"]), 1) \
+		if bool(risk["hasVolatility"]) else "—"
+	_risk_values["maxDrawdown"].text = SmaFormat.pct_plain(float(risk["maxDrawdownPct"]), 1)
+	_risk_values["exposure"].text = SmaFormat.pct_plain(float(risk["exposurePct"]), 1)
+	_risk_values["hhi"].text = SmaFormat.num(float(risk["hhi"]), 0)
+	_risk_values["largest"].text = SmaFormat.pct_plain(float(risk["largestPct"]), 1)
+	var level := String(risk["riskLevel"])
+	_risk_level_label.text = I18n.t("portfolio.risk_%s" % level)
+	if level == "high":
+		_risk_level_label.add_theme_color_override("font_color", SmaUiTheme.NEGATIVE)
+	elif level == "medium":
+		_risk_level_label.add_theme_color_override("font_color", SmaUiTheme.WARNING)
+	else:
+		_risk_level_label.add_theme_color_override("font_color", SmaUiTheme.POSITIVE)
 
 
 func _day_start_equity() -> float:

@@ -1,0 +1,205 @@
+{
+  "id": "black_friday",
+  "title": {
+    "zh_CN": "黑色星期五",
+    "en": "Black Friday"
+  },
+  "start": "catastrophe",
+  "nodes": {
+    "catastrophe": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "学院压力测试中心",
+        "en": "Academy Stress Test Center"
+      },
+      "text": {
+        "zh_CN": "【年度压力测试】学院用历史危机数据重建了一场系统性崩盘：一家全球大型金融机构突然进入破产清算，隔夜资产折价抛售，流动性骤然枯竭。情景中的远望指数开盘跳空重挫，多只权重标的同步大跌。以下账户与客户反应均为情景推演。",
+        "en": "[ANNUAL STRESS TEST] The academy has rebuilt a systemic crash from historical crisis data: a major global financial institution enters disorderly liquidation, forced selling drains liquidity, and the Farview Index gaps down hard at the open. All account and client reactions below are simulated."
+      },
+      "next": "gu_yan_ruin"
+    },
+    "gu_yan_ruin": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "……没了。全没了。在情景里，我的高倍杠杆组合开盘第一秒就直接穿仓，系统按最差价格自动强平……净值暴跌了 65%……昨天指标还在创新高……怎么会这样？！",
+        "en": "...Gone. It's all gone. In the scenario, my leveraged book blew through maintenance at the opening tick. Automated risk algorithms dumped everything at the worst available price... down 65% in seconds... How? Technicals hit new highs yesterday... how could this happen?!",
+        "portrait": ""
+      },
+      "next": "mr_wang_call"
+    },
+    "mr_wang_call": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "王先生 · 情景客户",
+        "en": "Mr. Wang · Scenario Client"
+      },
+      "text": {
+        "zh_CN": "【情景来电】经理……新闻里全在说金融海啸，很多基金都要关门……我老伴看到数字后一直睡不着……你当初答应过我，最坏的时候会守住……我们的养老钱还能拿出来吗？",
+        "en": "[Scenario call] Manager... the news is calling it a financial crisis. They say funds are shutting down... my wife has been up all night after seeing the numbers. You told me you'd hold the line at the worst... can we still get our retirement savings out?"
+      },
+      "next": "su_he_run"
+    },
+    "su_he_run": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "情景中，全市场发生踩踏式挤兑！远望一期收到的单日赎回申请已经超过总规模的 30%！如果现在按折价抛售资产变现，我们将承受巨额账面折价；但如果不抛售，我们账上的现金根本不够兑付赎回单！",
+        "en": "In the scenario, a panic redemption run hits every account! Farview Fund has received redemption notices exceeding 30% of our total AUM in an hour! If we liquidate at these frozen bids, we crystallize devastating haircuts. But if we don't sell, our cash cannot honor the redemption queue!"
+      },
+      "next": "lin_lan_anchor"
+    },
+    "lin_lan_anchor": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "七年前，我也坐在这个座位上。满屏红色，警报不停，电话里全是客户焦急的声音。压力测试把你放回同样的位置：你手里握着的不是几串代码，是别人很多年的积蓄。告诉我，你守什么？",
+        "en": "Seven years ago, I sat in that same chair. Red screens, alarms, anxious clients on every line. The stress test puts you in the same seat: what you're holding isn't a few lines of code; it's years of other people's savings. Tell me: what do you protect?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "面对流动性危机与客户挤兑风暴的生死抉择：",
+        "en": "Existential decision amid market crash and client redemption run:"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "【优先兑付】不惜代价变现流动性，全额承兑王先生与客户的赎回，认亏保客户。",
+            "en": "[Protect Clients] Liquidate assets unconditionally; honor Mr. Wang's redemptions in full to preserve client trust."
+          },
+          "next": "protect_reply",
+          "effects": [
+            {
+              "set_flag": "crisis_choice",
+              "value": "protect"
+            },
+            {
+              "toast": {
+                "zh_CN": "抉择：优先全额兑付客户，守住受托底线",
+                "en": "Crisis decision: Fiduciary duty upheld, redemptions honored"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "【满仓反击】拒绝在低位割肉，动用全部备用金在恐慌里满仓抄底博弈 V 型反转。",
+            "en": "[Attack Reversal] Refuse to sell the bottom; deploy all reserve capital in the panic to gamble on a V-shaped snapback."
+          },
+          "next": "attack_reply",
+          "effects": [
+            {
+              "set_flag": "crisis_choice",
+              "value": "attack"
+            },
+            {
+              "toast": {
+                "zh_CN": "抉择：满仓抄底逆势豪赌，将风险推向极致",
+                "en": "Crisis decision: All-in counter-cyclical gamble"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "【暂停赎回】启动紧急防守门槛（Gate），冻结客户赎回，等待流动性与理智恢复。",
+            "en": "[Gate Fund] Trigger emergency redemption gates; freeze withdrawals until market liquidity normalizes."
+          },
+          "next": "gate_reply",
+          "effects": [
+            {
+              "set_flag": "crisis_choice",
+              "value": "gate"
+            },
+            {
+              "toast": {
+                "zh_CN": "抉择：启动门槛条款，暂停客户资金赎回",
+                "en": "Crisis decision: Activated emergency redemption gate"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "protect_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "王先生 · 退休教师",
+        "en": "Mr. Wang · Retired Teacher"
+      },
+      "text": {
+        "zh_CN": "【电话那头声音发哑】谢谢你，经理……虽然亏了一点，但我和老伴的养老钱保住了……你是个讲良心、守信用的人……",
+        "en": "[Voice hoarse] Thank you, Manager... We took a small loss, but our retirement savings survived... You're an honest man who kept his word...",
+        "portrait": ""
+      },
+      "next": "protect_lin"
+    },
+    "protect_lin": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "林岚轻轻点头：“你做到了我七年前没能做到的事。市场可以拿走一时的收益，但只要守住对客户的底线，你就还有资格继续做下去。”",
+        "en": "Lin Lan nods slowly. 'You did what I couldn't do seven years ago. The market can take a year's gains, but if you keep faith with clients, you earn the right to keep going.'"
+      },
+      "next": "wrap"
+    },
+    "attack_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "苏禾面无表情地合上了文件夹：“你在拿普通客户的养老钱，为你的赌性买单。就算这笔暴跌反弹让你侥幸翻倍，作为受托人，你也已经输了。”",
+        "en": "Su He snaps her binder shut with ice-cold detachment: 'You are gambling ordinary families' retirement savings on your appetite for risk. Even if a snapback doubles your capital, you have already failed as a fiduciary.'"
+      },
+      "next": "wrap"
+    },
+    "gate_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "电话那头沉默了很久。苏禾在报告上盖下红章：“法律允许门槛条款（Gate Clause），但客户信任一旦破裂，就很难再修补。”",
+        "en": "The line goes silent. Su He stamps the report: 'The charter allows a gate clause, but trust, once broken, is hard to repair.'"
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "压力测试结束了。这一天的每一个决定，都会留在你的风控档案里。准备好你的投资组合与风控日志，最高答辩礼堂在等着你。",
+        "en": "The stress test is over. Every decision you made today stays in your risk file. Prepare your trade blotter and risk audit. The grand defense chamber awaits."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

@@ -1070,7 +1070,8 @@ func _close_session(rng: SmaRng) -> void:
 	state["dayIndex"] = int(state["dayIndex"]) + 1
 	state["second"] = 0
 	state["corporateEvents"] = SmaCorporate.apply_session_open(state)
-	state["newsToday"] = SmaNews.maybe_emit(state, rng)
+	state["newsToday"] = SmaEarnings.maybe_emit(state, int(state["dayIndex"])) \
+		+ SmaNews.maybe_emit(state, rng)
 	_pay_dividends()
 	SmaEtfs.mark(state["companies"])
 	state["optionSettlements"] = []

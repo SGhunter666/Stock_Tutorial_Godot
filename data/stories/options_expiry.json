@@ -1,0 +1,136 @@
+{
+  "id": "options_expiry",
+  "title": {
+    "zh_CN": "期权到期日",
+    "en": "Option Expiration Day"
+  },
+  "start": "countdown",
+  "nodes": {
+    "countdown": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "老陈 · 做市商前辈",
+        "en": "Lao Chen · Market Maker Veteran"
+      },
+      "text": {
+        "zh_CN": "离收盘最后半小时，到期倒计时开始喽。看着盘口上那几个虚值期权合约跳动没有？买方每天都在流血损失 Theta 时间价值，做市商最喜欢你们这种热衷买彩票的愣头青。",
+        "en": "Thirty minutes until expiry bell. See those deep out-of-the-money strikes flickering on the book? Long buyers bleed Theta decay every tick. Market makers love rookies treating options like lottery tickets."
+      },
+      "next": "gu_yan_lottery"
+    },
+    "gu_yan_lottery": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "彩票？只要标的在收盘前拉升 1.5%，我手里这批 0.05 美元的虚值 Call 就会暴涨到 1.50，整整三十倍的赔率！用微不足道的权利金博取三十倍收益，这是小资金弯道超车的唯一科学路径！",
+        "en": "Lottery? If underlying ticks up 1.5% before the bell, my 5-cent OTM calls explode to 1.50 — a thirty-bagger payoff! Risking pennies of premium to hunt asymmetric multi-baggers is the only math-backed shortcut for retail capital!"
+      },
+      "next": "lin_lan_truth"
+    },
+    "lin_lan_truth": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "期权不是彩票，它把风险、时间和波动率拆成不同的维度。机构投资者很少只赌方向，他们持有现货，卖出备兑看涨期权（Covered Call），像房东收租一样把时间价值变成现金流。你的期权思路是什么？",
+        "en": "Options aren't lottery tickets; they separate risk, time, and volatility into different dimensions. Institutions rarely bet on direction alone. They hold the stock, sell covered calls, and turn time value into cash flow like a landlord collecting rent. What's your approach?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "关于期权交易的主导逻辑：",
+        "en": "Select your overarching options trading doctrine:"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "构建 Covered Call 备兑策略，出让极端涨幅，换取稳定租金收益。",
+            "en": "Deploy Covered Call strategies: cap extreme upside to collect consistent premium income."
+          },
+          "next": "covered_reply",
+          "effects": [
+            {
+              "set_flag": "option_style",
+              "value": "covered"
+            },
+            {
+              "toast": {
+                "zh_CN": "策略偏好确立：备兑收租（Covered Call）",
+                "en": "Strategy established: Covered Call Income"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "买入方向性虚值期权，严格控制下注规模，以小博大抓极端行情。",
+            "en": "Purchase directional OTM options; size small to capture explosive convex moves."
+          },
+          "next": "speculate_reply",
+          "effects": [
+            {
+              "set_flag": "option_style",
+              "value": "speculate"
+            },
+            {
+              "toast": {
+                "zh_CN": "策略偏好确立：方向性杠杆投机",
+                "en": "Strategy established: Convex Speculation"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "covered_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "这是很成熟的机构视角。你开始让概率站在自己这一边，克制对暴利的幻想，用结构化现金流平滑净值。你已经迈过了业余交易员最难的一道门槛。",
+        "en": "That's a mature institutional view. You're putting probability on your side, giving up the fantasy of quick fortunes, and using structured cash flow to smooth the ride. You've crossed the hardest line for an amateur trader."
+      },
+      "next": "wrap"
+    },
+    "speculate_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "老陈 · 做市商前辈",
+        "en": "Lao Chen · Market Maker Veteran"
+      },
+      "text": {
+        "zh_CN": "嘿，愿赌服输就行！但牢牢记住：当期权到期归零的那一秒钟，它连一张废纸都不会给你剩下。拿它当主食的人，最后连骨头渣子都不剩。",
+        "en": "Heh, just remember to accept what the tape serves! But engrave this: the second an option expires worthless, it doesn't even leave you toilet paper. Feast on lottery tickets, and you end up starving."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "打开期权链与 Greeks 指标面板。无论你做买方还是卖方，永远清楚自己在交易什么——是方向、是波动率、还是时间。",
+        "en": "Open the option chain and monitor Greeks. Whether long or short, know precisely what asset you are pricing: direction, implied volatility, or pure time."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

@@ -29,6 +29,8 @@ func refresh(_reason: String = "") -> void:
 	_render_header()
 	_render_language()
 	_render_simulation()
+	_render_audio()
+	_render_shortcuts()
 	_render_display()
 	_render_data()
 	_render_scope()
@@ -115,6 +117,58 @@ func _render_simulation() -> void:
 		game.settings["reducedMotion"] = value
 		game.save_game(false))
 	box.add_child(motion)
+	box.add_child(SmaKit.muted(I18n.t("settings.reducedMotionHint"), 10))
+	_body.add_child(card)
+
+
+func _render_audio() -> void:
+	var card := SmaKit.card(12)
+	var box := SmaKit.vbox(6)
+	card.add_child(box)
+	box.add_child(SmaKit.label(I18n.t("settings.audioTitle"), 14))
+	box.add_child(SmaKit.muted(I18n.t("settings.audioSubtitle"), 11))
+	for spec in [["masterVolume", "settings.masterVolume"],
+			["musicVolume", "settings.musicVolume"],
+			["sfxVolume", "settings.sfxVolume"]]:
+		var key := String(spec[0])
+		var row := SmaKit.hbox(8)
+		row.add_child(SmaKit.label(I18n.t(String(spec[1])), 11))
+		var slider := HSlider.new()
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.05
+		slider.value = float(game.settings.get(key, 0.8))
+		slider.custom_minimum_size.x = 240
+		var value_label := SmaKit.muted("%d%%" % int(round(slider.value * 100.0)), 10)
+		slider.value_changed.connect(func(value):
+			value_label.text = "%d%%" % int(round(value * 100.0))
+			game.set_audio_volume(key, value, false))
+		slider.drag_ended.connect(func(_changed): game.save_game(false))
+		row.add_child(slider)
+		row.add_child(value_label)
+		box.add_child(row)
+	var mute := CheckBox.new()
+	mute.text = I18n.t("settings.muted")
+	mute.button_pressed = bool(game.settings.get("muted", false))
+	mute.toggled.connect(func(value): game.set_muted(value))
+	box.add_child(mute)
+	box.add_child(SmaKit.muted(I18n.t("settings.audioHint"), 10))
+	_body.add_child(card)
+
+
+func _render_shortcuts() -> void:
+	var card := SmaKit.card(12)
+	var box := SmaKit.vbox(4)
+	card.add_child(box)
+	var head := SmaKit.hbox(8)
+	head.add_child(SmaKit.label(I18n.t("shortcuts.title"), 14))
+	head.add_child(SmaKit.hspacer())
+	head.add_child(SmaKit.caption(I18n.t("shortcuts.openHint")))
+	box.add_child(head)
+	for key in ["shortcuts.pause", "shortcuts.day", "shortcuts.minute",
+			"shortcuts.speed", "shortcuts.save", "shortcuts.help"]:
+		box.add_child(SmaKit.muted("• " + I18n.t(key), 11))
+	box.add_child(SmaKit.muted(I18n.t("shortcuts.hint"), 10))
 	_body.add_child(card)
 
 
@@ -151,6 +205,34 @@ func _render_display() -> void:
 		game.set_window_preset(String(preset_select.get_item_metadata(index))))
 	preset_row.add_child(preset_select)
 	box.add_child(preset_row)
+	var scale_row := SmaKit.hbox(6)
+	scale_row.add_child(SmaKit.label(I18n.t("settings.uiScale"), 11))
+	var scale_select := OptionButton.new()
+	for value in SmaDisplay.UI_SCALES:
+		scale_select.add_item(I18n.t("settings.uiScaleAuto") if value == "auto"
+			else "%d%%" % int(round(float(value) * 100.0)))
+		scale_select.set_item_metadata(scale_select.item_count - 1, value)
+		if String(game.settings.get("uiScale", "auto")) == value:
+			scale_select.select(scale_select.item_count - 1)
+	scale_select.custom_minimum_size.x = 150
+	scale_select.item_selected.connect(func(index):
+		game.set_ui_scale(String(scale_select.get_item_metadata(index))))
+	scale_row.add_child(scale_select)
+	box.add_child(scale_row)
+	var snapshot := SmaDisplay.display_snapshot()
+	var current := SmaKit.muted(I18n.t("settings.displayCurrent", {
+		"window": "%d×%d" % [int(snapshot["window"].x), int(snapshot["window"].y)],
+		"screen": "%d×%d" % [int(snapshot["usable"].x), int(snapshot["usable"].y)],
+		"auto": "%d×%d" % [int(snapshot["auto"].x), int(snapshot["auto"].y)],
+	}), 10)
+	current.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(current)
+	var applied := SmaDisplay.resolve_ui_scale(
+		String(game.settings.get("uiScale", "auto")), snapshot["window"])
+	box.add_child(SmaKit.muted(I18n.t("settings.uiScaleApplied", {
+		"scale": "%d%%" % int(round(applied * 100.0)),
+	}), 10))
+	box.add_child(SmaKit.muted(I18n.t("settings.uiScaleNote"), 10))
 	box.add_child(SmaKit.muted(I18n.t("settings.displayNote"), 10))
 	_body.add_child(card)
 

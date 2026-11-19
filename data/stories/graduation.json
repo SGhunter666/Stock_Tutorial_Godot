@@ -1,0 +1,194 @@
+{
+  "id": "graduation",
+  "title": {
+    "zh_CN": "毕业答辩",
+    "en": "The Grand Defense"
+  },
+  "start": "hall",
+  "nodes": {
+    "hall": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "答辩大厅很安静。大屏幕上正回放着你从第一天入职远望、第一次下单、第一笔股息、经历利率冲击、做空与杠杆，直至黑色星期五压力测试的全部交割单与净值曲线。",
+        "en": "The grand defense amphitheater stands quiet. The projector scrolls through your entire trade journal from day one: first order, first dividend, rate shocks, shorting, margin calls, through the Black Friday stress test."
+      },
+      "next": "lin_lan_truth"
+    },
+    "lin_lan_truth": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "七年来，学院里一直有传言，说我当年看错宏观周期，才导致旧基金清盘。今天我可以把真相说出来：那一年我没有看错趋势。在清盘前的最后一分钟，我知道只要再扛三天，市场反弹就能让我翻身。",
+        "en": "For seven years, the academy has whispered that I misread the macro cycle and caused the old fund's liquidation. Today I can tell you the truth: I did not misread the trend. In the final minute before liquidation, I knew that three more days of holding could have saved me."
+      },
+      "next": "lin_lan_choice"
+    },
+    "lin_lan_choice": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "但我面对的是数百个普通家庭。如果我赌输了，他们的生活会被彻底打乱。在最后一刻，我签下了清盘清算单，把每一分能找回的现金还给了他们。那年我不是输给市场，我是输给了‘不肯认错’的执念。但至少，我保住了受托人的良知。",
+        "en": "But I was responsible for hundreds of ordinary families. If I lost the bet, their lives would be upended. In that last minute, I signed the liquidation order and returned every dollar I could. I didn't lose to the market; I lost to a stubborn refusal to admit I was wrong. But I kept my conscience as a fiduciary."
+      },
+      "next": "gu_yan_head"
+    },
+    "gu_yan_head": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 同届学员",
+        "en": "Gu Yan · Fellow Trainee"
+      },
+      "text": {
+        "zh_CN": "台下的顾言神情疲惫，锋芒收敛了许多。他默默看着你，微微点头。他在这场危机里摔了一跤，也第一次学会了敬畏。",
+        "en": "Gu Yan looks tired, his sharp edges worn down. He meets your eyes and nods. The crisis cost him dearly, but it taught him respect."
+      },
+      "next": "lin_lan_verdict"
+    },
+    "lin_lan_verdict": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "你已经完成了全部 32 个单元的学业考验，也经历了一轮完整的市场周期。你向学院证明：活下来，比赚得快更重要。远望学院全体导师准予你最高荣誉毕业。告诉我，你的掌舵之路通向何方？",
+        "en": "You have completed all 32 units and lived through a complete market cycle. You proved Farview's core creed: surviving long outranks sprinting fast. The board awards you graduation with highest honors. Where do you steer next?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "确立未来的职业掌舵方向：",
+        "en": "Select your ultimate career destiny:"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "【稳健掌舵人】继续执掌远望一期，以受托人底线为信仰，做常青基金经理。",
+            "en": "[Steadfast Helmsman] Continue piloting Farview Fund; make fiduciary integrity your religion as an enduring portfolio manager."
+          },
+          "condition": {
+            "fund_active": true
+          },
+          "next": "manager_reply",
+          "effects": [
+            {
+              "set_flag": "ending_path",
+              "value": "manager"
+            },
+            {
+              "toast": {
+                "zh_CN": "毕业去向：成为远望一期正式掌舵人",
+                "en": "Career destiny: Lead Portfolio Manager of Farview Fund"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "【学院导师】留在远望交易学院任教，把对市场的敬畏与风险纪律传承给后人。",
+            "en": "[Academy Mentor] Join the academy faculty; pass down market humility and rigorous risk discipline to future apprentices."
+          },
+          "next": "mentor_reply",
+          "effects": [
+            {
+              "set_flag": "ending_path",
+              "value": "mentor"
+            },
+            {
+              "toast": {
+                "zh_CN": "毕业去向：接任远望交易学院导师",
+                "en": "Career destiny: Farview Academy Mentor"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "【独行游侠】创办激进对冲团队，在更广阔的高风险深海探索极致策略边界。",
+            "en": "[Independent Maverick] Launch an agile hedge fund; pioneer high-conviction frontiers across deep waters."
+          },
+          "next": "star_reply",
+          "effects": [
+            {
+              "set_flag": "ending_path",
+              "value": "star"
+            },
+            {
+              "toast": {
+                "zh_CN": "毕业去向：扬帆深海，成立独立对冲基金",
+                "en": "Career destiny: Independent Hedge Fund Founder"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "manager_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "王先生 · 退休教师",
+        "en": "Mr. Wang · Retired Teacher"
+      },
+      "text": {
+        "zh_CN": "王先生在台下带头起立鼓掌。林岚走上前，郑重地将一枚刻着远望罗盘的掌舵人印章交到你的手中：“从今天起，远望一期的这艘大船，交给你了。”",
+        "en": "Mr. Wang rises to lead a standing ovation. Lin Lan steps forward and presents the brass Farview compass seal into your hands: 'From this day onward, Farview's flagship belongs to you.'"
+      },
+      "next": "wrap"
+    },
+    "mentor_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "周衡教授抚掌微笑：“教人避开深渊，往往比自己跨越深渊功德无量。远望的讲台，从此多了一位真正懂得市场的引路人。”",
+        "en": "Professor Zhou smiles warmly: 'Guiding others away from the abyss is an honor far surpassing leaping it alone. Farview's lecture hall welcomes a navigator who truly understands the sea.'"
+      },
+      "next": "wrap"
+    },
+    "star_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 同届学员",
+        "en": "Gu Yan · Fellow Trainee"
+      },
+      "text": {
+        "zh_CN": "顾言在台下站起身，眼神中重新燃起锐利的光芒：“我等你。在深水区里，也许你真能走出一条既有进攻性、又能活着回来的新路。”",
+        "en": "Gu Yan stands, a renewed and sober sharpness igniting his eyes: 'I'll see you in the deep. Perhaps you will forge a path that attacks fiercely yet returns alive.'"
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "答辩委员会一致通过。祝贺你，交易员，愿你在任何狂风巨浪面前，心中永远有一张清醒的航海图。",
+        "en": "The committee affirms with unanimous consent. Congratulations, trader. Through every hurricane yet to come, may your internal chart remain clean and unwavering."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

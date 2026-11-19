@@ -28,6 +28,7 @@ const SUITES := [
 	"res://tests/test_replay.gd",
 	"res://tests/test_theme.gd",
 	"res://tests/test_market_intel.gd",
+	"res://tests/test_earnings.gd",
 	"res://tests/test_history.gd",
 	"res://tests/test_indicators.gd",
 	"res://tests/test_industry.gd",

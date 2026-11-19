@@ -1,0 +1,157 @@
+{
+  "id": "epilogue",
+  "title": { "zh_CN": "尾声：远望之海", "en": "Epilogue: The Sea of Farview" },
+  "start": "summary",
+  "nodes": {
+    "summary": {
+      "type": "line",
+      "speaker": { "zh_CN": "远望档案室", "en": "Farview Archives" },
+      "text": {
+        "zh_CN": "学年的喧嚣渐渐散去，交易大厅熄灭了聚光灯。档案室将你在远望学院的全部轨迹归档。这里没有完美的预测，只有你愿意承担的代价与信念。",
+        "en": "The academic year's clamor fades; spotlights dim across the trading floor. The archives record your complete trajectory at Farview. There are no perfect forecasts here — only the costs you chose to bear and the principles you kept."
+      },
+      "next": "style_note"
+    },
+    "style_note": {
+      "type": "line",
+      "speaker": { "zh_CN": "远望档案室", "en": "Farview Archives" },
+      "text": {
+        "zh_CN": "档案里没有完美的预测，只有你愿意承担的代价与信念。",
+        "en": "There are no perfect forecasts here — only the costs you chose to bear and the principles you kept."
+      },
+      "text_by_flag": [
+        { "condition": { "flag": "ethics", "value": "report" }, "text": { "zh_CN": "档案里留着一份没有署名的风险预警。你当时选择绕开陷阱，而不是证明自己是对的。", "en": "The file holds an unsigned risk warning. You chose to walk around the trap instead of proving yourself right." } },
+        { "condition": { "flag": "leverage", "value": "reduce" }, "text": { "zh_CN": "保证金警报响起的那晚，你选择先减仓。你放弃了一部分反弹，也拿回了主动权。", "en": "The night the margin alarm rang, you cut exposure first. You gave up part of the rebound and took back control." } },
+        { "condition": { "flag": "risk_response", "value": "cut" }, "text": { "zh_CN": "利率冲击来临时，你先把仓位换成现金。那份克制后来救了你一次。", "en": "When rates shocked the market, you moved to cash first. That restraint saved you once." } },
+        { "condition": { "flag": "hedge", "value": "full" }, "text": { "zh_CN": "危机前夜，你为组合买好了保险。它拖慢了净值，也让你在最坏的时刻还有选择。", "en": "On the eve of the crisis, you insured the portfolio. It slowed the NAV and kept your options open at the worst moment." } },
+        { "condition": { "flag": "option_style", "value": "covered" }, "text": { "zh_CN": "你更喜欢收租，而不是买彩票。备兑期权让时间站在你这边。", "en": "You preferred collecting rent to buying lottery tickets. Covered calls put time on your side." } },
+        { "condition": { "flag": "diversify", "value": "etf" }, "text": { "zh_CN": "你把 ETF 放进底仓。它没有让你一夜暴富，但让你在单票暴雷时还能睡着。", "en": "You put ETFs in the core. They didn't make you rich overnight, but they let you sleep when a single stock blew up." } },
+        { "condition": { "flag": "income_style", "value": "reinvest" }, "text": { "zh_CN": "你没有花掉那笔股息，而是让它继续滚动。复利的故事通常很安静。", "en": "You didn't spend the dividend; you let it compound. Compounding is usually a quiet story." } },
+        { "condition": { "flag": "research", "value": "valuation" }, "text": { "zh_CN": "你写下的第一份研报从现金流开始。你更愿意相信数字，而不是故事。", "en": "Your first report started with cash flow. You preferred numbers to narratives." } },
+        { "condition": { "flag": "mission_day1", "value": "accepted" }, "text": { "zh_CN": "第一天收盘时，你真的去核对了权益和现金。纪律从那一天开始。", "en": "At the first close, you actually checked equity and cash. Discipline started that day." } },
+        { "condition": { "flag": "discipline", "value": true }, "text": { "zh_CN": "你把每一笔交易的理由写进了日志。市场没有因此变简单，但你不再靠记忆交易。", "en": "You wrote down why you made every trade. The market didn't get easier, but you stopped trading from memory." } },
+        { "condition": { "flag": "path", "value": "momentum" }, "text": { "zh_CN": "你从价格和成交量开始。你学会的不是预测趋势，而是在趋势失效时及时退出。", "en": "You started with price and volume. What you learned wasn't to predict trends, but to leave when a trend breaks." } },
+        { "condition": { "flag": "path", "value": "value" }, "text": { "zh_CN": "你从财报和估值开始。这个选择没有让你跑得最快，但让你走得更远。", "en": "You started with filings and valuation. It didn't make you the fastest, but it took you further." } }
+      ],
+      "next": "verdict_gate"
+    },
+    "verdict_gate": {
+      "type": "choice",
+      "speaker": { "zh_CN": "远望档案室", "en": "Farview Archives" },
+      "text": {
+        "zh_CN": "请检阅你在远望留下的终局航行图：",
+        "en": "Review your final navigational chart at Farview:"
+      },
+      "choices": [
+        {
+          "text": { "zh_CN": "【稳健掌舵人】检阅长青基金执掌档案", "en": "[Steadfast Helmsman] Open Evergreen Flagship File" },
+          "condition": {
+            "any": [
+              { "flag": "ending_path", "value": "manager" },
+              {
+                "all": [
+                  { "flag": "client_trust", "value": "high" },
+                  { "flag": "crisis_choice", "value": "protect" }
+                ]
+              }
+            ]
+          },
+          "next": "ending_manager"
+        },
+        {
+          "text": { "zh_CN": "【学院导师】检阅交易学院教职档案", "en": "[Academy Mentor] Open Academy Faculty File" },
+          "condition": { "flag": "ending_path", "value": "mentor" },
+          "next": "ending_mentor"
+        },
+        {
+          "text": { "zh_CN": "【独立交易员】检阅个人交易档案", "en": "[Independent Trader] Open Personal Trading File" },
+          "condition": { "flag": "ending_path", "value": "independent" },
+          "next": "ending_independent"
+        },
+        {
+          "text": { "zh_CN": "【暂停赎回】检阅危机处置档案", "en": "[Redemption Gate] Open Crisis Response File" },
+          "condition": { "flag": "crisis_choice", "value": "gate" },
+          "next": "ending_gate"
+        },
+        {
+          "text": { "zh_CN": "【明星交易员】检阅对冲基金独行档案", "en": "[Star Trader] Open Hedge Fund Maverick File" },
+          "condition": {
+            "any": [
+              { "flag": "crisis_choice", "value": "attack" },
+              { "flag": "ending_path", "value": "star" }
+            ]
+          },
+          "next": "ending_star"
+        },
+        {
+          "text": { "zh_CN": "【风险复盘】检阅交易与风控档案", "en": "[Risk Review] Open Trading & Risk File" },
+          "next": "ending_debrief"
+        }
+      ]
+    },
+    "ending_manager": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 终身合伙人", "en": "Lin Lan · Senior Partner" },
+      "text": {
+        "zh_CN": "五年过去，远望一期已成长为市场上最具声誉的常青价值基金之一。每年中秋，王先生都会寄来一盒自家阳台晒的桂花茶。林岚已退居幕后，将全院席位交托给你。市场风浪依旧，但只要你在舵盘前，所有人都睡得踏实。",
+        "en": "Five years pass. Farview Fund matures into one of the most respected evergreen flagships in the industry. Every autumn, Mr. Wang sends a tin of sweet osmanthus tea from his garden. Lin Lan has stepped back to senior counsel. The seas churn ceaselessly, but with you at the helm, everyone sleeps soundly."
+      },
+      "next": "final_creed"
+    },
+    "ending_mentor": {
+      "type": "line",
+      "speaker": { "zh_CN": "周衡 · 荣休教授", "en": "Zhou Heng · Professor Emeritus" },
+      "text": {
+        "zh_CN": "交易大厅的晨光洒在整洁的讲台上。林岚正式卸任，你站在了当年她带你走过的大厅中央，迎接着新一届满怀暴富梦想的年轻学徒。你微笑着递给他们第一张图表：“欢迎来到远望交易学院。今天第一课，我们先学怎么活下来。”",
+        "en": "Morning sunlight streams across the lecture podium. Lin Lan steps down with honors. You stand at the very center of the hall where she first met you, greeting a fresh cohort of dream-filled rookies. You smile and hand them their first chart: 'Welcome to Farview. Lesson one: how to stay alive.'"
+      },
+      "next": "final_creed"
+    },
+    "ending_star": {
+      "type": "line",
+      "speaker": { "zh_CN": "顾言 · 合伙人", "en": "Gu Yan · Partner" },
+      "text": {
+        "zh_CN": "你的名字高居年度对冲基金收益榜首，资金像潮水一样涌入。顾言成了你的执行搭档，你们在更复杂的衍生品市场里寻找机会。只是每当深夜警报响起，你始终记着老陈那句话：“盘口不会骗你，但会试探你。”",
+        "en": "Your name headlines global hedge fund return league tables; capital pours in like a tide. Gu Yan operates as your execution wing, hunting opportunities across complex derivative markets. Yet whenever the midnight alarms ring, you still hear Lao Chen's line: 'The book never lies, but it will test you.'"
+      },
+      "next": "final_creed"
+    },
+    "ending_gate": {
+      "type": "line",
+      "speaker": { "zh_CN": "苏禾 · 风控合规官", "en": "Su He · Risk & Compliance Officer" },
+      "text": {
+        "zh_CN": "门槛条款生效的那一周，赎回电话几乎打爆了办公室。你保住了基金的流动性，也失去了一部分客户的信任。三个月后市场恢复，留下来的客户拿回了本金和一部分收益；而你的名字在行业里多了一个注脚：守住了船，也得罪了人。",
+        "en": "In the week the gate held, redemption calls nearly overwhelmed the office. You saved the fund's liquidity and lost part of your clients' trust. Three months later the market recovered. Clients who stayed recovered principal and some gains, but your name carried a footnote in the industry: you saved the ship and made enemies doing it."
+      },
+      "next": "final_creed"
+    },
+    "ending_independent": {
+      "type": "line",
+      "speaker": { "zh_CN": "顾言 · 同届学员", "en": "Gu Yan · Fellow Trainee" },
+      "text": {
+        "zh_CN": "你没有基金，也没有客户，只有自己的账户和一套已经验证过的规则。几年后，你的交易记录被整理成一份安静的样本：不惊艳，但每年都在。顾言偶尔还会来找你复盘，他不再问收益率，只问你最近有没有违反自己的规则。",
+        "en": "No fund, no clients — just your own account and a set of rules you have tested. Years later, your trade log reads like a quiet sample: unspectacular, but consistent every year. Gu Yan still drops by to review trades. He no longer asks about returns; he asks whether you broke your own rules."
+      },
+      "next": "final_creed"
+    },
+    "ending_debrief": {
+      "type": "line",
+      "speaker": { "zh_CN": "苏禾 · 风控合规官", "en": "Su He · Risk & Compliance Officer" },
+      "text": {
+        "zh_CN": "办公室的灯光熄灭了。空荡荡的房间里只有一台电脑的微光，上面复盘着每一次侥幸、每一次过度杠杆与每一次侥幸。苏禾给你倒了一杯温水：“这份档案不是判决书。只要你还愿意复盘，学费就没白交。”你在日志本上写下最后一句话：“市场永远是对的。”",
+        "en": "Office lights are switched off. In the quiet room, a single monitor glows with a post-mortem of every close call, every overleveraged tick, every rationalization. Su He hands you a warm glass of water: 'This file is not a verdict. As long as you are willing to review it, the tuition wasn't wasted.' You pen the final log entry: 'The market is always right.'"
+      },
+      "next": "final_creed"
+    },
+    "final_creed": {
+      "type": "line",
+      "speaker": { "zh_CN": "远望交易学院", "en": "Farview Trading Academy" },
+      "text": {
+        "zh_CN": "【远望校训】交易的第一课不是赚钱，而是承认自己会错。风险控制不是懦弱，而是让下一笔交易还有机会发生。感谢完成《远望：从学徒到掌舵人》。",
+        "en": "[Farview Creed] The first lesson in trading is not winning, but admitting when you are wrong. Risk discipline is not cowardice; it ensures the next trade can happen. Thank you for completing Farview: From Apprentice to Helmsman."
+      },
+      "next": "end"
+    },
+    "end": { "type": "end" }
+  }
+}

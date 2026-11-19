@@ -60,6 +60,75 @@ static func timeline(account: Dictionary, limit: int = 12) -> Array:
 	return rows.slice(0, maxi(1, limit))
 
 
+## Portfolio risk read model: annualized daily volatility, peak-to-trough
+## drawdown, gross exposure and a Herfindahl concentration index.
+static func portfolio_risk(account: Dictionary, equity_value: float,
+		long_rows: Array, short_rows: Array) -> Dictionary:
+	var history: Array = account.get("equityHistory", [])
+	var returns: Array[float] = []
+	var previous := 0.0
+	var has_previous := false
+	for point in history:
+		var value := float(point.get("equity", 0.0))
+		if has_previous and previous > 0.0 and value > 0.0:
+			returns.append(value / previous - 1.0)
+		previous = value
+		has_previous = true
+	var annual_vol := 0.0
+	if returns.size() >= 2:
+		var mean := 0.0
+		for value in returns:
+			mean += value
+		mean /= float(returns.size())
+		var variance := 0.0
+		for value in returns:
+			variance += pow(value - mean, 2.0)
+		variance /= float(returns.size() - 1)
+		annual_vol = sqrt(variance) * sqrt(252.0) * 100.0
+	var peak := -INF
+	var max_drawdown := 0.0
+	for point in history:
+		var value := float(point.get("equity", 0.0))
+		peak = maxf(peak, value)
+		if peak > 0.0:
+			max_drawdown = maxf(max_drawdown, (peak - value) / peak * 100.0)
+	peak = maxf(peak, equity_value)
+	if peak > 0.0:
+		max_drawdown = maxf(max_drawdown, (peak - equity_value) / peak * 100.0)
+	var gross := 0.0
+	var weights: Array[float] = []
+	for row in long_rows:
+		var market_value := absf(float(row.get("marketValue", 0.0)))
+		gross += market_value
+		if equity_value > 0.0:
+			weights.append(market_value / equity_value)
+	for row in short_rows:
+		var market_value := absf(float(row.get("marketValue", 0.0)))
+		gross += market_value
+		if equity_value > 0.0:
+			weights.append(market_value / equity_value)
+	var exposure := gross / equity_value * 100.0 if equity_value > 0.0 else 0.0
+	var hhi := 0.0
+	var largest := 0.0
+	for weight in weights:
+		hhi += weight * weight * 10000.0
+		largest = maxf(largest, weight * 100.0)
+	var risk_level := "low"
+	if annual_vol >= 35.0 or max_drawdown >= 20.0:
+		risk_level = "high"
+	elif annual_vol >= 18.0 or max_drawdown >= 10.0:
+		risk_level = "medium"
+	return {
+		"hasVolatility": returns.size() >= 2,
+		"annualVolPct": annual_vol,
+		"maxDrawdownPct": max_drawdown,
+		"exposurePct": exposure,
+		"hhi": hhi,
+		"largestPct": largest,
+		"riskLevel": risk_level,
+	}
+
+
 static func summary(account: Dictionary, equity_value: float, day: int) -> Dictionary:
 	var closed: Array = []
 	for trade in account.get("trades", []):

@@ -24,6 +24,51 @@ const TOOL_RULES := {
 	"trade.futures": {"unitId": "u29", "sectionId": "s1"},
 }
 
+## Progressive market access. Core sectors are available from the first day;
+## later sectors open with the units that teach their risks.
+const SECTOR_UNLOCK := {
+	"technology": "", "communication": "", "consumer": "", "financials": "",
+	"healthcare": "u4", "industrials": "u4",
+	"energy": "u7", "materials": "u7",
+	"realestate": "u13", "utilities": "u13", "telecom": "u13",
+}
+const ETF_UNLOCK_UNIT := "u7"
+
+## Single source of truth for the achievement gallery. Categories are only a
+## display hint; evaluation lives in evaluate_achievements().
+const ACHIEVEMENTS := [
+	{"id": "observer", "category": "learning"},
+	{"id": "firstPractice", "category": "learning"},
+	{"id": "academyInitiate", "category": "learning"},
+	{"id": "quizAce", "category": "learning"},
+	{"id": "bilingual", "category": "learning"},
+	{"id": "glossaryExplorer", "category": "learning"},
+	{"id": "stageOneGraduate", "category": "learning"},
+	{"id": "branchGraduate", "category": "learning"},
+	{"id": "allStages", "category": "learning"},
+	{"id": "firstTrade", "category": "trading"},
+	{"id": "limitMaster", "category": "trading"},
+	{"id": "firstOption", "category": "trading"},
+	{"id": "firstFutures", "category": "trading"},
+	{"id": "firstShort", "category": "trading"},
+	{"id": "firstMargin", "category": "trading"},
+	{"id": "firstDividend", "category": "trading"},
+	{"id": "firstEtf", "category": "trading"},
+	{"id": "multiAsset", "category": "trading"},
+	{"id": "diversified", "category": "trading"},
+	{"id": "cashCushion", "category": "trading"},
+	{"id": "tenTrades", "category": "trading"},
+	{"id": "fiftyTrades", "category": "trading"},
+	{"id": "profitMaker", "category": "trading"},
+	{"id": "riskAware", "category": "trading"},
+	{"id": "careerStart", "category": "career"},
+	{"id": "fundFounder", "category": "career"},
+	{"id": "challengeFirst", "category": "career"},
+	{"id": "taxLearner", "category": "career"},
+	{"id": "quantResearcher", "category": "career"},
+	{"id": "historian", "category": "career"},
+]
+
 static var _catalog_cache: Dictionary = {}
 
 
@@ -86,6 +131,7 @@ static func create_state() -> Dictionary:
 		"demosCompleted": {},
 		"financialsViewed": [],
 		"languageSwitched": false,
+		"milestones": {},
 	}
 	for entry in units():
 		state["units"][String(entry["id"])] = _new_unit_progress()
@@ -117,6 +163,8 @@ static func normalize_state(saved: Variant) -> Dictionary:
 	state["demosCompleted"] = data.get("demosCompleted", {})
 	state["financialsViewed"] = data.get("financialsViewed", [])
 	state["languageSwitched"] = bool(data.get("languageSwitched", false))
+	var saved_milestones: Variant = data.get("milestones", {})
+	state["milestones"] = saved_milestones if typeof(saved_milestones) == TYPE_DICTIONARY else {}
 	var saved_units: Dictionary = data.get("units", {})
 	for entry in units():
 		var unit_id := String(entry["id"])
@@ -966,22 +1014,137 @@ static func _same_set(left: Array, right: Array) -> bool:
 
 static func evaluate_achievements(state: Dictionary, snapshot: Dictionary) -> Array:
 	var unlocked: Array = []
+	var trades: Array = snapshot.get("trades", [])
+	var positions: Dictionary = snapshot.get("positions", {})
+	var shorts: Dictionary = snapshot.get("shorts", {})
+	var orders: Array = snapshot.get("orders", [])
+	var equity := float(snapshot.get("equity", 0.0))
+	var cash := float(snapshot.get("cash", 0.0))
+	var milestones: Dictionary = snapshot.get("milestones", {})
 	var checks := {
 		"observer": state["inspectedTickers"].size() >= 2,
-		"firstTrade": snapshot.get("trades", []).size() > 0,
+		"firstTrade": trades.size() > 0,
 		"firstPractice": _any_practice_done(state),
 		"academyInitiate": is_unit_complete(state, "u1"),
 		"quizAce": _has_perfect_quiz(state),
-		"limitMaster": _has_filled_limit(snapshot.get("orders", [])),
+		"limitMaster": _has_filled_limit(orders),
 		"bilingual": bool(state["languageSwitched"]),
 		"glossaryExplorer": state["glossaryOpened"].size() >= 3,
 		"stageOneGraduate": _all_stage_one_complete(state),
+		"branchGraduate": _any_branch_complete(state),
+		"allStages": _all_core_complete(state),
+		"firstOption": not snapshot.get("optionTrades", []).is_empty(),
+		"firstFutures": not snapshot.get("futuresTrades", []).is_empty(),
+		"firstShort": _has_short_activity(snapshot),
+		"firstMargin": _has_margin_usage(snapshot),
+		"firstDividend": not snapshot.get("dividends", []).is_empty(),
+		"firstEtf": _has_etf_trade(trades, snapshot.get("etfTickers", [])),
+		"multiAsset": _has_multi_asset(snapshot),
+		"diversified": positions.size() + shorts.size() >= 5,
+		"cashCushion": trades.size() >= 5 and equity > 0.0 and cash / equity >= 0.4,
+		"tenTrades": trades.size() >= 10,
+		"fiftyTrades": trades.size() >= 50,
+		"profitMaker": float(snapshot.get("realizedPnl", 0.0)) > 0.0,
+		"riskAware": _has_risk_order(orders),
+		"careerStart": int(snapshot.get("careerRank", 1)) > 1,
+		"fundFounder": bool(snapshot.get("fundFounded", false)),
+		"challengeFirst": not snapshot.get("challengesCompleted", []).is_empty(),
+		"taxLearner": bool(milestones.get("tax", false)),
+		"quantResearcher": bool(milestones.get("quant", false)),
+		"historian": bool(milestones.get("history", false)),
 	}
 	for achievement_id in checks.keys():
 		if bool(checks[achievement_id]) and not state["achievements"].has(achievement_id):
 			state["achievements"].append(achievement_id)
 			unlocked.append(achievement_id)
 	return unlocked
+
+
+static func _has_short_activity(snapshot: Dictionary) -> bool:
+	if not snapshot.get("shorts", {}).is_empty():
+		return true
+	for trade in snapshot.get("trades", []):
+		var action := String(trade.get("action", ""))
+		if action == "openShort" or String(trade.get("side", "")) == "short":
+			return true
+	return false
+
+
+static func _has_margin_usage(snapshot: Dictionary) -> bool:
+	var margin: Dictionary = snapshot.get("margin", {})
+	if float(margin.get("accruedInterest", 0.0)) > 0.0:
+		return true
+	if float(margin.get("accruedBorrowFees", 0.0)) > 0.0:
+		return true
+	return not margin.get("charges", []).is_empty()
+
+
+static func _has_etf_trade(trades: Array, etf_tickers: Array) -> bool:
+	var lookup := {}
+	for ticker in etf_tickers:
+		lookup[String(ticker)] = true
+	for trade in trades:
+		if lookup.has(String(trade.get("ticker", ""))):
+			return true
+	return false
+
+
+static func _has_multi_asset(snapshot: Dictionary) -> bool:
+	for key in ["bonds", "fx", "commodities", "crypto"]:
+		if not snapshot.get(key, []).is_empty():
+			return true
+	return false
+
+
+static func _has_risk_order(orders: Array) -> bool:
+	for order in orders:
+		var order_type := String(order.get("type", ""))
+		if order_type == "stop" or order_type == "trailing":
+			return true
+	return false
+
+
+static func _any_branch_complete(state: Dictionary) -> bool:
+	for entry in branch_units():
+		if is_unit_complete(state, String(entry["id"])):
+			return true
+	return false
+
+
+static func _all_core_complete(state: Dictionary) -> bool:
+	for index in range(1, 33):
+		if not is_unit_complete(state, "u%d" % index):
+			return false
+	return true
+
+
+static func record_milestone(state: Dictionary, key: String) -> void:
+	if key == "" or state.is_empty():
+		return
+	if typeof(state.get("milestones")) != TYPE_DICTIONARY:
+		state["milestones"] = {}
+	state["milestones"][key] = true
+
+
+static func sector_unlock_unit(sector: String) -> String:
+	return String(SECTOR_UNLOCK.get(sector, ""))
+
+
+## Returns {"locked": false} or the unit that still has to be completed.
+static func market_lock_info(state: Dictionary, ticker: String, sector: String,
+		is_etf: bool = false) -> Dictionary:
+	if state.is_empty() or typeof(state.get("units")) != TYPE_DICTIONARY:
+		return {"locked": false, "ticker": ticker}
+	var required := ETF_UNLOCK_UNIT if is_etf else sector_unlock_unit(sector)
+	if required == "" or is_unit_complete(state, required):
+		return {"locked": false, "ticker": ticker}
+	var entry := unit(required)
+	return {
+		"locked": true,
+		"ticker": ticker,
+		"unitId": required,
+		"unitTitleKey": String(entry.get("titleKey", "")),
+	}
 
 
 static func _any_practice_done(state: Dictionary) -> bool:

@@ -61,6 +61,7 @@ static func button(text: String, callback: Callable = Callable(), primary: bool 
 	var node := Button.new()
 	node.text = text
 	node.focus_mode = Control.FOCUS_NONE
+	node.pressed.connect(_play_click)
 	node.add_theme_font_size_override("font_size",
 		maxi(9, int(round(12.0 * SmaUiTheme.density))))
 	if primary:
@@ -198,3 +199,14 @@ static func style_label(style: String) -> String:
 	if I18n.has_key(key):
 		return I18n.t(key)
 	return style.capitalize()
+
+
+## UI sounds are optional: the autoload is absent in headless logic tests, so
+## every helper fails quietly instead of requiring a running audio server.
+static func _play_click() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return
+	var audio := tree.root.get_node_or_null("Sfx")
+	if audio != null and audio.has_method("play_click"):
+		audio.play_click()

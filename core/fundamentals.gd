@@ -7,6 +7,7 @@ extends RefCounted
 
 const QUARTER_DAYS := 63
 const REPORT_LAG_DAYS := 14
+const SEASON_DAYS := 20
 const FIRST_QUARTER := -8
 const MAX_QUARTER := 40
 const TAX_RATE := 0.21
@@ -14,9 +15,13 @@ const INTEREST_RATE := 0.04
 const SEASONAL := [0.96, 0.99, 1.02, 1.03]
 
 
-static func latest_quarter(day: int) -> int:
+static func latest_quarter(day: int, ticker: String = "") -> int:
 	var quarter := int(floor(float(day - REPORT_LAG_DAYS) / float(QUARTER_DAYS))) - 1
-	return clampi(quarter, FIRST_QUARTER, MAX_QUARTER)
+	quarter = clampi(quarter, FIRST_QUARTER, MAX_QUARTER)
+	if ticker != "":
+		while quarter >= FIRST_QUARTER and report_day_for(ticker, quarter) > day:
+			quarter -= 1
+	return quarter
 
 
 static func quarter_end_day(quarter: int) -> int:
@@ -25,6 +30,21 @@ static func quarter_end_day(quarter: int) -> int:
 
 static func report_day(quarter: int) -> int:
 	return (quarter + 1) * QUARTER_DAYS + REPORT_LAG_DAYS
+
+
+## Each issuer keeps a stable slot inside the earnings season, the way real
+## companies tend to report in the same part of the cycle every quarter.
+static func report_offset(ticker: String) -> int:
+	var rng := SmaRng.new("earnings-date:%s" % ticker)
+	return rng.rand_int(0, SEASON_DAYS)
+
+
+static func report_day_for(ticker: String, quarter: int) -> int:
+	return report_day(quarter) + report_offset(ticker)
+
+
+static func period_label(quarter: int) -> String:
+	return _period_label(quarter)
 
 
 static func _round2(value: float) -> float:
@@ -100,12 +120,13 @@ static func report(ticker: String, quarter: int) -> Dictionary:
 	var financing_cash := debt_issuance - dividends_paid
 	var net_change := operating_cash + investing_cash + financing_cash
 	var free_cash := operating_cash + quarter_capex
-	var split_factor := split_factor_through(ticker, report_day(quarter))
+	var as_of_day := report_day_for(ticker, quarter)
+	var split_factor := split_factor_through(ticker, as_of_day)
 	return {
 		"ticker": ticker,
 		"quarter": quarter,
 		"periodLabel": _period_label(quarter),
-		"reportDate": SmaCalendar.iso_date(report_day(quarter)),
+		"reportDate": SmaCalendar.iso_date(as_of_day),
 		"splitFactor": split_factor,
 		"income": {
 			"revenue": _round2(revenue),
@@ -156,7 +177,7 @@ static func report(ticker: String, quarter: int) -> Dictionary:
 
 
 static func history(ticker: String, count: int = 8, day: int = 0) -> Array:
-	var latest := latest_quarter(day)
+	var latest := latest_quarter(day, ticker)
 	var reports: Array = []
 	for index in maxi(1, count):
 		var quarter := latest - index

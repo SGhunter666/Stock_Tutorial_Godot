@@ -17,7 +17,441 @@
       "event": "day_closed",
       "story": "day_one",
       "once": true,
-      "condition": { "day_gte": 1 }
+      "condition": {
+        "day_gte": 1
+      }
+    },
+    {
+      "id": "dividend_unit",
+      "event": "unit_completed",
+      "story": "dividend",
+      "once": true,
+      "condition": {
+        "unit_complete": "u5"
+      }
+    },
+    {
+      "id": "dividend_fallback",
+      "event": "day_closed",
+      "story": "dividend",
+      "once": true,
+      "condition": {
+        "unit_complete": "u5"
+      }
+    },
+    {
+      "id": "diversify_unit",
+      "event": "unit_completed",
+      "story": "diversify",
+      "once": true,
+      "condition": {
+        "unit_complete": "u7"
+      }
+    },
+    {
+      "id": "diversify_fallback",
+      "event": "day_closed",
+      "story": "diversify",
+      "once": true,
+      "condition": {
+        "unit_complete": "u7"
+      }
+    },
+    {
+      "id": "research_unit",
+      "event": "unit_completed",
+      "story": "research",
+      "once": true,
+      "condition": {
+        "any": [
+          {
+            "unit_complete": "u11"
+          },
+          {
+            "unit_complete": "u12"
+          }
+        ]
+      }
+    },
+    {
+      "id": "research_fallback",
+      "event": "day_closed",
+      "story": "research",
+      "once": true,
+      "condition": {
+        "unit_complete": "u11"
+      }
+    },
+    {
+      "id": "macro_shock_unit",
+      "event": "unit_completed",
+      "story": "macro_shock",
+      "once": true,
+      "condition": {
+        "unit_complete": "u13"
+      }
+    },
+    {
+      "id": "macro_shock_fallback",
+      "event": "day_closed",
+      "story": "macro_shock",
+      "once": true,
+      "condition": {
+        "unit_complete": "u13"
+      }
+    },
+    {
+      "id": "short_mirror_shorted",
+      "event": "short_opened",
+      "story": "short_mirror",
+      "once": true,
+      "condition": {
+        "unit_complete": "u17"
+      }
+    },
+    {
+      "id": "short_mirror_unit",
+      "event": "unit_completed",
+      "story": "short_mirror",
+      "once": true,
+      "condition": {
+        "unit_complete": "u17"
+      }
+    },
+    {
+      "id": "short_mirror_fallback",
+      "event": "day_closed",
+      "story": "short_mirror",
+      "once": true,
+      "condition": {
+        "unit_complete": "u17"
+      }
+    },
+    {
+      "id": "leverage_night_margin",
+      "event": "margin_call",
+      "story": "leverage_night",
+      "once": true,
+      "condition": {
+        "unit_complete": "u18"
+      }
+    },
+    {
+      "id": "leverage_night_unit",
+      "event": "unit_completed",
+      "story": "leverage_night",
+      "once": true,
+      "condition": {
+        "unit_complete": "u18"
+      }
+    },
+    {
+      "id": "leverage_night_fallback",
+      "event": "day_closed",
+      "story": "leverage_night",
+      "once": true,
+      "condition": {
+        "unit_complete": "u18"
+      }
+    },
+    {
+      "id": "options_expiry_trade",
+      "event": "option_traded",
+      "story": "options_expiry",
+      "once": true,
+      "condition": {
+        "unit_complete": "u21"
+      }
+    },
+    {
+      "id": "options_expiry_unit",
+      "event": "unit_completed",
+      "story": "options_expiry",
+      "once": true,
+      "condition": {
+        "unit_complete": "u21"
+      }
+    },
+    {
+      "id": "options_expiry_fallback",
+      "event": "day_closed",
+      "story": "options_expiry",
+      "once": true,
+      "condition": {
+        "unit_complete": "u21"
+      }
+    },
+    {
+      "id": "client_trust_fund",
+      "event": "fund_created",
+      "story": "client_trust",
+      "once": true
+    },
+    {
+      "id": "client_trust_fallback",
+      "event": "day_closed",
+      "story": "client_trust",
+      "once": true,
+      "condition": {
+        "fund_active": true
+      }
+    },
+    {
+      "id": "crisis_eve_futures",
+      "event": "futures_traded",
+      "story": "crisis_eve",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u29"
+          },
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis_eve_unit",
+      "event": "unit_completed",
+      "story": "crisis_eve",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u29"
+          },
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          }
+        ]
+      }
+    },
+    {
+      "id": "crisis_eve_fallback",
+      "event": "day_closed",
+      "story": "crisis_eve",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u29"
+          },
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          }
+        ]
+      }
+    },
+    {
+      "id": "black_friday_drawdown",
+      "event": "drawdown_breached",
+      "story": "black_friday",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u31"
+          },
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          },
+          {
+            "story_seen": "crisis_eve"
+          }
+        ]
+      }
+    },
+    {
+      "id": "black_friday_unit",
+      "event": "unit_completed",
+      "story": "black_friday",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u31"
+          },
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          },
+          {
+            "story_seen": "crisis_eve"
+          }
+        ]
+      }
+    },
+    {
+      "id": "black_friday_fallback",
+      "event": "day_closed",
+      "story": "black_friday",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u31"
+          },
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          },
+          {
+            "story_seen": "crisis_eve"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graduation_unit",
+      "event": "unit_completed",
+      "story": "graduation",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u32"
+          },
+          {
+            "story_seen": "black_friday"
+          },
+          {
+            "not": {
+              "story_seen": "graduation_unfunded"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "graduation_fallback",
+      "event": "day_closed",
+      "story": "graduation",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u32"
+          },
+          {
+            "story_seen": "black_friday"
+          },
+          {
+            "not": {
+              "story_seen": "graduation_unfunded"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "graduation_unfunded_unit",
+      "event": "unit_completed",
+      "story": "graduation_unfunded",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u32"
+          },
+          {
+            "fund_active": false
+          },
+          {
+            "not": {
+              "story_seen": "black_friday"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "graduation_unfunded_fallback",
+      "event": "day_closed",
+      "story": "graduation_unfunded",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "unit_complete": "u32"
+          },
+          {
+            "fund_active": false
+          },
+          {
+            "not": {
+              "story_seen": "black_friday"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "epilogue_finished",
+      "event": "story_finished",
+      "story": "epilogue",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "story_seen": "graduation"
+          },
+          {
+            "finished_story": "graduation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "epilogue_fallback",
+      "event": "day_closed",
+      "story": "epilogue",
+      "once": true,
+      "condition": {
+        "story_seen": "graduation"
+      }
+    },
+    {
+      "id": "epilogue_unfunded_finished",
+      "event": "story_finished",
+      "story": "epilogue",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "story_seen": "graduation_unfunded"
+          },
+          {
+            "finished_story": "graduation_unfunded"
+          }
+        ]
+      }
+    },
+    {
+      "id": "epilogue_unfunded_fallback",
+      "event": "day_closed",
+      "story": "epilogue",
+      "once": true,
+      "condition": {
+        "story_seen": "graduation_unfunded"
+      }
     }
   ]
 }

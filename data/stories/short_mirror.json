@@ -1,0 +1,148 @@
+{
+  "id": "short_mirror",
+  "title": {
+    "zh_CN": "做空的镜子",
+    "en": "The Mirror of Shorting"
+  },
+  "start": "findings",
+  "nodes": {
+    "findings": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "你找出来的这份核查材料很扎实。这家所谓的光伏明星企业，连续四个季度的自由现金流为负，应收账款周转天数拉长了一倍，海外空壳客户的地址竟然是一片荒地。",
+        "en": "Your investigative dossier is solid. This supposed solar star has posted negative free cash flow for four consecutive quarters, doubled its DSO, and its offshore shell customer traces back to a vacant lot."
+      },
+      "next": "gu_yan_short"
+    },
+    "gu_yan_short": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "这是难得的机会。这种造假一旦被戳破，股价至少腰斩。我已经申请了最大额度的券源，全仓融券做空。看着造假者付出代价，顺便赚到该赚的钱，这才是交易的快感。",
+        "en": "This is a rare opportunity. Once the fraud is exposed, the stock halves. I've already borrowed the maximum supply and gone all-in short. Watching fraudsters pay and getting paid for it — that's the thrill of trading."
+      },
+      "next": "su_he_caution"
+    },
+    "su_he_caution": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "收起你的兴奋，顾言。做空在数学逻辑上与做多存在致命的非对称性：做多最坏亏损 100%，但做空的向上亏损在理论上是无穷大的。如果庄家配合利好暴力轧空（Short Squeeze），你的保证金会在一个开盘被直接清零。",
+        "en": "Temper your excitement, Gu Yan. Shorting harbors a lethal mathematical asymmetry: going long caps your loss at 100%, but shorting exposes you to theoretically infinite losses. If insiders trigger a short squeeze on fake news, your margin is wiped out before you can blink."
+      },
+      "next": "lin_lan_reflect"
+    },
+    "lin_lan_reflect": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "做空是一面最冷酷的镜子。它照出市场的虚伪，也照出交易者的贪婪与傲慢。很多研究员不是输在看错了真相，而是输在低估了泡沫破裂前的非理性狂欢。面对这份证据，你打算怎么做？",
+        "en": "Shorting is the coldest mirror. It reflects the market's hypocrisy, and the trader's greed and arrogance. Many analysts weren't wrong about the facts; they underestimated how long irrational exuberance can last. What do you do with this evidence?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "面对财务疑点公司的操作决策：",
+        "en": "Decision regarding the suspicious fraudulent firm:"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "融券建仓做空，严格设置止损，参与价值回归。",
+            "en": "Borrow shares and short with strict stops; monetize the inevitable mean reversion."
+          },
+          "next": "short_reply",
+          "effects": [
+            {
+              "set_flag": "ethics",
+              "value": "short"
+            },
+            {
+              "toast": {
+                "zh_CN": "交易决断：借券建立做空仓位",
+                "en": "Trade executed: Opened Short Position"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "撰写风险预警研报并彻底回避，不涉足高风险融券博弈。",
+            "en": "Publish risk memo and avoid entirely; refuse high-risk short squeeze gambles."
+          },
+          "next": "report_reply",
+          "effects": [
+            {
+              "set_flag": "ethics",
+              "value": "report"
+            },
+            {
+              "toast": {
+                "zh_CN": "交易决断：发布预警，回避有毒标的",
+                "en": "Stance taken: Published Warning Memo"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "short_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "做空可以赚钱，但它会以极快的速度放大你的执念。时刻盯紧借券利率与流动性池深度。一旦股价逆势拉升，无论你多坚信它是骗局，都必须无条件斩仓。",
+        "en": "Shorting can generate returns, but it feeds obsession faster than anything else. Monitor borrow fees and pool liquidity like a hawk. If the tape squeezes up, you must cut loss unconditionally, no matter how certain of the fraud you are."
+      },
+      "next": "wrap"
+    },
+    "report_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "极高明的克制。知道什么是陷阱并选择绕开它，远比自以为能踩着钢丝跳舞更为成熟。守住不亏损的底线，本就是最大的盈利。",
+        "en": "Superb discipline. Spotting a minefield and choosing to walk around it is far more mature than thinking you can dance on razor wire. Protecting downside is itself the purest alpha."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "去交易台查看借券费率与做空机制说明。永远记住：在市场上，‘证明自己是对的’远没有‘保全账户活下去’来得重要。",
+        "en": "Inspect borrow rates and mechanics on the trade ticket. Never forget: in this market, 'proving you are right' matters infinitely less than keeping your capital alive."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

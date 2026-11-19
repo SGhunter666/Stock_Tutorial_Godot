@@ -44,6 +44,7 @@ var _ff_percent: Label
 var _toast_panel: PanelContainer
 var _toast_label: Label
 var _toast_tween: Tween
+var _help_dialog: AcceptDialog
 
 var _cash_label: Label
 var _equity_label: Label
@@ -73,6 +74,16 @@ func _ready() -> void:
 	I18n.locale_changed.connect(_on_locale_changed)
 	Game.layout_changed.connect(_on_layout_changed)
 	Game.theme_changed.connect(_on_theme_changed)
+	Game.trade_filled.connect(func(_trade): _play_sound("fill"))
+	Game.order_rejected.connect(func(_error): _play_sound("reject"))
+	Game.day_closed.connect(func(_day): _play_sound("day_close"))
+	Game.achievement_unlocked.connect(func(_ids): _play_sound("achievement"))
+	Game.margin_call_triggered.connect(func(): _play_sound("margin_call"))
+	Game.career_promoted.connect(func(_rank): _play_sound("promotion"))
+	Game.challenge_finished.connect(func(status, _id):
+		_play_sound("achievement" if status == "completed" else "reject"))
+	Game.game_started.connect(func(): _play_sound("story"))
+	Game.game_loaded.connect(func(): _play_sound("story"))
 	_build_ui()
 	if not Game.started:
 		_show_start_overlay()
@@ -99,6 +110,7 @@ func _build_ui() -> void:
 	_toast_panel = null
 	_toast_label = null
 	_toast_tween = null
+	_help_dialog = null
 	_nav_buttons.clear()
 	_speed_buttons.clear()
 	_step_buttons.clear()
@@ -601,6 +613,9 @@ func _show_start_overlay() -> void:
 	var footer := SmaKit.hbox(10)
 	footer.add_child(SmaKit.caption(I18n.t("start.footer")))
 	footer.add_child(SmaKit.hspacer())
+	footer.add_child(SmaKit.caption(I18n.t("app.version", {
+		"version": String(ProjectSettings.get_setting("application/config/version", "beta-01")),
+	})))
 	footer.add_child(SmaKit.button(I18n.t("start.language"), _toggle_language))
 	box.add_child(footer)
 	var disclaimer := SmaKit.caption(I18n.t("app.disclaimer"))
@@ -618,6 +633,99 @@ func _continue_game() -> void:
 		_start_overlay.visible = false
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	var key_event := event as InputEventKey
+	if key_event == null or not key_event.pressed or key_event.echo:
+		return
+	var ctrl: bool = key_event.ctrl_pressed or key_event.meta_pressed
+	if key_event.keycode == KEY_F1:
+		_toggle_shortcuts()
+		get_viewport().set_input_as_handled()
+		return
+	if ctrl and key_event.keycode == KEY_S:
+		Game.save_game(true)
+		get_viewport().set_input_as_handled()
+		return
+	if key_event.keycode == KEY_ESCAPE and _help_dialog != null \
+			and is_instance_valid(_help_dialog) and _help_dialog.visible:
+		_help_dialog.hide()
+		get_viewport().set_input_as_handled()
+		return
+	if ctrl or key_event.alt_pressed or _shortcuts_blocked():
+		return
+	var speeds := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5]
+	var speed_index := speeds.find(key_event.keycode)
+	if speed_index >= 0:
+		_on_speed(int(Game.SPEEDS[speed_index]))
+		get_viewport().set_input_as_handled()
+		return
+	match key_event.keycode:
+		KEY_SPACE:
+			Game.toggle_pause()
+			_update_topbar()
+		KEY_N:
+			Game.step_day()
+			_update_topbar()
+		KEY_M:
+			Game.step_minute()
+			_update_topbar()
+		_:
+			return
+	get_viewport().set_input_as_handled()
+
+
+func _shortcuts_blocked() -> bool:
+	if not Game.started:
+		return true
+	if _start_overlay != null and _start_overlay.visible:
+		return true
+	if _ff_overlay != null and _ff_overlay.visible:
+		return true
+	if Game.narrative != null and Game.narrative.is_active():
+		return true
+	if Game.is_fast_forwarding():
+		return true
+	# Text fields, dropdowns and other focusable controls own their keyboard.
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit or focus is BaseButton or focus is HSlider:
+		return true
+	return false
+
+
+func _toggle_shortcuts() -> void:
+	if _help_dialog != null and is_instance_valid(_help_dialog):
+		if _help_dialog.visible:
+			_help_dialog.hide()
+		else:
+			_help_dialog.popup_centered()
+		return
+	var dialog := AcceptDialog.new()
+	dialog.title = I18n.t("shortcuts.title")
+	dialog.ok_button_text = I18n.t("common.close")
+	dialog.dialog_text = "\n".join([
+		I18n.t("shortcuts.pause"),
+		I18n.t("shortcuts.day"),
+		I18n.t("shortcuts.minute"),
+		I18n.t("shortcuts.speed"),
+		I18n.t("shortcuts.save"),
+		I18n.t("shortcuts.help"),
+		"",
+		I18n.t("shortcuts.hint"),
+	])
+	dialog.min_size = Vector2i(520, 340)
+	dialog.confirmed.connect(func(): dialog.queue_free())
+	dialog.close_requested.connect(func(): dialog.queue_free())
+	add_child(dialog)
+	_help_dialog = dialog
+	dialog.popup_centered()
+
+
+func _play_sound(sound: String) -> void:
+	var audio := get_node_or_null("/root/Sfx")
+	if audio != null and audio.has_method("play"):
+		audio.play(sound)
+
+
 func show_toast(message: String) -> void:
 	if _toast_panel == null or message == "":
 		return
@@ -630,5 +738,6 @@ func show_toast(message: String) -> void:
 		_toast_tween.kill()
 	_toast_tween = create_tween()
 	_toast_tween.tween_interval(2.6)
-	_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.35)
+	if not bool(Game.settings.get("reducedMotion", false)):
+		_toast_tween.tween_property(_toast_panel, "modulate:a", 0.0, 0.35)
 	_toast_tween.tween_callback(func(): _toast_panel.visible = false)

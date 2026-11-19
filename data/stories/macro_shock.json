@@ -1,0 +1,179 @@
+{
+  "id": "macro_shock",
+  "title": {
+    "zh_CN": "利率冲击",
+    "en": "The Interest Rate Shock"
+  },
+  "start": "rhino",
+  "nodes": {
+    "rhino": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "历史反复证明：大浪来临前，海面上总是异常平静。人们喜欢把每次崩盘归咎于飞来的‘黑天鹅’，但通胀失控、利差倒挂与央行加息，从来都是体量庞大却被视而不见的‘灰犀牛’。",
+        "en": "History proves repeatedly: before the tsunami, the water is deceptively still. People love blaming crashes on 'black swans,' yet surging inflation, inverted yield curves, and rate hikes are always massive, visible 'gray rhinos' that everyone chooses to ignore."
+      },
+      "next": "alarm"
+    },
+    "alarm": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "【宏观情景推演】假设最新通胀数据远超央行预期，十年期国债收益率急剧飙升 40 个基点。在情景里，全市场估值乘数遭到无差别杀跌，高估值成长股首当其冲，跌幅居前。",
+        "en": "[Macro Scenario] Suppose fresh CPI numbers massively overshoot expectations and 10-year Treasury yields spike 40 basis points. In the scenario, valuation multiples are slashed across the board, with high-multiple tech leading the decline."
+      },
+      "next": "gu_yan_dip"
+    },
+    "gu_yan_dip": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "慌什么！每次恐慌抛售都是黄金坑！无风险利率升高只是纸上谈兵，优秀公司的护城河能抵御一切！我准备把剩下的可用保证金全部押上去抄底！",
+        "en": "Why panic? Every flash dump is a golden buying opportunity! Risk-free rate hikes are just academic theory; great corporate moats weather everything! I'm deploying every dime of my remaining margin into this dip!"
+      },
+      "next": "zhou_warn"
+    },
+    "zhou_warn": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "所有企业估值，分母都是无风险利率加风险溢价。分母变大，资产价格就会承压，这是估值的数学规律。市场环境已经变冷，你的组合如何应对？",
+        "en": "Every valuation denominator is the risk-free rate plus a risk premium. When the denominator rises, asset prices come under pressure; that's valuation math. The market environment has turned cold. How does your portfolio respond?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "面对无风险利率与通胀冲击，你的防御策略是？",
+        "en": "Faced with rate shocks and inflation, what is your defensive stance?"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "主动削减高风险股票仓位，换回现金，等待估值企稳。",
+            "en": "Proactively trim high-beta equity exposure into cash; wait for valuations to settle."
+          },
+          "next": "cut_reply",
+          "effects": [
+            {
+              "set_flag": "risk_response",
+              "value": "cut"
+            },
+            {
+              "toast": {
+                "zh_CN": "宏观响应：削减权益敞口套现",
+                "en": "Macro stance: De-risking to Cash"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "启动衍生品与对冲工具，锁定净值，保持底仓不割肉。",
+            "en": "Deploy derivative hedges to lock in net asset value without realizing losses."
+          },
+          "next": "hedge_reply",
+          "effects": [
+            {
+              "set_flag": "risk_response",
+              "value": "hedge"
+            },
+            {
+              "toast": {
+                "zh_CN": "宏观响应：构建系统性风险对冲",
+                "en": "Macro stance: Hedging Systematic Risk"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "相信持仓基本面优秀，拒绝恐慌减仓，坚决硬扛波动。",
+            "en": "Trust fundamental moats; refuse to panic-sell and ride through the turbulence."
+          },
+          "next": "hold_reply",
+          "effects": [
+            {
+              "set_flag": "risk_response",
+              "value": "hold"
+            },
+            {
+              "toast": {
+                "zh_CN": "宏观响应：坚守现有持仓敞口",
+                "en": "Macro stance: Riding Out Volatility"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "cut_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "极其敏锐的纪律。当宏观折现率整体上升时，把脆弱的筹码兑现为真正的购买力，是最朴素也最有效的生存本能。",
+        "en": "Sharp discipline. When macro discount rates rise across the board, converting vulnerable exposure into liquid purchasing power is the most vital survival instinct."
+      },
+      "next": "wrap"
+    },
+    "hedge_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "现代组合理论的优雅所在。你不仅学会了如何驾驭顺风，更学会了在暴风雨来临时，如何为整艘大船绑紧缆绳与撑起风帆。",
+        "en": "The true elegance of modern portfolio theory. You don't just sail with tailwinds; you learn how to secure the rigging and trim the storm sails when gale arrives."
+      },
+      "next": "wrap"
+    },
+    "hold_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "勇气可嘉，但你必须清楚：硬扛的前提是没有负债杠杆。如果你的持仓里有融资盘，亏损会被迅速放大。",
+        "en": "Admirable courage, but be clear: holding through requires no margin debt. If you're leveraged, losses will be amplified quickly."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
+      "text": {
+        "zh_CN": "去宏观指标面板观察利率与通胀的后续变化。记住：在宏观周期面前，没有个股能永远独善其身。",
+        "en": "Review the macro indicators panel as rate and inflation prints develop. Remember: in the presence of macro cycles, no stock is an island forever."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

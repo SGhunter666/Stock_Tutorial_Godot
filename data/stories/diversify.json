@@ -1,0 +1,148 @@
+{
+  "id": "diversify",
+  "title": {
+    "zh_CN": "篮子与分散",
+    "en": "Baskets and Diversification"
+  },
+  "start": "shock",
+  "nodes": {
+    "shock": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "风控部调出了一份历史案例：一家所谓的白马股盘前突发财务核查停牌，开盘直接闪崩 -18%。假设顾言的实盘模拟单日回撤突破了 12%。",
+        "en": "Risk has pulled up a historical case: a so-called blue chip was halted for audit scrutiny and plunged -18% at the open. Suppose Gu Yan's simulated book took a 12% hit in one day."
+      },
+      "next": "gu_yan_defend"
+    },
+    "gu_yan_defend": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "黑天鹅谁能未卜先知？追求极致阿尔法就必须承受单票暴击。买一篮子 ETF 等于承认自己不知道哪只最好，那只是平庸指数投资者的避难所。",
+        "en": "Who can predict a black swan? Chasing maximum alpha means taking single-stock hits. Buying an ETF basket just admits you don't know what's best. It's a shelter for mediocrity."
+      },
+      "next": "su_he_counter"
+    },
+    "su_he_counter": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "市场并不奖赏狂妄的借口。分散投资不是为了消除风险，而是为了不让某一个突发的随机错误毁掉你整年的心血。这就是非系统性风险的代价。",
+        "en": "The market doesn't reward arrogant excuses. Diversification isn't about zero risk; it's about preventing one random mistake from wiping out a year's labor. That is the price of unsystematic risk."
+      },
+      "next": "lin_lan_ask"
+    },
+    "lin_lan_ask": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "单家企业可能遭遇财务造假、诉讼或技术颠覆，但整个行业指数和宽基市场不会在一夜之间蒸发。接下来的组合架构，你打算怎么选？",
+        "en": "A single company can be hit by fraud, litigation, or disruption. An entire sector or broad index won't disappear overnight. How will you structure the portfolio?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "你的组合构建偏好是？",
+        "en": "What is your portfolio construction preference?"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "以 ETF 宽基与行业指数构建核心底仓，平滑波动。",
+            "en": "Use broad ETFs and sector baskets as core holdings to smooth volatility."
+          },
+          "next": "etf_reply",
+          "effects": [
+            {
+              "set_flag": "diversify",
+              "value": "etf"
+            },
+            {
+              "toast": {
+                "zh_CN": "已确立核心配置：ETF 分散化",
+                "en": "Core allocated: ETF Diversification"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "精选高胜率个股集中持有，靠深度研究博取超额收益。",
+            "en": "Concentrate on high-conviction stocks and beat the market via depth."
+          },
+          "next": "single_reply",
+          "effects": [
+            {
+              "set_flag": "diversify",
+              "value": "single"
+            },
+            {
+              "toast": {
+                "zh_CN": "已确立核心配置：个股集中持仓",
+                "en": "Core allocated: Concentrated Stock Picks"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "etf_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "理性的底仓构筑。关注 ETF 的净值偏离度和管理费率，用被动指数作为防守锚，你才有精力去寻找真正的战术 Alpha。",
+        "en": "Rational foundation. Keep an eye on tracking error and expense ratios. With passive baskets as your defensive anchor, you have the bandwidth for real tactical alpha."
+      },
+      "next": "wrap"
+    },
+    "single_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "集中持仓会极度放大你的胜负手。如果你选这条路，你的财务审查和安全边际必须比别人苛刻一倍以上，否则你只是在裸奔。",
+        "en": "Concentration magnifies every payoff and every penalty. If you walk this path, your fundamental due diligence must be twice as strict, or you are running naked."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "去 ETF 页面查看不同指数的成分股权重与历史表现。记住，学会分散，是你在大浪中保全本金的第一块盾牌。",
+        "en": "Inspect component weights and past metrics on the ETF screen. Remember: diversification is the first shield that preserves your capital in heavy seas."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

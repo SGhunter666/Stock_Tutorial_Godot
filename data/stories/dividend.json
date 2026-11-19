@@ -1,0 +1,88 @@
+{
+  "id": "dividend",
+  "title": { "zh_CN": "第一笔股息", "en": "The First Dividend" },
+  "start": "notice",
+  "nodes": {
+    "notice": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "设想你持有的一家公司刚刚派息：你没有卖出任何一股股票，现金却增加了。这就是经营现金流——一家真实创造利润的企业，在按期与股东分享成果。",
+        "en": "Imagine one of your holdings just paid a dividend: you didn't sell a single share, yet cash arrived. That is operating cash flow — a real business sharing genuine profits with shareholders."
+      },
+      "next": "gu_yan"
+    },
+    "gu_yan": {
+      "type": "line",
+      "speaker": { "zh_CN": "顾言 · 明星学员", "en": "Gu Yan · Star Trainee" },
+      "text": {
+        "zh_CN": "年化两三个点？太慢了。我今天早盘抓一次动量突破就拿了四个点。等你们靠股息滚出复利，这轮牛市早散场了。",
+        "en": "Two or three percent annualized? Painfully slow. I locked four points on a single momentum breakout this morning. By the time you compound dividends, the bull run is long gone."
+      },
+      "next": "lin_lan_reply"
+    },
+    "lin_lan_reply": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "市场里最快的钱，通常也最快离开。慢不等于平庸，它意味着你不需要每天靠心跳去赌方向。现在这笔现金在你手里，你打算怎么分配？",
+        "en": "The fastest money in the market usually leaves the fastest. Slow isn't mediocre; it means you don't need daily adrenaline to survive. Now that the cash is here, how do you handle it?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "关于这笔现金分红，你的策略是？",
+        "en": "What is your dividend allocation strategy?"
+      },
+      "choices": [
+        {
+          "text": { "zh_CN": "设定红利再投资（DRIP），让复利滚雪球。", "en": "Set dividend reinvestment (DRIP) to compound the snowball." },
+          "next": "reinvest_reply",
+          "effects": [
+            { "set_flag": "income_style", "value": "reinvest" },
+            { "toast": { "zh_CN": "确立策略：红利自动再投资", "en": "Strategy set: Dividend Reinvestment" } }
+          ]
+        },
+        {
+          "text": { "zh_CN": "留作防守现金储备，等待估值便宜时加仓。", "en": "Keep as defensive cash reserve, waiting for bargains." },
+          "next": "cash_reply",
+          "effects": [
+            { "set_flag": "income_style", "value": "cash" },
+            { "toast": { "zh_CN": "确立策略：保留现金防守", "en": "Strategy set: Defensive Cash Reserve" } }
+          ]
+        }
+      ]
+    },
+    "reinvest_reply": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "经典的复利思维。它在短期内极其安静甚至乏味，但在十年后，几何级数的复利会把追涨杀跌的人远远甩在身后。",
+        "en": "Classic compounding mindset. It is quiet and almost boring in the short run, but after a decade, exponential growth leaves traders far behind."
+      },
+      "next": "wrap"
+    },
+    "cash_reply": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "克制而理性的储备。流动性就是你的干粮与子弹。当狂热消退、恐慌杀跌时，只有手握现金的人才有从容扫货的底气。",
+        "en": "Disciplined and calculated. Liquidity is your dry powder. When euphoria fades and panic strikes, only those with cash can scoop up bargains with composure."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "去持仓页看看分红与除息记录在哪里。从今天起，别只盯价格的上下跳动，学会去读懂现金流的脉搏。",
+        "en": "Open the Portfolio tab and find where dividends and ex-dividend entries are recorded. From today on, don't just stare at price ticks; learn to feel the pulse of cash flow."
+      },
+      "next": "end"
+    },
+    "end": { "type": "end" }
+  }
+}

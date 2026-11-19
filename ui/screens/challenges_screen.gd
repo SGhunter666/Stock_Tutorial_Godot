@@ -120,9 +120,10 @@ func _metric(label_key: String, value: String, tone: float) -> VBoxContainer:
 func _format_value(kind: String, value: float) -> String:
 	if kind == "return":
 		return SmaFormat.pct(value, 1)
-	if kind == "drawdownMax":
+	if kind == "drawdownMax" or kind == "cashRatio":
 		return SmaFormat.pct_plain(value, 1)
-	if kind == "trades" or kind == "optionTrades" or kind == "futuresTrades":
+	if kind in ["trades", "optionTrades", "futuresTrades", "etfTrades",
+			"shortTrades", "dividends", "openPositions"]:
 		return SmaFormat.num(value, 0)
 	return I18n.t("challenges.yes") if value > 0.0 else I18n.t("challenges.no")
 

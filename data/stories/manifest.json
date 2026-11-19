@@ -1,4 +1,21 @@
 {
-  "stories": ["opening.json", "first_trade.json", "day_one.json"],
+  "stories": [
+    "opening.json",
+    "first_trade.json",
+    "day_one.json",
+    "dividend.json",
+    "diversify.json",
+    "research.json",
+    "macro_shock.json",
+    "short_mirror.json",
+    "leverage_night.json",
+    "options_expiry.json",
+    "client_trust.json",
+    "crisis_eve.json",
+    "black_friday.json",
+    "graduation.json",
+    "graduation_unfunded.json",
+    "epilogue.json"
+  ],
   "triggers": "triggers.json"
 }

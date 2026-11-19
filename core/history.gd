@@ -7,8 +7,6 @@ extends RefCounted
 const CATALOG_PATH := "res://data/history/catalog.json"
 const DATASET_DIR := "res://data/history"
 const TICKS_PER_DAY := 8
-const INTRADAY_5M_BARS := 78
-const MINUTES_PER_BAR := 5
 const VOLUME_WEIGHTS := [0.18, 0.12, 0.10, 0.08, 0.09, 0.11, 0.14, 0.18]
 
 var catalog: Dictionary = {}
@@ -295,123 +293,6 @@ static func _clock_text(minutes: int) -> String:
 	return "%02d:%02d" % [int(minutes / 60.0), minutes % 60]
 
 
-static func _minute_path(bar: Array, symbol: String) -> Array:
-	var open_price := float(bar[1])
-	var high := float(bar[2])
-	var low := float(bar[3])
-	var close := float(bar[4])
-	var steps := INTRADAY_5M_BARS * MINUTES_PER_BAR
-	if not is_finite(high) or not is_finite(low) or high <= low:
-		var flat: Array = []
-		for step in steps:
-			flat.append(_round(open_price))
-		return flat
-	var hash_value := _hash_string("%s|%s|minute" % [symbol, bar[0]])
-	var high_first := (hash_value & 1) == 0
-	var anchors := [
-		{"step": 0, "price": open_price},
-		{"step": int(floor(steps * 0.32)), "price": high if high_first else low},
-		{"step": int(floor(steps * 0.66)), "price": low if high_first else high},
-		{"step": steps - 1, "price": close},
-	]
-	var prices: Array = []
-	for step in steps:
-		var right: Dictionary = anchors[anchors.size() - 1]
-		for anchor in anchors:
-			if int(anchor["step"]) >= step:
-				right = anchor
-				break
-		var left: Dictionary = anchors[0]
-		for anchor in anchors:
-			if int(anchor["step"]) <= step:
-				left = anchor
-		var span := int(right["step"]) - int(left["step"])
-		var ratio := float(step - int(left["step"])) / float(span) if span > 0 else 0.0
-		var price := float(left["price"]) + (float(right["price"]) - float(left["price"])) * ratio
-		if step != int(left["step"]):
-			price += _noise(hash_value, step + 3) * (high - low) * 0.035
-		prices.append(_round(clampf(price, low, high), 4))
-	for anchor in anchors:
-		prices[int(anchor["step"])] = _round(float(anchor["price"]), 4)
-	return prices
-
-
-static func _aggregate_candles(candles: Array, size: int) -> Array:
-	if size <= 1:
-		return candles
-	var output: Array = []
-	var index := 0
-	while index < candles.size():
-		var group: Array = candles.slice(index, mini(index + size, candles.size()))
-		var high := -INF
-		var low := INF
-		var volume := 0
-		for candle in group:
-			high = maxf(high, float(candle["h"]))
-			low = minf(low, float(candle["l"]))
-			volume += int(candle.get("v", 0))
-		output.append({"d": group[0]["d"], "time": group[0].get("time", ""),
-			"end": group[group.size() - 1]["d"], "o": group[0]["o"], "h": high,
-			"l": low, "c": group[group.size() - 1]["c"], "v": volume})
-		index += size
-	return output
-
-
-static func build_intraday_candles(bar: Array, symbol: String, tick: int,
-		timeframe: String, current_price: float) -> Array:
-	var minute_prices := _minute_path(bar, symbol)
-	var weights: Array = []
-	var weight_sum := 0.0
-	for index in INTRADAY_5M_BARS:
-		var position := float(index) / float(INTRADAY_5M_BARS - 1) if INTRADAY_5M_BARS > 1 else 0.0
-		var weight := 0.55 + 0.9 * absf(position * 2.0 - 1.0)
-		weights.append(weight)
-		weight_sum += weight
-	var bars: Array = []
-	for index in INTRADAY_5M_BARS:
-		var start := index * MINUTES_PER_BAR
-		var group: Array = minute_prices.slice(start, start + MINUTES_PER_BAR)
-		var high := -INF
-		var low := INF
-		for price in group:
-			high = maxf(high, float(price))
-			low = minf(low, float(price))
-		bars.append({"d": bar[0], "o": group[0], "h": high, "l": low,
-			"c": group[group.size() - 1],
-			"v": int(round(float(bar[5] if bar.size() > 5 else 0) * float(weights[index]) / weight_sum)),
-			"time": _clock_text(9 * 60 + 30 + start)})
-	var elapsed := maxi(0, tick) * 48
-	var visible := mini(INTRADAY_5M_BARS, maxi(1, int(floor(float(elapsed) / MINUTES_PER_BAR)) + 1))
-	var candles: Array = bars.slice(0, visible)
-	var last_index := candles.size() - 1
-	var minutes_into := maxi(1, mini(MINUTES_PER_BAR,
-		elapsed - last_index * MINUTES_PER_BAR + 1))
-	if last_index >= 0 and minutes_into < MINUTES_PER_BAR:
-		var start := last_index * MINUTES_PER_BAR
-		var group: Array = minute_prices.slice(start, start + minutes_into)
-		var high := -INF
-		var low := INF
-		for price in group:
-			high = maxf(high, float(price))
-			low = minf(low, float(price))
-		candles[last_index] = {
-			"d": candles[last_index]["d"], "time": candles[last_index]["time"],
-			"o": group[0], "h": high, "l": low, "c": group[group.size() - 1],
-			"v": int(round(float(candles[last_index].get("v", 0))
-				* float(minutes_into) / float(MINUTES_PER_BAR))),
-		}
-	if timeframe == "15m":
-		candles = _aggregate_candles(candles, 3)
-	elif timeframe == "1h":
-		candles = _aggregate_candles(candles, 12)
-	if is_finite(current_price) and not candles.is_empty():
-		var last: Dictionary = candles[candles.size() - 1]
-		last["c"] = _round(current_price, 4)
-		last["h"] = maxf(float(last["h"]), float(last["c"]))
-		last["l"] = minf(float(last["l"]), float(last["c"]))
-	return candles
-
-
 static func _week_key(date_text: String) -> String:
 	var parsed := Time.get_datetime_dict_from_datetime_string(date_text + "T00:00:00", true)
 	var weekday := int(parsed["weekday"])
@@ -449,11 +330,8 @@ static func history_candles(dataset: Dictionary, symbol: String, day_index: int,
 	var bars := bars_for(dataset, symbol)
 	if bars.is_empty():
 		return {"candles": [], "labels": [], "intraday": false}
-	if ["5m", "15m", "1h"].has(timeframe):
-		var candles := build_intraday_candles(bars[day_index], symbol, tick, timeframe, current_price)
-		var labels := [candles[0].get("time", "09:30") if not candles.is_empty() else "09:30",
-			_session_clock_text(tick)]
-		return {"candles": candles, "labels": labels, "intraday": true}
+	if not ["1d", "1w", "1mo", "1y"].has(timeframe):
+		return {"candles": [], "labels": [], "intraday": false}
 	var completed: Array = []
 	for index in mini(day_index, bars.size()):
 		var bar: Array = bars[index]
@@ -502,17 +380,19 @@ func advance_tick(scenario_id: String, dataset: Dictionary) -> Dictionary:
 	return {"run": run_data, "dayClosed": day_closed, "reachedEnd": reached_end}
 
 
-func advance_day(scenario_id: String, dataset: Dictionary) -> Dictionary:
+func advance_day(scenario_id: String, dataset: Dictionary,
+		daily_mode: bool = false) -> Dictionary:
 	var run_data := ensure_run(scenario_id, dataset)
 	var max_index := bar_count(dataset) - 1
 	var next_index := mini(max_index, int(run_data["dayIndex"]) + 1)
 	run_data["dayIndex"] = next_index
-	run_data["tick"] = 0
+	run_data["tick"] = TICKS_PER_DAY - 1 if daily_mode else 0
 	_record_equity(run_data, dataset)
 	return {"run": run_data, "reachedEnd": next_index >= max_index}
 
 
-func advance_to_event(scenario_id: String, dataset: Dictionary) -> Dictionary:
+func advance_to_event(scenario_id: String, dataset: Dictionary,
+		daily_mode: bool = false) -> Dictionary:
 	var run_data := ensure_run(scenario_id, dataset)
 	var entry := scenario(scenario_id)
 	var date := current_date(dataset, int(run_data["dayIndex"]))
@@ -527,7 +407,7 @@ func advance_to_event(scenario_id: String, dataset: Dictionary) -> Dictionary:
 	for index in bars.size():
 		if String(bars[index][0]) >= target:
 			run_data["dayIndex"] = index
-			run_data["tick"] = 0
+			run_data["tick"] = TICKS_PER_DAY - 1 if daily_mode else 0
 			_record_equity(run_data, dataset)
 			return {"run": run_data, "reachedEnd": false}
 	return {"run": run_data, "reachedEnd": true}

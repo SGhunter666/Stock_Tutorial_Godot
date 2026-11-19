@@ -381,6 +381,7 @@ func _ready() -> void:
 	main.navigate("etf")
 	await _settle(6)
 	await _shot("etf")
+	Game.academy["units"]["u7"]["completed"] = true
 	Game.submit_order({"ticker": "MKT", "side": "buy", "type": "market", "qty": 10})
 	main._screens["etf"].refresh()
 	await _settle(4)

@@ -19,6 +19,24 @@
         "zh_CN": "先别急着下单。我带你走到工位：左边是行情，中间是交易台，右边是你的持仓。今天只有一个任务——弄明白你买入的到底是什么。",
         "en": "Don't rush to trade. I'll walk you to your desk: quotes on the left, the ticket in the middle, your positions on the right. Today's only task is to understand what you are buying."
       },
+      "next": "gu_yan_pass"
+    },
+    "gu_yan_pass": {
+      "type": "line",
+      "speaker": { "zh_CN": "顾言 · 明星学员", "en": "Gu Yan · Star Trainee" },
+      "text": {
+        "zh_CN": "林老师，又在跟新人交代保本？学院教的是不亏钱，但市场奖励的是敢下注的人。",
+        "en": "Still preaching capital preservation to rookies, Mentor Lin? The academy teaches how not to lose, but the market rewards those who dare to bet big."
+      },
+      "next": "lin_reply"
+    },
+    "lin_reply": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "在市场里活过五年的，没有一个是靠敢下注活下来的。别被他打乱节奏，你今天只做好一件事。",
+        "en": "Nobody who survived five years in this market did so by betting big. Don't let him break your rhythm. Focus on one thing today."
+      },
       "next": "choice"
     },
     "choice": {

@@ -56,6 +56,12 @@ const PRESET_CASES := [
 	[Vector2i(3840, 2160), "1920x1080", Vector2i(1920, 1080)],
 	[Vector2i(3840, 2160), "2560x1600", Vector2i(2560, 1600)],
 	[Vector2i(5120, 2880), "2560x1600", Vector2i(2560, 1600)],
+	[Vector2i(1920, 1080), "1600x900", Vector2i(1600, 900)],
+	[Vector2i(1920, 1080), "1920x1200", Vector2i(1920, 1080)],
+	[Vector2i(2560, 1440), "2560x1440", Vector2i(2560, 1440)],
+	[Vector2i(2560, 1600), "1680x1050", Vector2i(1680, 1050)],
+	[Vector2i(1280, 720), "1280x800", Vector2i(1280, 720)],
+	[Vector2i(3840, 2160), "2560x1440", Vector2i(2560, 1440)],
 ]
 
 
@@ -68,8 +74,9 @@ func run() -> void:
 		and SmaDisplay.BASE_SIZE.y < SmaDisplay.MAX_SIZE.y,
 		"base height sits between the minimum and maximum")
 	eq(SmaDisplay.MODES, ["windowed", "fullscreen"], "supported window modes")
-	eq(SmaDisplay.PRESETS, ["auto", "1440x900", "1920x1080", "2560x1600"],
-		"supported presets")
+	eq(SmaDisplay.PRESETS, ["auto", "1280x720", "1280x800", "1366x768",
+		"1440x900", "1600x900", "1680x1050", "1920x1080", "1920x1200",
+		"2560x1440", "2560x1600"], "supported presets")
 
 	describe("display-auto-resolutions")
 	for row in AUTO_CASES:
@@ -116,6 +123,22 @@ func run() -> void:
 	eq(SmaDisplay.normalise_preset(""), "auto", "empty preset falls back")
 	eq(SmaDisplay.normalise_preset("8K"), "auto",
 		"unknown preset falls back to auto")
+
+	describe("display-ui-scale")
+	eq(SmaDisplay.UI_SCALES, ["auto", "1.0", "1.1", "1.25"],
+		"supported UI scale modes")
+	approx(SmaDisplay.resolve_ui_scale("auto", Vector2i(1440, 900)), 1.0, 0.001,
+		"auto keeps the authored scale at the base size")
+	approx(SmaDisplay.resolve_ui_scale("auto", Vector2i(1280, 720)), 1.1, 0.001,
+		"auto enlarges the UI under the base size")
+	approx(SmaDisplay.resolve_ui_scale("1.1", Vector2i(1280, 720)), 1.1, 0.001,
+		"110% is available on the minimum window")
+	approx(SmaDisplay.resolve_ui_scale("1.25", Vector2i(1440, 900)), 1.1, 0.001,
+		"125% falls back to 110% on a small window")
+	approx(SmaDisplay.resolve_ui_scale("1.25", Vector2i(1920, 1080)), 1.25, 0.001,
+		"125% is available on a large window")
+	eq(SmaDisplay.normalise_ui_scale("bogus"), "auto",
+		"unknown UI scale falls back to auto")
 
 	describe("display-centering")
 	eq(SmaDisplay.centered_position(Rect2i(0, 0, 2560, 1600),

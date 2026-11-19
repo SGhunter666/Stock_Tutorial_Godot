@@ -1,0 +1,148 @@
+{
+  "id": "research",
+  "title": {
+    "zh_CN": "第一份研究报告",
+    "en": "The First Research Report"
+  },
+  "start": "night",
+  "nodes": {
+    "night": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "陈曦 · 量化研究员",
+        "en": "Chen Xi · Quantitative Researcher"
+      },
+      "text": {
+        "zh_CN": "夜深了。你桌上的三张财务报表已经翻了三遍。大部分分析师喜欢讲动人的成长故事，但因子回测告诉我：应收账款与存货的异常积累，往往是暴雷前最诚实的信号。",
+        "en": "It's late. You've scrutinized those three financial statements three times. Most analysts sell romantic growth narratives, but factor backtests tell me: abnormal accounts receivable and inventories are the truest precursors to a blowout."
+      },
+      "next": "gu_yan_mock"
+    },
+    "gu_yan_mock": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "还在算一年前的折旧与负债率？K 线上资金进出的痕迹清清楚楚，成交量突破就是买入信号。写几十页估值报告，不过是给客户看的安慰剂。",
+        "en": "Still calculating depreciation and leverage ratios from last year? Capital flow leaves unmistakable footprints on the tape. Volume breakouts mean buy. Dozens of pages of valuation work are just placebos for clients."
+      },
+      "next": "chen_xi_reply"
+    },
+    "chen_xi_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "陈曦 · 量化研究员",
+        "en": "Chen Xi · Quantitative Researcher"
+      },
+      "text": {
+        "zh_CN": "图表只反映过去的撮合结果。把历史走势拟合成优美的曲线，在统计学上叫过拟合（Overfitting）。一旦样本外的宏观或行业逻辑突变，动量模型第一个崩塌。",
+        "en": "Charts merely plot historical execution prints. Curve-fitting past action into neat shapes is what statisticians call overfitting. The moment out-of-sample regimes shift, momentum is the first to unravel."
+      },
+      "next": "lin_lan_frame"
+    },
+    "lin_lan_frame": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "财报是过去，价格是预期。职业分析师的任务，是评估市场预期与企业内在价值之间的偏差。你的第一份研报，核心分析框架是什么？",
+        "en": "Financials are the past; prices are expectations. A professional analyst's job is to judge the gap between market expectations and intrinsic value. What's the core framework for your first report?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "确立研报核心分析框架：",
+        "en": "Select the core analysis framework for your report:"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "基于现金流折现（DCF）与同行倍数，估算安全边际区间。",
+            "en": "Estimate margin of safety via Discounted Cash Flow (DCF) and peer multiples."
+          },
+          "next": "val_reply",
+          "effects": [
+            {
+              "set_flag": "research",
+              "value": "valuation"
+            },
+            {
+              "toast": {
+                "zh_CN": "分析框架确定：基本面与估值区间",
+                "en": "Framework established: Valuation & Margin of Safety"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "基于趋势动量、成交量分布与阻力位，顺应价格趋势。",
+            "en": "Map trend momentum, volume profile, and path of least resistance."
+          },
+          "next": "trend_reply",
+          "effects": [
+            {
+              "set_flag": "research",
+              "value": "trend"
+            },
+            {
+              "toast": {
+                "zh_CN": "分析框架确定：量价动量与趋势跟踪",
+                "en": "Framework established: Price Action & Momentum"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "val_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "扎实的根基。永远不要给出一个绝对精确的目标价，市场不相信算命。给出悲观、中性、乐观的三档情景，算出你的安全边际有多厚。",
+        "en": "Solid ground. Never offer an overly precise price target; markets don't buy fortune-telling. Provide bear, base, and bull scenarios, and compute how thick your margin of safety truly is."
+      },
+      "next": "wrap"
+    },
+    "trend_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "陈曦 · 量化研究员",
+        "en": "Chen Xi · Quantitative Researcher"
+      },
+      "text": {
+        "zh_CN": "顺势而为效率最高，但必须配套严格的失效条件。在研报里明确写下：跌破哪个关键点位你就必须认错清仓，不留余地。",
+        "en": "Trading along momentum is capital efficient, but demands strict invalidation criteria. State explicitly in your report: at what key level are you undeniably wrong and forced to liquidate."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "打开公司的财报与基本面界面，把你的判断落入文字。写下来的东西，收盘后市场会一条一条替你验证。",
+        "en": "Open the company filings and fundamental metrics. Commit your thesis to paper. After the bell, the market will grade every single premise."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

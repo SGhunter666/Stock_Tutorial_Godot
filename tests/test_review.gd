@@ -50,3 +50,24 @@ func run() -> void:
 	eq(String(timeline[2]["kind"]), "stock", "stock trade included")
 	var limited := SmaReview.timeline(account, 2)
 	eq(limited.size(), 2, "limit respected")
+
+	describe("review-risk")
+	var risk_account := {
+		"equityHistory": [
+			{"day": 0, "equity": 100000.0},
+			{"day": 1, "equity": 110000.0},
+			{"day": 2, "equity": 99000.0},
+			{"day": 3, "equity": 105000.0},
+		],
+	}
+	var risk := SmaReview.portfolio_risk(risk_account, 105000.0,
+		[{"marketValue": 12000.0}], [{"marketValue": 4500.0}])
+	check(bool(risk["hasVolatility"]), "daily history produces a volatility sample")
+	approx(float(risk["maxDrawdownPct"]), 10.0, 0.01, "peak-to-trough drawdown")
+	approx(float(risk["exposurePct"]), 16500.0 / 105000.0 * 100.0, 0.01,
+		"gross exposure includes long and short books")
+	approx(float(risk["largestPct"]), 12000.0 / 105000.0 * 100.0, 0.01,
+		"largest position weight")
+	approx(float(risk["hhi"]), (pow(12000.0 / 105000.0, 2.0)
+		+ pow(4500.0 / 105000.0, 2.0)) * 10000.0, 0.1, "concentration HHI")
+	eq(String(risk["riskLevel"]), "high", "large daily moves map to high risk")

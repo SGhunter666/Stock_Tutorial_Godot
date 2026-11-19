@@ -11,7 +11,7 @@ func _academy_with(unit_ids: Array) -> Dictionary:
 
 func run() -> void:
 	describe("challenge-catalog")
-	eq(SmaChallenges.DEFS.size(), 6, "six challenge definitions")
+	eq(SmaChallenges.DEFS.size(), 14, "fourteen challenge definitions")
 	eq(SmaChallenges.by_id("hedger").get("unlockUnit", ""), "u30", "hedger unlocks at u30")
 	eq(SmaChallenges.by_id("missing").is_empty(), true, "unknown challenge returns empty")
 
@@ -58,6 +58,28 @@ func run() -> void:
 	eq(String(timeout.get("status", "")), "failed", "deadline fails the run")
 	eq(timeout_state["failed"].has("firstProfit"), true, "failed challenge recorded")
 
+	describe("challenge-new-metrics")
+	var extra := SmaExchange.new("challenge-extra")
+	var extra_state := SmaChallenges.create_state()
+	SmaChallenges.start(extra_state, exchange_academy(), "dividendCollector", 0,
+		extra.equity())
+	extra.state["account"]["trades"] = [
+		{"ticker": "MKT", "action": "openLong", "side": "buy", "day": 1,
+			"qty": 5, "price": 100.0},
+		{"ticker": "APLA", "action": "openShort", "side": "short", "day": 1,
+			"qty": 2, "price": 100.0},
+	]
+	extra.state["account"]["dividends"] = [{"day": 1, "amount": 10.0}]
+	extra.state["account"]["bonds"] = [{"id": "gov2"}]
+	extra.state["account"]["positions"] = {"APLA": {"qty": 10, "avgCost": 100.0}}
+	var extra_metrics := SmaChallenges.metrics(extra_state, extra)
+	eq(int(extra_metrics["etfTrades"]), 1, "ETF fills counted")
+	eq(int(extra_metrics["shortTrades"]), 1, "short fills counted")
+	eq(int(extra_metrics["dividends"]), 1, "dividend rows counted")
+	eq(int(extra_metrics["openPositions"]), 1, "open positions counted")
+	eq(int(extra_metrics["multiAsset"]), 1, "non-equity position detected")
+	check(float(extra_metrics["cashRatio"]) > 0.0, "cash ratio is reported")
+
 	describe("challenge-structure")
 	var hedge_state := SmaChallenges.create_state()
 	var hedge_academy := _academy_with(["u30"])
@@ -83,4 +105,5 @@ func run() -> void:
 
 
 func exchange_academy() -> Dictionary:
-	return _academy_with(["u3", "u15", "u30", "u32", "u26", "u28"])
+	return _academy_with(["u3", "u5", "u7", "u13", "u15", "u17", "u21", "u26",
+		"u28", "u29", "u30", "u32"])

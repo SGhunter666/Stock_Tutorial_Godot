@@ -31,11 +31,26 @@ func refresh(_reason: String = "") -> void:
 	if game == null or not game.started:
 		return
 	_render_header()
+	var lock: Dictionary = game.market_lock_info(_selected)
+	if bool(lock.get("locked", false)):
+		_render_lock_banner(lock)
 	_render_summary()
 	_render_list()
 	_render_detail()
 	_render_positions()
 	_body.add_child(SmaKit.muted(I18n.t("etf.note"), 10))
+
+
+func _render_lock_banner(lock: Dictionary) -> void:
+	var card := SmaKit.card(10)
+	var box := SmaKit.vbox(3)
+	card.add_child(box)
+	box.add_child(SmaKit.label(I18n.t("trade.lockedTitle"), 14, SmaUiTheme.WARNING))
+	box.add_child(SmaKit.muted(I18n.t("trade.lockedBody", {
+		"ticker": _selected,
+		"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
+	}), 11))
+	_body.add_child(card)
 
 
 func _render_header() -> void:

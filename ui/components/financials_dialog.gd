@@ -42,6 +42,24 @@ func _build() -> void:
 	header.add_child(SmaKit.button(I18n.t("common.close"), _close))
 	root.add_child(header)
 	root.add_child(SmaKit.muted(I18n.t("financials.subtitle"), 12))
+	if game.exchange != null:
+		var last_earnings: Dictionary = game.exchange.state.get("companies", {}) \
+			.get(ticker, {}).get("lastEarnings", {})
+		if not last_earnings.is_empty():
+			var earnings_card := SmaKit.card(10)
+			var earnings_box := SmaKit.vbox(4)
+			earnings_card.add_child(earnings_box)
+			earnings_box.add_child(SmaKit.label("%s · %s" % [
+				I18n.t("financials.lastEarnings"),
+				String(last_earnings.get("periodLabel", ""))], 12, SmaUiTheme.INFO))
+			earnings_box.add_child(SmaKit.muted(I18n.t("news.earningsDetail", {
+				"eps": SmaFormat.num(float(last_earnings.get("eps", 0.0)), 2),
+				"expected": SmaFormat.num(float(last_earnings.get("expectedEps", 0.0)), 2),
+				"surprise": SmaFormat.pct(float(last_earnings.get("surprisePct", 0.0)), 1),
+				"guidance": I18n.t("news.guidance.%s" % String(
+					last_earnings.get("guidance", "maintain"))),
+			}), 10))
+			root.add_child(earnings_card)
 	root.add_child(SmaKit.separator())
 	var columns := GridContainer.new()
 	columns.columns = 2

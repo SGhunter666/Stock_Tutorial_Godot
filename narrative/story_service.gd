@@ -25,6 +25,7 @@ var queue: Array[String] = []
 var active_id: String = ""
 var active_story: Dictionary = {}
 var node_id: String = ""
+var last_finished_id: String = ""
 
 
 func setup(target_host: Object) -> void:
@@ -149,7 +150,7 @@ func current_view() -> Dictionary:
 		"story_id": active_id,
 		"title": _resolve(active_story.get("title", "")),
 		"speaker": _resolve(node.get("speaker", "")),
-		"text": _resolve(node.get("text", "")),
+		"text": _node_text(node),
 		"type": node_type,
 		"choices": choices,
 		"background": String(node.get("background", "")),
@@ -242,6 +243,33 @@ func evaluate(condition: Variant) -> bool:
 	if data.has("story_seen"):
 		if not bool(seen.get(String(data["story_seen"]), false)):
 			return false
+	if data.has("finished_story"):
+		if String(data["finished_story"]) != last_finished_id:
+			return false
+	if data.has("unit_complete"):
+		var u_id := String(data["unit_complete"])
+		if host != null and host.has_method("is_unit_complete"):
+			if not bool(host.is_unit_complete(u_id)):
+				return false
+	if data.has("career_rank_gte"):
+		var rank_val := int(data["career_rank_gte"])
+		if host != null and host.has_method("get_career_rank"):
+			if int(host.get_career_rank()) < rank_val:
+				return false
+	if data.has("fund_active"):
+		var expected_active := bool(data["fund_active"])
+		var is_fund := false
+		if host != null and host.has_method("is_fund_active"):
+			is_fund = bool(host.is_fund_active())
+		if is_fund != expected_active:
+			return false
+	if data.has("drawdown_gte"):
+		var dd_threshold := float(data["drawdown_gte"])
+		var actual_dd := 0.0
+		if host != null and host.has_method("get_fund_drawdown"):
+			actual_dd = float(host.get_fund_drawdown())
+		if actual_dd < dd_threshold:
+			return false
 	return true
 
 
@@ -265,6 +293,27 @@ func _apply_effects(effects: Array) -> void:
 			var message := _resolve(effect["toast"])
 			if host != null and host.has_method("toast"):
 				host.toast(message)
+		if effect.has("add_fund_client"):
+			var client: Variant = effect["add_fund_client"]
+			if typeof(client) == TYPE_DICTIONARY and host != null \
+					and host.has_method("story_add_fund_client"):
+				host.story_add_fund_client(String(client.get("name", "")),
+					float(client.get("principal", 0.0)))
+
+
+## A node may carry flag-specific variants of its narration. The first matching
+## entry wins; otherwise the default "text" is used.
+func _node_text(node: Dictionary) -> String:
+	var value: Variant = node.get("text", "")
+	var variants: Variant = node.get("text_by_flag", [])
+	if typeof(variants) == TYPE_ARRAY:
+		for entry in variants:
+			if typeof(entry) != TYPE_DICTIONARY:
+				continue
+			if evaluate(entry.get("condition", null)):
+				value = entry.get("text", value)
+				break
+	return _resolve(value)
 
 
 func _resolve(value: Variant) -> String:
@@ -300,6 +349,8 @@ func _finish() -> void:
 	if not finished_id.is_empty():
 		_record("finish")
 		story_finished.emit(finished_id)
+		last_finished_id = finished_id
+		handle_event("story_finished", {"story_id": finished_id})
 	view_changed.emit()
 	if not queue.is_empty():
 		var next_story: String = queue.pop_front()

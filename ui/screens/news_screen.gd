@@ -25,6 +25,7 @@ func refresh(_reason: String = "") -> void:
 	if game == null or not game.started:
 		return
 	_render_header()
+	_render_earnings_calendar()
 	var items: Array = game.news_items()
 	if items.is_empty():
 		_render_empty()
@@ -45,6 +46,33 @@ func _render_header() -> void:
 	var market_button := SmaKit.button(I18n.t("nav.market"), _go_market)
 	header.add_child(market_button)
 	_body.add_child(header)
+
+
+func _render_earnings_calendar() -> void:
+	var rows: Array = game.earnings_calendar(3)
+	if rows.is_empty():
+		return
+	var card := SmaKit.card(12)
+	var box := SmaKit.vbox(5)
+	card.add_child(box)
+	box.add_child(SmaKit.label(I18n.t("news.calendar.title"), 13))
+	for row in rows:
+		var names: Array = []
+		for ticker in row.get("tickers", []):
+			var company := SmaCompanyCatalog.get_company(String(ticker))
+			names.append("%s %s" % [String(ticker),
+				String(company.get("name", ""))])
+		var shown := names.slice(0, 4)
+		var extra := names.size() - shown.size()
+		var tickers_text := ", ".join(PackedStringArray(shown))
+		if extra > 0:
+			tickers_text += " " + I18n.t("news.calendar.more", {"count": extra})
+		box.add_child(SmaKit.muted(I18n.t("news.calendar.row", {
+			"date": SmaCalendar.iso_date(int(row.get("day", 0))),
+			"period": String(row.get("periodLabel", "")),
+			"tickers": tickers_text,
+		}), 10))
+	_body.add_child(card)
 
 
 func _go_market() -> void:
@@ -69,8 +97,9 @@ func _news_card(item: Dictionary) -> PanelContainer:
 	card.add_child(box)
 	var meta := SmaKit.hbox(8)
 	var kind := String(item.get("kind", "company"))
-	meta.add_child(SmaKit.label(I18n.t("news.kind.%s" % kind), 10,
-		SmaUiTheme.ACCENT if kind == "macro" else SmaUiTheme.WARNING))
+	var kind_color := SmaUiTheme.ACCENT if kind == "macro" \
+		else (SmaUiTheme.INFO if kind == "earnings" else SmaUiTheme.WARNING)
+	meta.add_child(SmaKit.label(I18n.t("news.kind.%s" % kind), 10, kind_color))
 	meta.add_child(SmaKit.caption(SmaCalendar.iso_date(int(item.get("day", 0)))))
 	meta.add_child(SmaKit.hspacer())
 	var pct := float(item.get("pct", 0.0))
@@ -84,10 +113,21 @@ func _news_card(item: Dictionary) -> PanelContainer:
 	var headline := I18n.t(template_key, {
 		"company": company_name if company_name != "" else ticker,
 		"pct": SmaFormat.num(absf(pct), 1) + "%",
+		"period": String(item.get("periodLabel", "")),
+		"eps": SmaFormat.num(float(item.get("eps", 0.0)), 2),
+		"expected": SmaFormat.num(float(item.get("expectedEps", 0.0)), 2),
+		"surprise": SmaFormat.pct(float(item.get("surprisePct", 0.0)), 1),
 	})
 	var headline_label := SmaKit.label(headline, 13)
 	headline_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(headline_label)
+	if kind == "earnings":
+		box.add_child(SmaKit.muted(I18n.t("news.earningsDetail", {
+			"eps": SmaFormat.num(float(item.get("eps", 0.0)), 2),
+			"expected": SmaFormat.num(float(item.get("expectedEps", 0.0)), 2),
+			"surprise": SmaFormat.pct(float(item.get("surprisePct", 0.0)), 1),
+			"guidance": I18n.t("news.guidance.%s" % String(item.get("guidance", "maintain"))),
+		}), 10))
 	if ticker != "":
 		box.add_child(SmaKit.muted("%s · %s" % [ticker, company_name], 10))
 	return card

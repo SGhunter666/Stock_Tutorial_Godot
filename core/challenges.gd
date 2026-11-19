@@ -45,6 +45,55 @@ const DEFS := [
 		"unlockUnit": "u32",
 		"checks": [{"kind": "return", "target": 5.0}, {"kind": "allRound"}],
 	},
+	{
+		"id": "dividendCollector", "titleKey": "challenges.dividendCollector.title",
+		"descKey": "challenges.dividendCollector.desc", "xp": 140, "days": 70,
+		"unlockUnit": "u5",
+		"checks": [{"kind": "dividends", "target": 1}, {"kind": "trades", "target": 2}],
+	},
+	{
+		"id": "etfAllocator", "titleKey": "challenges.etfAllocator.title",
+		"descKey": "challenges.etfAllocator.desc", "xp": 180, "days": 30,
+		"unlockUnit": "u7",
+		"checks": [{"kind": "etfTrades", "target": 2}, {"kind": "openPositions", "target": 2}],
+	},
+	{
+		"id": "shortSeller", "titleKey": "challenges.shortSeller.title",
+		"descKey": "challenges.shortSeller.desc", "xp": 200, "days": 20,
+		"unlockUnit": "u17",
+		"checks": [{"kind": "shortTrades", "target": 1}, {"kind": "drawdownMax", "target": 8.0}],
+	},
+	{
+		"id": "optionsStarter", "titleKey": "challenges.optionsStarter.title",
+		"descKey": "challenges.optionsStarter.desc", "xp": 180, "days": 20,
+		"unlockUnit": "u21",
+		"checks": [{"kind": "optionTrades", "target": 1}],
+	},
+	{
+		"id": "optionsIncome", "titleKey": "challenges.optionsIncome.title",
+		"descKey": "challenges.optionsIncome.desc", "xp": 260, "days": 25,
+		"unlockUnit": "u26",
+		"checks": [{"kind": "income"}, {"kind": "optionTrades", "target": 2}],
+	},
+	{
+		"id": "futuresStarter", "titleKey": "challenges.futuresStarter.title",
+		"descKey": "challenges.futuresStarter.desc", "xp": 220, "days": 20,
+		"unlockUnit": "u29",
+		"checks": [{"kind": "futuresTrades", "target": 1}, {"kind": "drawdownMax", "target": 10.0}],
+	},
+	{
+		"id": "multiAssetExplorer", "titleKey": "challenges.multiAssetExplorer.title",
+		"descKey": "challenges.multiAssetExplorer.desc", "xp": 240, "days": 30,
+		"unlockUnit": "u13",
+		"checks": [{"kind": "multiAsset"}, {"kind": "cashRatio", "target": 20.0}],
+	},
+	{
+		"id": "cashGuard", "titleKey": "challenges.cashGuard.title",
+		"descKey": "challenges.cashGuard.desc", "xp": 200, "days": 30,
+		"unlockUnit": "u15",
+		"checks": [{"kind": "cashRatio", "target": 40.0},
+			{"kind": "drawdownMax", "target": 5.0}, {"kind": "trades", "target": 5}],
+	},
 ]
 
 
@@ -145,6 +194,42 @@ static func _count_futures_trades(account: Dictionary, start_day: int) -> int:
 	return _count_since(account.get("futuresTrades", []), start_day)
 
 
+static func _count_dividends(account: Dictionary, start_day: int) -> int:
+	return _count_since(account.get("dividends", []), start_day)
+
+
+static func _count_short_trades(account: Dictionary, start_day: int) -> int:
+	var count := 0
+	for trade in account.get("trades", []):
+		if int(trade.get("day", -1)) < start_day:
+			continue
+		if String(trade.get("action", "")) == "openShort" \
+				or String(trade.get("side", "")) == "short":
+			count += 1
+	return count
+
+
+static func _count_etf_trades(account: Dictionary, start_day: int,
+		etf_tickers: Array) -> int:
+	var lookup := {}
+	for ticker in etf_tickers:
+		lookup[String(ticker)] = true
+	var count := 0
+	for trade in account.get("trades", []):
+		if int(trade.get("day", -1)) < start_day:
+			continue
+		if lookup.has(String(trade.get("ticker", ""))):
+			count += 1
+	return count
+
+
+static func _has_multi_asset(account: Dictionary) -> bool:
+	for key in ["bonds", "fx", "commodities", "crypto"]:
+		if not account.get(key, []).is_empty():
+			return true
+	return false
+
+
 static func _has_hedge(account: Dictionary) -> bool:
 	var long_stock := false
 	for position in account.get("positions", {}).values():
@@ -220,6 +305,7 @@ static func metrics(state: Dictionary, exchange: SmaExchange) -> Dictionary:
 	var stock_trades := _count_since(account.get("trades", []), start_day)
 	var option_trades := _count_option_trades(account, start_day)
 	var futures_trades := _count_futures_trades(account, start_day)
+	var cash := float(account.get("cash", 0.0))
 	return {
 		"equity": current,
 		"return": SmaFormat.round_to(return_pct, 4),
@@ -227,6 +313,13 @@ static func metrics(state: Dictionary, exchange: SmaExchange) -> Dictionary:
 		"trades": stock_trades,
 		"optionTrades": option_trades,
 		"futuresTrades": futures_trades,
+		"etfTrades": _count_etf_trades(account, start_day,
+			exchange.state.get("etfTickers", [])),
+		"shortTrades": _count_short_trades(account, start_day),
+		"dividends": _count_dividends(account, start_day),
+		"openPositions": account.get("positions", {}).size() + account.get("shorts", {}).size(),
+		"cashRatio": cash / current * 100.0 if current > 0.0 else 0.0,
+		"multiAsset": 1 if _has_multi_asset(account) else 0,
 		"hedge": 1 if _has_hedge(account) else 0,
 		"income": 1 if _has_income(account) else 0,
 		"volatility": 1 if _has_volatility(account) else 0,

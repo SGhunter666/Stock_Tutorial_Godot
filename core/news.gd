@@ -6,8 +6,6 @@ extends RefCounted
 const LIMIT := 80
 
 const COMPANY_EVENTS := [
-	{"template": "earningsBeat", "min": 3.0, "max": 8.0},
-	{"template": "earningsMiss", "min": -8.0, "max": -3.0},
 	{"template": "contractWin", "min": 2.0, "max": 6.0},
 	{"template": "lawsuit", "min": -7.0, "max": -2.0},
 	{"template": "ceoExit", "min": -5.0, "max": -2.0},

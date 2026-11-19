@@ -4,7 +4,7 @@
 class_name SmaHistoryScreen
 extends SmaScreen
 
-const TIMEFRAMES := ["5m", "15m", "1h", "1d", "1w", "1mo", "1y"]
+const TIMEFRAMES := ["1d", "1w", "1mo", "1y"]
 
 var _list_view: VBoxContainer
 var _lab_view: VBoxContainer
@@ -14,9 +14,12 @@ var _selected_symbol := ""
 var _timeframe := "1d"
 var _playing := false
 var _speed := 1
+var _daily_mode := true
 var _accum := 0.0
 var _ui_accum := 0.0
 var _loading_id := ""
+var _daily_check: CheckBox
+var _advance_tick_button: Button
 
 var _date_label: Label
 var _tick_label: Label
@@ -74,7 +77,8 @@ func on_tick() -> void:
 
 
 func _process(delta: float) -> void:
-	if not visible or _scenario_id == "" or _dataset.is_empty() or not _playing:
+	if not visible or _scenario_id == "" or _dataset.is_empty() or not _playing \
+			or _daily_mode:
 		return
 	var interval := 1.0 / float(_speed)
 	_accum += delta
@@ -173,6 +177,8 @@ func _start_scenario(scenario_id: String) -> void:
 	_dataset = dataset
 	_scenario_id = scenario_id
 	var run_data: Dictionary = Game.history.ensure_run(scenario_id, dataset)
+	if _daily_mode:
+		run_data["tick"] = SmaHistoryService.TICKS_PER_DAY - 1
 	_selected_symbol = String(run_data.get("selectedTicker", ""))
 	if _selected_symbol == "" and not dataset.get("tickers", []).is_empty():
 		_selected_symbol = String(dataset["tickers"][0]["symbol"])
@@ -195,8 +201,10 @@ func _build_lab() -> void:
 	SmaKit.clear_children(_lab_view)
 	var scenario := Game.history.scenario(_scenario_id)
 	var top := SmaKit.card(10)
+	var top_box := SmaKit.vbox(4)
+	top.add_child(top_box)
 	var top_row := SmaKit.hbox(12)
-	top.add_child(top_row)
+	top_box.add_child(top_row)
 	top_row.add_child(SmaKit.button(I18n.t("history.backToList"), _back_to_list))
 	var title_box := SmaKit.vbox(1)
 	title_box.add_child(SmaKit.label(I18n.t(String(scenario.get("titleKey", ""))), 17))
@@ -219,6 +227,7 @@ func _build_lab() -> void:
 	pnl.add_child(_return_label)
 	top_row.add_child(pnl)
 	_play_button = SmaKit.button(I18n.t("history.play"), _toggle_play)
+	_play_button.disabled = _daily_mode
 	top_row.add_child(_play_button)
 	var speed_group := ButtonGroup.new()
 	for value in [1, 5, 20]:
@@ -227,10 +236,20 @@ func _build_lab() -> void:
 		button.button_pressed = value == 1
 		button.pressed.connect(_set_speed.bind(value))
 		top_row.add_child(button)
-	top_row.add_child(SmaKit.button(I18n.t("history.advanceTick"), _advance_tick))
+	_advance_tick_button = SmaKit.button(I18n.t("history.advanceTick"), _advance_tick)
+	_advance_tick_button.disabled = _daily_mode
+	top_row.add_child(_advance_tick_button)
 	top_row.add_child(SmaKit.button(I18n.t("history.nextDay"), _advance_day))
 	top_row.add_child(SmaKit.button(I18n.t("history.nextEvent"), _next_event))
 	top_row.add_child(SmaKit.button(I18n.t("history.resetShort"), _reset))
+	var mode_row := SmaKit.hbox(8)
+	_daily_check = CheckBox.new()
+	_daily_check.text = I18n.t("history.dailyMode")
+	_daily_check.button_pressed = _daily_mode
+	_daily_check.toggled.connect(_on_daily_mode_toggled)
+	mode_row.add_child(_daily_check)
+	mode_row.add_child(SmaKit.muted(I18n.t("history.dailyModeHint"), 10))
+	top_box.add_child(mode_row)
 	_lab_view.add_child(top)
 
 	var body := SmaKit.hbox(12)
@@ -481,6 +500,8 @@ func _tick() -> void:
 
 
 func _toggle_play() -> void:
+	if _daily_mode:
+		return
 	_playing = not _playing
 	_play_button.text = I18n.t("history.pause" if _playing else "history.play")
 
@@ -494,6 +515,23 @@ func _on_timeframe(timeframe: String) -> void:
 	_update_chart()
 
 
+func _on_daily_mode_toggled(value: bool) -> void:
+	_daily_mode = value
+	_playing = false
+	_accum = 0.0
+	_ui_accum = 0.0
+	if _play_button != null:
+		_play_button.text = I18n.t("history.play")
+		_play_button.disabled = _daily_mode
+	if _advance_tick_button != null:
+		_advance_tick_button.disabled = _daily_mode
+	var run_data: Dictionary = Game.history.run(_scenario_id)
+	if not run_data.is_empty():
+		run_data["tick"] = SmaHistoryService.TICKS_PER_DAY - 1 if _daily_mode else 0
+	Game.history_commit()
+	_update_all()
+
+
 func _advance_tick() -> void:
 	_playing = false
 	_play_button.text = I18n.t("history.play")
@@ -505,7 +543,7 @@ func _advance_tick() -> void:
 func _advance_day() -> void:
 	_playing = false
 	_play_button.text = I18n.t("history.play")
-	var result: Dictionary = Game.history.advance_day(_scenario_id, _dataset)
+	var result: Dictionary = Game.history.advance_day(_scenario_id, _dataset, _daily_mode)
 	Game.history_commit()
 	if bool(result.get("reachedEnd", false)):
 		game.toast(I18n.t("history.atEnd"))
@@ -515,7 +553,7 @@ func _advance_day() -> void:
 func _next_event() -> void:
 	_playing = false
 	_play_button.text = I18n.t("history.play")
-	var result: Dictionary = Game.history.advance_to_event(_scenario_id, _dataset)
+	var result: Dictionary = Game.history.advance_to_event(_scenario_id, _dataset, _daily_mode)
 	Game.history_commit()
 	if bool(result.get("reachedEnd", false)):
 		game.toast(I18n.t("history.noMoreEvents"))
@@ -526,6 +564,8 @@ func _reset() -> void:
 	_playing = false
 	_play_button.text = I18n.t("history.play")
 	var run_data: Dictionary = Game.history.reset_run(_scenario_id)
+	if _daily_mode:
+		run_data["tick"] = SmaHistoryService.TICKS_PER_DAY - 1
 	_selected_symbol = String(run_data.get("selectedTicker", ""))
 	if _selected_symbol == "" and not _dataset.get("tickers", []).is_empty():
 		_selected_symbol = String(_dataset["tickers"][0]["symbol"])
@@ -575,7 +615,12 @@ func _update_all() -> void:
 	var day := int(run_data.get("dayIndex", 0))
 	var tick := int(run_data.get("tick", 0))
 	_date_label.text = SmaHistoryService.current_date(_dataset, day)
-	_tick_label.text = I18n.t("history.tickOf", {"tick": tick + 1, "total": 8})
+	_tick_label.text = I18n.t("history.dailyLabel") if _daily_mode \
+		else I18n.t("history.tickOf", {"tick": tick + 1, "total": 8})
+	if _play_button != null:
+		_play_button.disabled = _daily_mode
+	if _advance_tick_button != null:
+		_advance_tick_button.disabled = _daily_mode
 	var summary: Dictionary = Game.history.summary(_scenario_id, _dataset)
 	_equity_label.text = SmaFormat.money(float(summary["equity"]))
 	_return_label.text = SmaFormat.pct(float(summary["returnPct"]))
@@ -626,8 +671,7 @@ func _update_chart() -> void:
 	_chart.set_candles(result.get("candles", []), _timeframe,
 		"%s · %s" % [_selected_symbol, tf_label])
 	var count := int(result.get("candles", []).size())
-	_chart_note.text = I18n.t("history.chartNoteIntraday" if bool(result.get("intraday", false))
-		else "history.chartNote", {"count": count, "tf": tf_label})
+	_chart_note.text = I18n.t("history.chartNote", {"count": count, "tf": tf_label})
 
 
 func _update_positions() -> void:

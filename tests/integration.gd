@@ -58,6 +58,43 @@ func _ready() -> void:
 	if int(Game.exchange.state["second"]) != 60:
 		failures.append("minute step did not advance the clock")
 
+	var speed_key := InputEventKey.new()
+	speed_key.keycode = KEY_3
+	speed_key.pressed = true
+	main._unhandled_input(speed_key)
+	if int(Game.speed) != 10:
+		failures.append("number shortcut did not select 10x speed")
+	Game.set_speed(1)
+	var pause_key := InputEventKey.new()
+	pause_key.keycode = KEY_SPACE
+	pause_key.pressed = true
+	var paused_before := Game.paused
+	main._unhandled_input(pause_key)
+	if Game.paused == paused_before:
+		failures.append("space shortcut did not toggle pause")
+	Game.set_paused(true)
+	var help_key := InputEventKey.new()
+	help_key.keycode = KEY_F1
+	help_key.pressed = true
+	main._unhandled_input(help_key)
+	if main._help_dialog == null or not is_instance_valid(main._help_dialog):
+		failures.append("F1 did not open the shortcut reference")
+	elif main._help_dialog.visible:
+		main._help_dialog.hide()
+
+	# Progressive market access must block new exposure but not exits.
+	if not bool(Game.market_lock_info("SLDY").get("locked", false)):
+		failures.append("energy sector should start locked")
+	var locked_buy := Game.submit_order({
+		"ticker": "SLDY", "side": "buy", "type": "market", "qty": 1})
+	if String(locked_buy.get("error", "")) != "order.marketLocked":
+		failures.append("locked-sector buy was not rejected")
+	var disguised_open := Game.submit_order({
+		"ticker": "SLDY", "side": "sell", "action": "openLong",
+		"type": "market", "qty": 1})
+	if String(disguised_open.get("error", "")) != "order.marketLocked":
+		failures.append("explicit openLong bypassed the market lock")
+
 	for screen_id in ["market", "trade", "portfolio"]:
 		main.navigate(screen_id)
 		await get_tree().process_frame
@@ -486,6 +523,7 @@ func _ready() -> void:
 		await get_tree().process_frame
 
 	# --- Phase 9 surfaces: ETFs, challenges, career, fund, quant, tax and utility pages.
+	Game.academy["units"]["u7"]["completed"] = true
 	var etf_buy: Dictionary = Game.submit_order({"ticker": "MKT", "side": "buy",
 		"type": "market", "qty": 5})
 	if not bool(etf_buy.get("ok", false)):
@@ -507,6 +545,7 @@ func _ready() -> void:
 	})
 	if not bool(fund_created.get("ok", false)):
 		failures.append("fund creation failed")
+	var fund_clients_before: int = Game.fund.get("clients", []).size()
 	if not bool(Game.fund_buy("APLA", 10).get("ok", false)):
 		failures.append("fund purchase failed")
 	var fund_plan: Dictionary = Game.fund_generate_plan()
@@ -547,7 +586,7 @@ func _ready() -> void:
 
 	for screen_id in ["etf", "challenges", "career", "fund", "quant", "tax",
 			"statements", "glossary", "sandbox", "roadmap", "boundaries", "settings",
-			"replay"]:
+			"replay", "news"]:
 		if not main._screens.has(screen_id):
 			failures.append("screen not registered: %s" % screen_id)
 			continue
@@ -605,6 +644,20 @@ func _ready() -> void:
 	main.navigate("portfolio")
 	await get_tree().process_frame
 	await get_tree().process_frame
+
+	# Consume any milestone story that queued during the long integration run.
+	for i in 40:
+		if not Game.narrative.is_active():
+			break
+		var queued_view: Dictionary = Game.narrative.current_view()
+		if String(queued_view.get("type", "")) == "choice":
+			Game.narrative.choose(0)
+		else:
+			Game.narrative.advance()
+
+	if bool(Game.narrative.seen.get("client_trust", false)) \
+			and Game.fund.get("clients", []).size() <= fund_clients_before:
+		failures.append("client trust did not create a real fund client")
 
 	# Full-day fast-forward runs in chunks so the UI stays responsive.
 	Game.step_day()

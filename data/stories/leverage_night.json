@@ -1,0 +1,179 @@
+{
+  "id": "leverage_night",
+  "title": {
+    "zh_CN": "杠杆之夜",
+    "en": "The Margin Night"
+  },
+  "start": "siren",
+  "nodes": {
+    "siren": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "全院平仓警报响了！夜盘外围市场急剧缩量下挫，维持担保比例（Margin Ratio）全线告急。顾言，你的融资多头已经跌破 130% 警戒线，离强制平仓只剩 60 秒！",
+        "en": "Academy-wide margin sirens are blaring! Overnight liquidity collapsed and margin maintenance ratios are cratering across desks. Gu Yan, your leveraged book breached the 130% threshold. You have 60 seconds before liquidation!"
+      },
+      "next": "gu_yan_panic"
+    },
+    "gu_yan_panic": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "别平仓！这是洗盘！只要明天早盘一开盘，资金一定会回流反弹的！我现在就向学院申请借调备用流动性把保证金补上！只要熬过今晚，我一定能翻本！",
+        "en": "Don't liquidate! This is a deliberate shakeout! The moment the morning bell rings, capital will rotate back in! I'm requesting emergency academy liquidity right now to wire collateral! If I just survive tonight, I will make it all back!"
+      },
+      "next": "lin_lan_past"
+    },
+    "lin_lan_past": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "七年前，‘远望旧基金’出事的那天夜里，走廊上的红灯和警报声也是这样。所有人都以为我是看错了周期……其实只要再给我三天，市场就会迎来一轮强劲反弹。",
+        "en": "Seven years ago, the night the old Farview Fund collapsed, the red lights and alarms looked the same. Everyone thought I had misread the cycle... in fact, three more days would have brought a strong rebound."
+      },
+      "next": "lin_lan_lesson"
+    },
+    "lin_lan_lesson": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "但我没能撑过那三天。因为我太自信，把每一分钱都加上了三倍杠杆。杠杆最危险的地方，不是放大亏损，而是剥夺了你在黎明前等待的时间。你想象一下：如果你的账户也收到保证金提醒，你打算怎么做？",
+        "en": "But I didn't last those three days. I was too confident and leveraged every dollar three times over. The real danger of leverage isn't bigger losses; it's that it takes away the time you need to wait for dawn. Imagine your own account just got a margin call. What do you do?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "面对保证金警戒线的处置方案：",
+        "en": "Action plan facing margin maintenance alert:"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "主动斩仓高风险敞口，立刻降低财务杠杆，退出危险区。",
+            "en": "Voluntarily slash vulnerable risk assets; derisk leverage immediately."
+          },
+          "next": "reduce_reply",
+          "effects": [
+            {
+              "set_flag": "leverage",
+              "value": "reduce"
+            },
+            {
+              "toast": {
+                "zh_CN": "风控决断：主动减仓，解除杠杆警戒",
+                "en": "Risk Action: Deleveraged positions to safety"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "追加防守备用金维持现有仓位，赌行情在次日迅速修复。",
+            "en": "Wire reserve collateral to defend positions; bet on morning bounce."
+          },
+          "next": "add_reply",
+          "effects": [
+            {
+              "set_flag": "leverage",
+              "value": "add"
+            },
+            {
+              "toast": {
+                "zh_CN": "风控决断：追加保证金，维持杠杆敞口",
+                "en": "Risk Action: Injected collateral to maintain leverage"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "不补不减，相信波动率自然收敛，硬扛过强平线考验。",
+            "en": "Neither wire nor sell; let volatility resolve and test the margin line."
+          },
+          "next": "hold_reply",
+          "effects": [
+            {
+              "set_flag": "leverage",
+              "value": "hold"
+            },
+            {
+              "toast": {
+                "zh_CN": "风控决断：拒绝干预，硬扛保证金压力",
+                "en": "Risk Action: Held through margin pressure"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "reduce_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "极其果断。虽然承认了账面亏损，但你拿回了主动权。市场永远不会给你体面退出的机会，除非你主动把刹车踩到底。",
+        "en": "Decisive execution. Realizing a paper loss stings, but you reclaimed control. The market never grants a graceful exit unless you slam the brakes yourself."
+      },
+      "next": "wrap"
+    },
+    "add_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "你可以补一次保证金，但你不能保证每次都有救命钱。永远警惕：不要用无辜的好钱，去拯救一笔已经证明失败的坏交易。",
+        "en": "You can wire collateral once, but you won't always have a lifeline. Beware the fatal sin: never throw good money after a structurally broken trade."
+      },
+      "next": "wrap"
+    },
+    "hold_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "靠侥幸撑过去，通常是清盘的前奏。把命运交给自动强平，在职业交易大厅里，这等于把主动权交出去。",
+        "en": "Counting on luck is usually the prelude to liquidation. Leaving your fate to automatic forced selling is simply giving up control."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "检查你的维持担保比例。在金融世界里，杠杆不是不能用，但你必须随时清楚：最坏的一刀砍下来时，你能不能活命。",
+        "en": "Audit your maintenance margin. Leverage isn't inherently evil, but you must answer at all times: when the worst-case axe drops, can you survive?"
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

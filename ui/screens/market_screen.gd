@@ -9,6 +9,8 @@ var _sector_filter: OptionButton
 var _sector_values: Array[String] = [""]
 var _list: VBoxContainer
 var _count_label: Label
+var _index_label: Label
+var _index_change: Label
 
 
 func _build() -> void:
@@ -24,6 +26,15 @@ func _build() -> void:
 	heading.add_child(SmaKit.title(I18n.t("market.title"), 22))
 	heading.add_child(SmaKit.muted(I18n.t("market.subtitle")))
 	root.add_child(heading)
+
+	var index_row := SmaKit.hbox(10)
+	index_row.add_child(SmaKit.caption(I18n.t("market.index")))
+	_index_label = SmaKit.label("—", 18)
+	_index_change = SmaKit.label("—", 12)
+	index_row.add_child(_index_label)
+	index_row.add_child(_index_change)
+	index_row.add_child(SmaKit.hspacer())
+	root.add_child(index_row)
 
 	var filters := SmaKit.hbox(10)
 	_search = LineEdit.new()
@@ -75,13 +86,14 @@ func _build() -> void:
 
 	var companies := SmaCompanyCatalog.load_companies()
 	for ticker in companies.keys():
-		_create_row(String(ticker), companies[ticker])
+		_create_row(String(ticker), companies[ticker], String(companies[ticker].get("sector", "")), false)
 	var etfs := SmaEtfs.instruments()
 	for ticker in etfs.keys():
-		_create_row(String(ticker), etfs[ticker])
+		_create_row(String(ticker), etfs[ticker], SmaEtfs.ETF_SECTOR, true)
 
 
-func _create_row(ticker: String, company: Dictionary) -> void:
+func _create_row(ticker: String, company: Dictionary, sector: String,
+		is_etf: bool) -> void:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = SmaUiTheme.PANEL if _rows.size() % 2 == 0 else SmaUiTheme.PANEL_ALT
@@ -109,7 +121,8 @@ func _create_row(ticker: String, company: Dictionary) -> void:
 	for key in ["ticker", "name", "sector", "last", "change", "bid", "ask", "volume"]:
 		row.add_child(cells[key])
 	_list.add_child(panel)
-	_rows[ticker] = {"panel": panel, "cells": cells}
+	_rows[ticker] = {"panel": panel, "cells": cells, "sector": sector,
+		"is_etf": is_etf, "locked": false}
 
 
 func refresh(_reason: String = "") -> void:
@@ -125,18 +138,44 @@ func _update_rows() -> void:
 	if game == null or not game.started or game.exchange == null:
 		if _count_label != null:
 			_count_label.text = I18n.t("start.no_save")
+		if _index_label != null:
+			_index_label.text = "—"
+			_index_change.text = "—"
 		return
+	if _index_label != null:
+		var index_change := float(game.market_index_change())
+		_index_label.text = SmaFormat.num(float(game.market_index()), 2)
+		_index_change.text = SmaFormat.pct(index_change, 2)
+		_index_change.add_theme_color_override("font_color", SmaKit.value_color(index_change))
 	var visible_count := 0
+	var locked_count := 0
 	for ticker in _rows.keys():
 		var entry: Dictionary = _rows[ticker]
 		var panel: PanelContainer = entry["panel"]
 		if not panel.visible:
 			continue
 		visible_count += 1
+		var lock: Dictionary = game.market_lock_info(ticker)
+		var locked := bool(lock.get("locked", false))
+		entry["locked"] = locked
+		if locked:
+			locked_count += 1
+		panel.modulate = Color(1, 1, 1, 0.55) if locked else Color.WHITE
+		panel.tooltip_text = "" if not locked else I18n.t("market.lockedHint", {
+			"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
+		})
 		var quote: Dictionary = game.exchange.quote(ticker)
 		var cells: Dictionary = entry["cells"]
 		var change := float(quote.get("changePct", 0.0))
 		var last := float(quote.get("last", 0.0))
+		if locked:
+			cells["last"].text = "—"
+			cells["change"].text = I18n.t("market.locked")
+			cells["change"].add_theme_color_override("font_color", SmaUiTheme.DIM)
+			cells["bid"].text = "—"
+			cells["ask"].text = "—"
+			cells["volume"].text = "—"
+			continue
 		cells["last"].text = SmaFormat.num(last, 2)
 		cells["change"].text = SmaFormat.pct(change, 2)
 		cells["change"].add_theme_color_override("font_color", SmaKit.value_color(change))
@@ -146,7 +185,8 @@ func _update_rows() -> void:
 		cells["ask"].text = SmaFormat.num(float(ask), 2) if ask != null else "—"
 		cells["volume"].text = SmaFormat.compact(float(quote.get("volume", 0)))
 	if _count_label != null:
-		_count_label.text = "%d / %d" % [visible_count, _rows.size()]
+		_count_label.text = "%d / %d · %s %d" % [visible_count, _rows.size(),
+			I18n.t("market.lockedCount"), locked_count]
 
 
 func _apply_filter() -> void:
@@ -169,6 +209,17 @@ func _apply_filter() -> void:
 
 func _on_row_input(event: InputEvent, ticker: String) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var lock: Dictionary = game.market_lock_info(ticker)
+		if bool(lock.get("locked", false)):
+			var account: Dictionary = game.exchange.state["account"]
+			var held := int(account.get("positions", {}).get(ticker, {}).get("qty", 0)) \
+				+ int(account.get("shorts", {}).get(ticker, {}).get("qty", 0))
+			if held <= 0:
+				game.toast(I18n.t("market.lockedToast", {
+					"ticker": ticker,
+					"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
+				}))
+				return
 		game.select_ticker(ticker)
 		var main := get_tree().get_first_node_in_group("main")
 		if main != null and main.has_method("navigate"):

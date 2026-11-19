@@ -1,0 +1,116 @@
+{
+  "id": "graduation_unfunded",
+  "title": { "zh_CN": "毕业答辩", "en": "The Grand Defense" },
+  "start": "hall",
+  "nodes": {
+    "hall": {
+      "type": "line",
+      "speaker": { "zh_CN": "周衡 · 宏观教授", "en": "Zhou Heng · Macroeconomics Professor" },
+      "text": {
+        "zh_CN": "答辩大厅很安静。大屏幕上回放着你在远望的完整记录：第一笔成交、第一笔股息、利率冲击、做空、期权与杠杆，直到 32 个单元全部结业。你目前没有在管理的基金，但每一笔自己的交易，你都走完了。",
+        "en": "The defense hall is quiet. The screen replays your complete record at Farview: first fill, first dividend, rate shocks, shorting, options, leverage, all the way through 32 units. You are not managing a fund right now, but you saw every one of your own trades through."
+      },
+      "next": "lin_lan_truth"
+    },
+    "lin_lan_truth": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "七年前，我管理的旧基金在这里清盘。外面一直说我输给了市场，其实我是输给了不肯认错。今天我站在这儿，不是要你复制我的路，而是想看你带着这条教训往下走。",
+        "en": "Seven years ago, the old fund I managed was liquidated here. People say I lost to the market; in truth I lost to my refusal to admit I was wrong. I'm not here to make you copy my path. I want to see you carry that lesson forward."
+      },
+      "next": "gu_yan_nod"
+    },
+    "gu_yan_nod": {
+      "type": "line",
+      "speaker": { "zh_CN": "顾言 · 同届学员", "en": "Gu Yan · Fellow Trainee" },
+      "text": {
+        "zh_CN": "台下的顾言安静地听着。他没有再争，只朝你点了点头。",
+        "en": "Gu Yan listens in silence. He doesn't argue this time; he just nods."
+      },
+      "next": "lin_lan_verdict"
+    },
+    "lin_lan_verdict": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "你完成了全部 32 个单元，也证明了自己能按规则活下来。远望学院准予你毕业。接下来，你想把这段经验用在什么地方？",
+        "en": "You completed all 32 units and proved you can survive by your own rules. Farview grants you graduation. Where do you want to put that experience next?"
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": { "zh_CN": "选择你的毕业去向：", "en": "Choose your path after graduation:" },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "【学院导师】留在远望任教，把风险纪律传给下一届学徒。",
+            "en": "[Academy Mentor] Stay at Farview and teach risk discipline to the next cohort."
+          },
+          "next": "mentor_reply",
+          "effects": [
+            {
+              "set_flag": "ending_path",
+              "value": "mentor"
+            },
+            {
+              "toast": {
+                "zh_CN": "毕业去向：成为远望交易学院导师",
+                "en": "Career destiny: Farview Academy Mentor"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "【独立交易员】带着自己的账户继续上路，在真实市场里验证这套方法。",
+            "en": "[Independent Trader] Take your own account into the real market and test what you've learned."
+          },
+          "next": "trader_reply",
+          "effects": [
+            {
+              "set_flag": "ending_path",
+              "value": "independent"
+            },
+            {
+              "toast": {
+                "zh_CN": "毕业去向：成为独立交易员",
+                "en": "Career destiny: Independent Trader"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "mentor_reply": {
+      "type": "line",
+      "speaker": { "zh_CN": "周衡 · 宏观教授", "en": "Zhou Heng · Macroeconomics Professor" },
+      "text": {
+        "zh_CN": "愿意把自己踩过的坑讲给别人听，比独自赚钱更难。远望的讲台，从今天起有你一个位置。",
+        "en": "Telling others about the mistakes you survived is harder than making money alone. There is a place for you at Farview's podium."
+      },
+      "next": "wrap"
+    },
+    "trader_reply": {
+      "type": "line",
+      "speaker": { "zh_CN": "顾言 · 同届学员", "en": "Gu Yan · Fellow Trainee" },
+      "text": {
+        "zh_CN": "没有基金，没有客户，只有你自己的账户。那就用结果说话。",
+        "en": "No fund, no clients, just your own account. Then let the results speak."
+      },
+      "next": "wrap"
+    },
+    "wrap": {
+      "type": "line",
+      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "text": {
+        "zh_CN": "答辩委员会一致通过。祝贺你，交易员。愿你记住：先活下来，再谈收益。",
+        "en": "The committee affirms with unanimous consent. Congratulations, trader. Remember: survive first, then talk returns."
+      },
+      "next": "end"
+    },
+    "end": { "type": "end" }
+  }
+}

@@ -579,21 +579,34 @@ func _render_achievements() -> void:
 	var card := SmaKit.card(12)
 	var box := SmaKit.vbox(8)
 	card.add_child(box)
-	box.add_child(SmaKit.label(I18n.t("academy.achievementsTitle"), 15))
+	var head := SmaKit.hbox(8)
+	head.add_child(SmaKit.label(I18n.t("academy.achievementsTitle"), 15))
+	head.add_child(SmaKit.hspacer())
+	var unlocked_count := 0
+	for definition in SmaAcademy.ACHIEVEMENTS:
+		if game.academy["achievements"].has(String(definition["id"])):
+			unlocked_count += 1
+	head.add_child(SmaKit.label("%d / %d" % [unlocked_count, SmaAcademy.ACHIEVEMENTS.size()],
+		11, SmaUiTheme.ACCENT))
+	box.add_child(head)
 	box.add_child(SmaKit.muted(I18n.t("academy.achievementsSubtitle"), 11))
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 6)
-	for achievement_id in ["observer", "firstTrade", "firstPractice", "academyInitiate",
-			"quizAce", "limitMaster", "bilingual", "glossaryExplorer", "stageOneGraduate"]:
-		var unlocked: bool = game.academy["achievements"].has(achievement_id)
-		var cell := SmaKit.vbox(1)
-		cell.add_child(SmaKit.label(I18n.t("achievement.%s.title" % achievement_id), 12,
-			SmaUiTheme.POSITIVE if unlocked else SmaUiTheme.DIM))
-		cell.add_child(SmaKit.caption(I18n.t("achievement.%s.desc" % achievement_id)))
-		grid.add_child(cell)
-	box.add_child(grid)
+	for category in ["learning", "trading", "career"]:
+		box.add_child(SmaKit.caption(I18n.t("achievement.category.%s" % category)))
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 14)
+		grid.add_theme_constant_override("v_separation", 6)
+		for definition in SmaAcademy.ACHIEVEMENTS:
+			if String(definition["category"]) != category:
+				continue
+			var achievement_id := String(definition["id"])
+			var unlocked: bool = game.academy["achievements"].has(achievement_id)
+			var cell := SmaKit.vbox(1)
+			cell.add_child(SmaKit.label(I18n.t("achievement.%s.title" % achievement_id), 12,
+				SmaUiTheme.POSITIVE if unlocked else SmaUiTheme.DIM))
+			cell.add_child(SmaKit.caption(I18n.t("achievement.%s.desc" % achievement_id)))
+			grid.add_child(cell)
+		box.add_child(grid)
 	_content.add_child(card)
 
 

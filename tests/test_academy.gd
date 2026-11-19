@@ -84,11 +84,62 @@ func run() -> void:
 	SmaAcademy.mark_section_read(state, "u4", "s3", 0)
 	check(SmaAcademy.is_tool_unlocked(state, "order.limit"), "reading u4 s3 unlocks limit orders")
 
+	describe("academy-market-lock")
+	var market_state := SmaAcademy.create_state()
+	check(not bool(SmaAcademy.market_lock_info(market_state, "VISO", "financials")["locked"]),
+		"core financial sector is available from day one")
+	check(bool(SmaAcademy.market_lock_info(market_state, "XOM", "energy")["locked"]),
+		"energy sector waits for u7")
+	check(bool(SmaAcademy.market_lock_info(market_state, "MKT", "etf", true)["locked"]),
+		"ETF waits for u7")
+	SmaAcademy.ensure_unit(market_state, "u7")["completed"] = true
+	check(not bool(SmaAcademy.market_lock_info(market_state, "XOM", "energy")["locked"]),
+		"completing u7 opens energy")
+	check(not bool(SmaAcademy.market_lock_info(market_state, "MKT", "etf", true)["locked"]),
+		"completing u7 opens ETFs")
+
 	describe("academy-achievements")
 	var achievements := SmaAcademy.evaluate_achievements(state, {"trades": [], "orders": []})
 	check(achievements.has("observer"), "observer achievement unlocked")
 	check(achievements.has("academyInitiate"), "academy initiate achievement unlocked")
 	check(achievements.has("quizAce"), "quiz ace achievement unlocked")
+
+	describe("academy-achievements-expanded")
+	var rich := SmaAcademy.create_state()
+	SmaAcademy.ensure_unit(rich, "b1")["completed"] = true
+	var rich_snapshot := {
+		"trades": [
+			{"ticker": "MKT", "action": "openLong", "side": "buy"},
+			{"ticker": "APLA", "action": "openLong", "side": "buy"},
+			{"ticker": "MSFY", "action": "openLong", "side": "buy"},
+			{"ticker": "VISO", "action": "openLong", "side": "buy"},
+			{"ticker": "GOGL", "action": "openShort", "side": "short"},
+		],
+		"orders": [{"type": "stop"}],
+		"positions": {"APLA": {}, "MSFY": {}, "VISO": {}, "GOGL": {}, "NVDO": {}},
+		"shorts": {"GOGL": {}},
+		"dividends": [{"amount": 12.0}],
+		"margin": {"accruedInterest": 3.0},
+		"optionTrades": [{"ticker": "APLA"}],
+		"futuresTrades": [{"ticker": "APLA"}],
+		"bonds": [{"id": "gov2"}],
+		"fx": [], "commodities": [], "crypto": [],
+		"etfTickers": ["MKT"],
+		"realizedPnl": 120.0,
+		"cash": 50000.0,
+		"equity": 100000.0,
+		"careerRank": 2,
+		"fundFounded": true,
+		"challengesCompleted": ["firstProfit"],
+		"milestones": {"tax": true, "quant": true, "history": true},
+	}
+	var rich_unlocked := SmaAcademy.evaluate_achievements(rich, rich_snapshot)
+	for achievement_id in ["firstOption", "firstFutures", "firstShort", "firstMargin",
+			"firstDividend", "firstEtf", "multiAsset", "diversified", "cashCushion",
+			"profitMaker", "riskAware", "careerStart", "fundFounder", "challengeFirst",
+			"taxLearner", "quantResearcher", "historian", "branchGraduate"]:
+		check(rich_unlocked.has(achievement_id), "%s unlocks from the enriched snapshot"
+			% achievement_id)
 
 	describe("academy-persistence")
 	var serialized: Variant = JSON.parse_string(JSON.stringify(state))
