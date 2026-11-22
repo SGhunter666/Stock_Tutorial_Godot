@@ -9,6 +9,7 @@ var _title: Label
 var _speaker: Label
 var _text: Label
 var _choices: VBoxContainer
+var _hint: Label
 var _continue: Button
 var _portrait: TextureRect
 var _portrait_frame: PanelContainer
@@ -91,7 +92,8 @@ func _build() -> void:
 	root.add_child(_choices)
 
 	var footer := SmaKit.hbox(8)
-	footer.add_child(SmaKit.caption("Enter / Space"))
+	_hint = SmaKit.caption("")
+	footer.add_child(_hint)
 	footer.add_child(SmaKit.hspacer())
 	_continue = SmaKit.button(I18n.t("story.continue"), _advance, true)
 	_continue.custom_minimum_size.x = 140
@@ -138,11 +140,16 @@ func refresh() -> void:
 		for choice in view.get("choices", []):
 			var button := SmaKit.button(String(choice["text"]), _choose.bind(int(choice["index"])))
 			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			button.focus_mode = Control.FOCUS_ALL
 			button.custom_minimum_size.y = 38
 			_choices.add_child(button)
 		if _choices.get_child_count() == 0:
 			_choices.visible = false
 			_continue.visible = true
+		else:
+			var first_choice: Button = _choices.get_child(0)
+			first_choice.grab_focus.call_deferred()
+	_hint.text = I18n.t("story.choiceKeys") if _choices.visible else "Enter / Space"
 
 
 func _advance() -> void:

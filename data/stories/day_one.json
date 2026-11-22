@@ -13,8 +13,8 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "收盘了。第一天最重要的是建立职业节奏，而不是急着赚多少。明天收盘时，你只有一个目标：账户权益达到 10.3 万美元，同时保留至少 40% 现金。",
-        "en": "The close is in. Day one is about building professional rhythm, not making money. By tomorrow's close, your only goal is $103,000 equity while keeping at least 40% in cash."
+        "zh_CN": "收盘了。检查成交后的仓位、实际费用和现金占比。给自己留出至少 40% 的现金作为练习目标，看看还有多少资金可以应对明天的变化。",
+        "en": "The market has closed. Review your position size, trading fees and cash share. Use a 40% cash target for this exercise and see what you have available for tomorrow."
       },
       "next": "gu_yan_object"
     },
@@ -66,8 +66,8 @@
             },
             {
               "toast": {
-                "zh_CN": "目标已记下：收盘时自己对照权益与现金",
-                "en": "Goal noted: check equity and cash at the close"
+                "zh_CN": "打开仪表盘，查看首笔交易的收盘复盘。",
+                "en": "Open the dashboard to review your first trade at the close."
               }
             }
           ]

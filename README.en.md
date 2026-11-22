@@ -2,13 +2,15 @@
 
 A single-player financial education and trading simulation built with **Godot 4**. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-01`
+- Version: `beta-02.1`
 - Engine: Godot `4.7+` (tested on `4.7.2`)
 - Renderer: GL Compatibility
 - Languages: Simplified Chinese / English
 - Platforms: Windows (exported), macOS / Linux from source
 - Repository: <https://github.com/SGhunter666/Stock_Tutorial_Godot>
 - Original project: <https://github.com/SGhunter666/STOCK_Tutorial>
+
+Check [GitHub Releases](https://github.com/SGhunter666/Stock_Tutorial_Godot/releases) for published Windows builds. Download the ZIP, extract it, and open the executable.
 
 > **Disclaimer**
 >
@@ -131,11 +133,12 @@ The start screen offers:
 - **Continue**: load `user://saves/career.json`.
 
 The simulation starts paused until the opening story finishes.
+New careers begin with Today’s Task on the dashboard. Write an optional trade plan, place a simulated order, and review its fill, fees, position size and closing cash share.
 
 ### Windows build
 
 ```text
-build/windows/StockMarketAcademy_beta-01.exe
+build/windows/StockMarketAcademy_beta-02.1.exe
 ```
 
 `build/` is ignored by Git.
@@ -434,12 +437,12 @@ Features: backtest, parameter optimization, factor research, regression and mach
 - Default path: `user://saves/career.json`
 - Automatic save every **20 seconds**.
 - Manual save with `Ctrl + S` / `Cmd + S` or the top-bar save button.
-- Writes use a temporary file plus rename to reduce corruption risk.
+- Saves keep the previous successful write as `career.json.bak`. The game can read that backup if the primary save is damaged.
 - Format: JSON, current `version = 1`.
 - Saved state includes settings, selected ticker, exchange, story, academy, history lab, challenges, career, quant config, fund, watchlist and price alerts.
 - Missing fields in old saves are normalized.
 - Sandbox mode never overwrites the career save.
-- The settings page can export and import JSON saves.
+- The settings page exports and imports JSON saves. An import replaces career progress after validation succeeds.
 
 Typical disk locations:
 
@@ -460,7 +463,7 @@ godot --headless --path . --script res://tests/run_tests.gd
 Expected output:
 
 ```text
-ALL TESTS PASSED (30072 checks)
+ALL TESTS PASSED (30169 checks)
 ```
 
 ### Integration test
@@ -497,12 +500,12 @@ macOS app bundle:
 Preset name: `Windows Desktop`
 
 ```bash
-godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-01.exe
+godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-02.1.exe
 ```
 
 - Windows export templates must be installed.
 - `build/` is ignored by Git.
-- Version comes from `project.godot` (`beta-01`).
+- Version comes from `project.godot` (`beta-02.1`).
 - The exported executable is about 122 MB.
 
 ---
@@ -603,6 +606,6 @@ This project is released under the [MIT License](LICENSE).
 
 ---
 
-- **Version:** `beta-01`
+- **Version:** `beta-02.1`
 - **Engine:** Godot 4.7+
 - **Languages:** Simplified Chinese / English

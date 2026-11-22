@@ -27,6 +27,10 @@ func _ready() -> void:
 			break
 		var view: Dictionary = Game.narrative.current_view()
 		if String(view.get("type", "")) == "choice":
+			await get_tree().process_frame
+			for option: Button in main._dialogue._choices.get_children():
+				if option.focus_mode != Control.FOCUS_ALL:
+					failures.append("dialogue choices cannot receive keyboard focus")
 			Game.narrative.choose(0)
 		else:
 			Game.narrative.advance()
@@ -34,6 +38,13 @@ func _ready() -> void:
 		failures.append("opening story did not finish")
 	if String(Game.narrative.flags.get("path", "")) != "value":
 		failures.append("story choice did not set the path flag")
+	if main._current_screen != "dashboard" or not Game.has_intro_task():
+		failures.append("opening did not lead to today's task")
+	main._screens["dashboard"]._open_intro_trade()
+	if main._current_screen != "trade" or Game.selected_ticker != "APLA":
+		failures.append("first task did not open the APLA ticket")
+	if not Game.set_intro_plan("Check the spread", "Exit below the morning range", 100.0):
+		failures.append("trade plan did not save before the fill")
 
 	await get_tree().process_frame
 	var order := Game.submit_order({
@@ -43,6 +54,10 @@ func _ready() -> void:
 		failures.append("market buy rejected: %s" % order.get("error", ""))
 	if int(Game.get_position_qty("APLA")) != 10:
 		failures.append("position did not update")
+	var first_receipt: Dictionary = Game.intro["receipt"]
+	if first_receipt.get("qty") != 10 or first_receipt.get("ticker") != "APLA" \
+			or not bool(Game.intro["plan"].get("beforeFill", false)):
+		failures.append("first fill did not capture the trade and its plan")
 	if Game.narrative == null or not Game.narrative.is_active():
 		failures.append("first-trade story did not trigger")
 	# Close the first-trade story so it does not block the clock.
@@ -717,6 +732,27 @@ func _ready() -> void:
 	var day_before := Game.get_day()
 	if not Game.load_game():
 		failures.append("load failed")
+	var restored_receipt: Dictionary = Game.intro.get("receipt", {})
+	if restored_receipt.get("orderId") != first_receipt.get("orderId") \
+			or not is_equal_approx(float(restored_receipt.get("price", 0.0)), float(first_receipt["price"])) \
+			or not is_equal_approx(float(restored_receipt.get("weight", 0.0)), float(first_receipt["weight"])):
+		failures.append("first-fill receipt changed across save/load")
+	var import_path := Game.save_path.get_basename() + "-import.json"
+	if not Game.export_save(import_path) or not Game.import_save(import_path):
+		failures.append("valid career export did not import")
+	var valid_save := FileAccess.get_file_as_bytes(Game.save_path)
+	var bad_save := SmaSaveService.read(Game.save_path)
+	bad_save["exchange"]["account"]["positions"]["APLA"] = {"qty": 5}
+	if not SmaSaveService.export_to(import_path, bad_save):
+		failures.append("could not create invalid import fixture")
+	elif Game.import_save(import_path) or FileAccess.get_file_as_bytes(Game.save_path) != valid_save:
+		failures.append("invalid import overwrote the career slot")
+	SmaSaveService.clear(import_path)
+	if not Game.save_game(false) or not SmaSaveService.export_to(Game.save_path,
+			{"version": 1, "exchange": []}) or not Game.load_game():
+		failures.append("valid backup did not recover a corrupt primary save")
+	elif not Game.save_game(false):
+		failures.append("recovered career could not be saved")
 	if absf(Game.get_equity() - equity_before) > 0.01:
 		failures.append("equity changed across save/load")
 	if Game.get_day() != day_before:
@@ -789,6 +825,10 @@ func _ready() -> void:
 		failures.append("fast-forward did not finish")
 	if Game.get_day() != day_before + 1:
 		failures.append("fast-forward did not advance one day")
+	var review: Dictionary = Game.intro["review"]
+	if review.get("day") != day_before or not review.has("cashPct") or not review.has("fees") \
+			or not review.has("firstTradePnl"):
+		failures.append("first fill did not produce a session close review")
 	for i in 12:
 		if not Game.narrative.is_active():
 			break
@@ -797,6 +837,12 @@ func _ready() -> void:
 			Game.narrative.choose(0)
 		else:
 			Game.narrative.advance()
+	Game.set_intro_exit_outcome("notTriggered")
+	Game.finish_intro_review()
+	if Game.has_intro_task() or not bool(Game.intro.get("complete", false)):
+		failures.append("close review did not complete the task")
+	if Game.intro["review"].get("exitOutcome") != "notTriggered":
+		failures.append("close review did not keep the player's exit assessment")
 	main.navigate("portfolio")
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -912,9 +958,16 @@ func _ready() -> void:
 		failures.append("earnings center did not render the company selector")
 	else:
 		earnings_screen._on_ticker_changed(1)
+		var research_ticker: String = earnings_screen._selected_ticker
+		Game.set_chart_timeframe("1W")
+		earnings_screen._go_trade()
 		await get_tree().process_frame
-		if earnings_screen._selected_ticker == "":
-			failures.append("earnings ticker switch lost the selection")
+		if main._current_screen != "trade" or Game.selected_ticker != research_ticker \
+				or main._screens["trade"]._timeframe != "1W":
+			failures.append("research ticker and timeframe did not reach the trade desk")
+		main.navigate("earnings")
+		if earnings_screen._selected_ticker != research_ticker:
+			failures.append("returning to earnings lost the research selection")
 
 	main.navigate("history")
 	await get_tree().process_frame
@@ -969,6 +1022,28 @@ func _ready() -> void:
 
 	Game.set_display_mode("windowed")
 	Game.set_window_preset("auto")
+
+	if DisplayServer.get_name() == "headless":
+		var window := get_window()
+		var original_size := window.size
+		var original_scale := window.content_scale_factor
+		var original_locale: String = I18n.locale
+		I18n.set_locale("en")
+		window.size = Vector2i(2560, 1600)
+		window.content_scale_factor = 1.25
+		main.navigate("trade")
+		for frame in 3:
+			await get_tree().process_frame
+		var compact_trade: SmaTradeScreen = main._screens["trade"]
+		var compact_actions := main._speed_picker.get_parent() as Control
+		if not main._nav_menu.visible or main._sidebar.visible or not main._speed_picker.visible:
+			failures.append("compact layout did not switch to navigation and speed menus")
+		if compact_actions.get_global_rect().end.x > main.size.x + 1.0 \
+				or compact_trade._submit_button.get_global_rect().end.x > main.size.x + 1.0:
+			failures.append("125% English layout clips actions or the order ticket")
+		window.size = original_size
+		window.content_scale_factor = original_scale
+		I18n.set_locale(original_locale)
 
 	if failures.is_empty():
 		print("INTEGRATION OK equity=%.2f day=%d stories=%d" % [

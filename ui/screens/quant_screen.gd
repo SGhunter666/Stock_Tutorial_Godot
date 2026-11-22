@@ -527,6 +527,7 @@ func _render_optimize() -> void:
 			float(baseline.get("totalReturnPct", 0.0))],
 	])
 	_body.add_child(grid)
+	_render_validation_windows(_result["windows"])
 	var overfit := bool(_result.get("overfitRisk", false))
 	_body.add_child(SmaKit.label(I18n.t("quant.opt.overfitWarning" if overfit
 		else "quant.opt.overfitClear"), 11,
@@ -535,6 +536,8 @@ func _render_optimize() -> void:
 	var params_box := SmaKit.vbox(4)
 	params_card.add_child(params_box)
 	params_box.add_child(SmaKit.label(I18n.t("quant.opt.bestTitle"), 14))
+	if best["params"].is_empty():
+		params_box.add_child(SmaKit.muted(I18n.t("quant.opt.fixedStrategy")))
 	for key in best["params"].keys():
 		params_box.add_child(_kv(String(key), SmaFormat.num(float(best["params"][key]), 0)))
 	_body.add_child(params_card)
@@ -553,11 +556,36 @@ func _render_optimize() -> void:
 		for key in candidate["params"].keys():
 			parts.append("%s %s" % [key, SmaFormat.num(float(candidate["params"][key]), 0)])
 		table_box.add_child(SmaKit.data_row([
-			" · ".join(parts), SmaFormat.pct(float(candidate["inSample"]["totalReturnPct"]), 2),
+			I18n.t("quant.opt.fixedStrategy") if parts.is_empty() else " · ".join(parts),
+			SmaFormat.pct(float(candidate["inSample"]["totalReturnPct"]), 2),
 			SmaFormat.num(float(candidate["inSample"]["sharpe"]), 2),
 			SmaFormat.num(float(candidate["score"]), 2),
 		], [2.0, 1.0, 0.8, 0.8]))
 	_body.add_child(table_card)
+
+
+func _render_validation_windows(windows: Array) -> void:
+	var card := SmaKit.card(12)
+	var box := SmaKit.vbox(6)
+	card.add_child(box)
+	box.add_child(SmaKit.label(I18n.t("quant.opt.validationTitle"), 14))
+	var columns := SmaKit.hbox(12)
+	var headings := ["quant.opt.trainWindow", "quant.opt.warmupWindow", "quant.opt.testWindow"]
+	var colors := [SmaUiTheme.INFO, SmaUiTheme.WARNING, SmaUiTheme.ACCENT]
+	for index in windows.size():
+		var window: Dictionary = windows[index]
+		var column := SmaKit.vbox(3)
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var marker := ColorRect.new()
+		marker.color = colors[index]
+		marker.custom_minimum_size.y = 3
+		column.add_child(marker)
+		column.add_child(SmaKit.label(I18n.t(headings[index]), 12, colors[index]))
+		column.add_child(SmaKit.muted(I18n.t("quant.opt.windowDates", {
+			"from": window["from"], "to": window["to"], "count": window["bars"]}), 11))
+		columns.add_child(column)
+	box.add_child(columns)
+	_body.add_child(card)
 
 
 func _kv(label: String, value: String) -> HBoxContainer:

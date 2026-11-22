@@ -44,6 +44,20 @@ func run() -> void:
 		check(int(optimized["comboCount"]) > 1, "grid evaluated several combinations")
 		check(not optimized["best"]["params"].is_empty(), "best parameters returned")
 		check(bool(optimized["outSample"].has("metrics")), "out-of-sample metrics returned")
+	var split_fixture: Array = []
+	for index in 200:
+		var price := 100.0 + float(mini(index, 139)) * 2.0
+		split_fixture.append({"d": str(index), "o": price, "h": price, "l": price, "c": price})
+	var holdout := SmaQuant.optimize(split_fixture, "momentum", {}, 100000.0, 0.0, 70, "totalReturn")
+	eq(holdout["outSample"]["metrics"]["bars"], 60, "warm-up bars excluded from scoring")
+	approx(float(holdout["outSample"]["metrics"]["totalReturnPct"]), 0.0, 0.001,
+		"training gains do not enter the flat held-out window")
+	eq(holdout["windows"][2]["from"], "140", "held-out window starts at the split")
+	var fixed := SmaQuant.optimize(split_fixture, "buyHold", {}, 100000.0, 0.0, 70, "sharpe")
+	check(fixed.get("ok", false), "buy and hold has a single fixed parameter set")
+	eq(fixed.get("comboCount"), 1, "fixed strategy evaluates exactly once")
+	var held_out_trades := SmaQuant.run_backtest(split_fixture, "buyHold", {}, 100000.0, 0.0, 140)
+	eq(held_out_trades["trades"][0]["entryIndex"], 140, "held-out fills begin at the split")
 
 	describe("quant-normalise")
 	var config := SmaQuant.normalize_config({

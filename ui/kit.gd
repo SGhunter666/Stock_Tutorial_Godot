@@ -57,6 +57,14 @@ static func hbox(separation: int = SmaUiTheme.GAP) -> HBoxContainer:
 	return box
 
 
+static func flow(separation: int = SmaUiTheme.GAP) -> HFlowContainer:
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", separation)
+	row.add_theme_constant_override("v_separation", 6)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return row
+
+
 static func button(text: String, callback: Callable = Callable(), primary: bool = false) -> Button:
 	var node := Button.new()
 	node.text = text
@@ -76,9 +84,10 @@ static func button(text: String, callback: Callable = Callable(), primary: bool 
 		hover.bg_color = SmaUiTheme.ACCENT
 		hover.border_color = SmaUiTheme.ACCENT
 		node.add_theme_stylebox_override("hover", hover)
-		node.add_theme_color_override("font_color", SmaUiTheme.BG_DEEP)
-		node.add_theme_color_override("font_hover_color", SmaUiTheme.BG_DEEP)
-		node.add_theme_color_override("font_pressed_color", SmaUiTheme.BG_DEEP)
+		node.add_theme_color_override("font_color", Color.WHITE)
+		node.add_theme_color_override("font_hover_color",
+			SmaUiTheme.TEXT if SmaUiTheme.mode == "light" else SmaUiTheme.BG_DEEP)
+		node.add_theme_color_override("font_pressed_color", Color.WHITE)
 	if callback.is_valid():
 		node.pressed.connect(callback)
 	return node

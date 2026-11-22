@@ -25,6 +25,8 @@ func refresh(_reason: String = "") -> void:
 	if game == null or not game.started:
 		return
 	_render_header()
+	if game.has_intro_task():
+		_body.add_child(_render_intro())
 	var columns := SmaKit.hbox(12)
 	var learning := _render_learning()
 	learning.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -50,6 +52,8 @@ func refresh(_reason: String = "") -> void:
 	review.custom_minimum_size.x = 420
 	bottom.add_child(review)
 	_body.add_child(bottom)
+	if not game.intro.is_empty() and not game.has_intro_task():
+		_body.add_child(_render_intro())
 
 
 func _render_header() -> void:
@@ -69,6 +73,138 @@ func _render_header() -> void:
 	header.add_child(SmaKit.button(I18n.t("dashboard.openAcademy"),
 		_go_academy, true))
 	_body.add_child(header)
+
+
+func _render_intro() -> Control:
+	var card := SmaKit.card(14)
+	var box := SmaKit.vbox(8)
+	card.add_child(box)
+	var receipt: Dictionary = game.intro["receipt"]
+	var plan: Dictionary = game.intro["plan"]
+	var review: Dictionary = game.intro["review"]
+	var complete := bool(game.intro["complete"])
+	var title := "intro.firstOrder" if receipt.is_empty() else (
+		"intro.firstFill" if review.is_empty() else (
+			"intro.completed" if complete else "intro.closeReview"))
+	box.add_child(SmaKit.label(I18n.t(title), 19))
+	if receipt.is_empty():
+		_add_intro_text(box, I18n.t("intro.firstOrderHint"))
+	else:
+		_add_intro_text(box, I18n.t("intro.receipt", {
+			"ticker": receipt["ticker"], "side": I18n.t("trade.%s" % receipt["side"]),
+			"qty": SmaFormat.quantity(float(receipt["qty"])),
+			"price": SmaFormat.money(float(receipt["price"])),
+			"fee": SmaFormat.money(float(receipt["fee"])),
+			"weight": SmaFormat.pct_plain(float(receipt["weight"]), 1),
+		}))
+	if not plan.is_empty():
+		_add_intro_text(box, I18n.t("intro.planSummary", {
+			"reason": plan["reason"], "exit": plan["exitRule"],
+			"loss": SmaFormat.money(float(plan["maxLoss"])),
+		}))
+	if not review.is_empty():
+		_add_intro_text(box, I18n.t("intro.closeStats", {
+			"date": SmaCalendar.iso_date(int(review["day"])),
+			"equity": SmaFormat.money(float(review["equity"])),
+			"cash": SmaFormat.pct_plain(float(review["cashPct"]), 1),
+			"fees": SmaFormat.money(float(review["fees"])),
+		}))
+		_add_intro_text(box, I18n.t("intro.cashMet" if bool(review["cashTargetMet"])
+			else "intro.cashBelow"))
+		if review.has("firstTradePnl"):
+			var pnl := float(review["firstTradePnl"])
+			_add_intro_text(box, I18n.t("intro.closePnl", {"pnl": SmaFormat.signed_money(pnl)}))
+			if not plan.is_empty():
+				var budget := float(plan["maxLoss"])
+				_add_intro_text(box, I18n.t("intro.riskBudgetMet" if pnl >= -budget \
+					else "intro.riskBudgetExceeded", {"budget": SmaFormat.money(budget)}))
+		var feedback := "intro.noPlan" if plan.is_empty() else (
+			"intro.beforeFill" if bool(plan["beforeFill"]) else "intro.afterFill")
+		_add_intro_text(box, I18n.t(feedback))
+		if not plan.is_empty():
+			var exit_row := SmaKit.flow(8)
+			exit_row.add_child(SmaKit.muted(I18n.t("intro.exitCheck")))
+			var outcomes := ["unrecorded", "triggered", "notTriggered"]
+			var labels := ["intro.exitUnrecorded", "intro.exitTriggered", "intro.exitNotTriggered"]
+			var selected := maxi(0, outcomes.find(String(review.get("exitOutcome", "unrecorded"))))
+			if complete:
+				exit_row.add_child(SmaKit.label(I18n.t(labels[selected])))
+			else:
+				var picker := OptionButton.new()
+				for label in labels:
+					picker.add_item(I18n.t(label))
+				picker.select(selected)
+				picker.item_selected.connect(func(index): game.set_intro_exit_outcome(outcomes[index]))
+				exit_row.add_child(picker)
+			box.add_child(exit_row)
+	var actions := SmaKit.hbox(8)
+	if receipt.is_empty():
+		actions.add_child(SmaKit.button(I18n.t("intro.openTrade"), _open_intro_trade, true))
+	elif review.is_empty():
+		actions.add_child(SmaKit.button(I18n.t("intro.advanceClose"), game.step_day, true))
+	elif not complete:
+		actions.add_child(SmaKit.button(I18n.t("intro.finishReview"), game.finish_intro_review, true))
+	if review.is_empty() and (receipt.is_empty() or not bool(plan.get("beforeFill", false))):
+		actions.add_child(SmaKit.button(I18n.t("intro.openPlan"), _edit_intro_plan))
+	if actions.get_child_count() > 0:
+		box.add_child(actions)
+	else:
+		actions.free()
+	return card
+
+
+func _add_intro_text(box: VBoxContainer, text: String) -> void:
+	var label := SmaKit.muted(text, 13)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(label)
+
+
+func _open_intro_trade() -> void:
+	var main := get_tree().get_first_node_in_group("main")
+	if main != null and main.has_method("open_ticker"):
+		main.open_ticker(game.INTRO_TICKER)
+
+
+func _edit_intro_plan() -> void:
+	var plan: Dictionary = game.intro["plan"]
+	var dialog := ConfirmationDialog.new()
+	dialog.title = I18n.t("intro.planTitle")
+	dialog.ok_button_text = I18n.t("intro.savePlan")
+	dialog.get_cancel_button().text = I18n.t("start.cancel")
+	var form := SmaKit.vbox(8)
+	form.custom_minimum_size.x = 470
+	dialog.add_child(form)
+	var reason := LineEdit.new()
+	reason.max_length = 180
+	reason.text = String(plan.get("reason", ""))
+	form.add_child(SmaKit.label(I18n.t("intro.reason")))
+	form.add_child(reason)
+	var exit_rule := LineEdit.new()
+	exit_rule.max_length = 180
+	exit_rule.text = String(plan.get("exitRule", ""))
+	form.add_child(SmaKit.label(I18n.t("intro.exitRule")))
+	form.add_child(exit_rule)
+	var max_loss := SpinBox.new()
+	max_loss.max_value = 10000000.0
+	max_loss.step = 0.01
+	max_loss.prefix = "$"
+	max_loss.value = float(plan.get("maxLoss", 0.0))
+	form.add_child(SmaKit.label(I18n.t("intro.maxLoss")))
+	form.add_child(max_loss)
+	var update_button := func():
+		dialog.get_ok_button().disabled = reason.text.strip_edges().is_empty() \
+			or exit_rule.text.strip_edges().is_empty() or max_loss.value <= 0.0
+	reason.text_changed.connect(func(_value): update_button.call())
+	exit_rule.text_changed.connect(func(_value): update_button.call())
+	max_loss.value_changed.connect(func(_value): update_button.call())
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.confirmed.connect(func():
+		game.set_intro_plan(reason.text, exit_rule.text, max_loss.value)
+		dialog.queue_free())
+	add_child(dialog)
+	update_button.call()
+	dialog.popup_centered()
+	reason.grab_focus()
 
 
 func _current_unit() -> Dictionary:

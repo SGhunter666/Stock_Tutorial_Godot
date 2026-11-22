@@ -30,6 +30,8 @@ const START_CASH := 100000.0
 const SPEEDS := [1, 5, 10, 30, 60]
 const AUTOSAVE_SECONDS := 20.0
 const MAX_STEPS_PER_FRAME := 240
+const INTRO_TICKER := "APLA"
+const INTRO_CASH_TARGET := 40.0
 
 var exchange: SmaExchange = null
 var narrative: SmaStoryService = null
@@ -40,6 +42,7 @@ var career: Dictionary = SmaCareer.create_state()
 var quant: Dictionary = SmaQuant.default_config()
 var fund: Dictionary = SmaFund.create_state()
 var alerts: Dictionary = SmaAlerts.create_state()
+var intro: Dictionary = {}
 var started := false
 var paused := true
 var speed := 1
@@ -53,6 +56,7 @@ var sandbox_config := {"cash": 100000.0, "seed": "sandbox-2026",
 	"difficulty": "normal", "commission": 1.0}
 var last_error := ""
 var save_path := SmaSaveService.SAVE_PATH
+var _keep_save_backup := false
 
 var _accum := 0.0
 var _ui_accum := 0.0
@@ -106,6 +110,8 @@ func _process(delta: float) -> void:
 # ---------------------------------------------------------------------------
 
 func new_game(seed_value: String = DEFAULT_SEED) -> void:
+	if not started and SmaSaveService.exists(save_path + ".bak"):
+		_keep_save_backup = _decode_save(SmaSaveService.read(save_path)).is_empty()
 	sandbox_mode = false
 	exchange = SmaExchange.new(seed_value, START_CASH)
 	academy = SmaAcademy.create_state()
@@ -115,6 +121,7 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	quant = SmaQuant.default_config()
 	fund = SmaFund.create_state()
 	alerts = SmaAlerts.create_state()
+	intro = {"plan": {}, "receipt": {}, "review": {}, "complete": false}
 	narrative = SmaStoryService.new()
 	narrative.setup(self)
 	narrative.load_content()
@@ -124,7 +131,8 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	speed = 1
 	settings["speed"] = 1
 	settings["locale"] = I18n.locale
-	selected_ticker = "APLA"
+	settings["chartTimeframe"] = "1D"
+	selected_ticker = INTRO_TICKER
 	_last_day = 0
 	_last_call_id = ""
 	_story_pause = false
@@ -151,10 +159,12 @@ func _on_story_started(_story_id: String) -> void:
 	state_changed.emit("story_started")
 
 
-func _on_story_finished(_story_id: String) -> void:
+func _on_story_finished(story_id: String) -> void:
 	_story_pause = narrative != null and narrative.is_active()
 	story_changed.emit()
 	state_changed.emit("story_finished")
+	if story_id in ["opening", "first_trade", "day_one"] and not sandbox_mode:
+		save_game.call_deferred(false)
 
 
 func _on_story_view_changed() -> void:
@@ -162,7 +172,6 @@ func _on_story_view_changed() -> void:
 
 
 func restart() -> void:
-	delete_save()
 	new_game(DEFAULT_SEED)
 	paused = true
 
@@ -177,17 +186,16 @@ func _advance_steps(steps: int) -> void:
 	var fills: Array = []
 	var call_before := _current_call_id()
 	for index in steps:
+		if int(exchange.state["second"]) == SmaExchange.SESSION_SECONDS - 1:
+			_record_intro_close()
 		exchange.advance_second()
 		_check_price_alerts()
 		if not exchange.last_player_fills.is_empty():
+			for fill in exchange.last_player_fills:
+				_record_intro_fill(fill)
 			fills.append_array(exchange.last_player_fills)
 	for fill in fills:
-		trade_filled.emit(fill)
-		if narrative != null:
-			narrative.handle_event("trade_filled", fill)
-			if String(fill.get("side", "")) == "short" \
-					or String(fill.get("action", "")) == "openShort":
-				narrative.handle_event("short_opened", fill)
+		_emit_trade_fill(fill)
 	var day_after := int(exchange.state["dayIndex"])
 	if day_after != _last_day:
 		_last_day = day_after
@@ -241,6 +249,125 @@ func _advance_steps(steps: int) -> void:
 	if not fills.is_empty():
 		state_changed.emit("trade")
 		academy_sync_practice()
+
+
+func _emit_trade_fill(fill: Dictionary) -> void:
+	trade_filled.emit(fill)
+	if narrative != null:
+		narrative.handle_event("trade_filled", fill)
+		if fill.get("side") == "short" or fill.get("action") == "openShort":
+			narrative.handle_event("short_opened", fill)
+
+
+func has_intro_task() -> bool:
+	return not intro.is_empty() and not bool(intro.get("complete", false))
+
+
+func set_intro_plan(reason: String, exit_rule: String, max_loss: float) -> bool:
+	if not has_intro_task() or not intro["review"].is_empty():
+		return false
+	var existing: Dictionary = intro["plan"]
+	if not intro["receipt"].is_empty() and bool(existing.get("beforeFill", false)):
+		return false
+	reason = reason.strip_edges().left(180)
+	exit_rule = exit_rule.strip_edges().left(180)
+	if reason.is_empty() or exit_rule.is_empty() or not is_finite(max_loss) or max_loss <= 0.0:
+		return false
+	intro["plan"] = {"reason": reason, "exitRule": exit_rule, "maxLoss": max_loss,
+		"beforeFill": intro["receipt"].is_empty()}
+	save_game(false)
+	state_changed.emit("intro")
+	return true
+
+
+func finish_intro_review() -> void:
+	if not has_intro_task() or intro["review"].is_empty():
+		return
+	intro["complete"] = true
+	save_game(false)
+	state_changed.emit("intro")
+
+
+func set_intro_exit_outcome(value: String) -> void:
+	if not has_intro_task() or intro["review"].is_empty() or intro["plan"].is_empty():
+		return
+	if value not in ["unrecorded", "triggered", "notTriggered"]:
+		return
+	intro["review"]["exitOutcome"] = value
+	save_game(false)
+	state_changed.emit("intro")
+
+
+func _record_intro_fill(fill: Dictionary) -> void:
+	if not has_intro_task() or not intro["review"].is_empty():
+		return
+	var order_id := String(fill.get("orderId", ""))
+	var receipt: Dictionary = intro["receipt"]
+	if not receipt.is_empty() and receipt.get("orderId") != order_id:
+		return
+	var qty := int(fill["qty"])
+	var price := float(fill["price"])
+	var ticker := String(fill["ticker"])
+	var position_key := "shorts" if fill.get("action") in ["openShort", "closeShort"] else "positions"
+	var equity := get_equity()
+	var held := int(exchange.state["account"][position_key].get(ticker, {}).get("qty", 0))
+	var total_qty := int(receipt.get("qty", 0)) + qty
+	var total_value := float(receipt.get("gross", 0.0)) + qty * price
+	intro["receipt"] = {"orderId": order_id, "ticker": ticker, "side": fill["side"],
+		"day": int(receipt.get("day", fill["day"])), "qty": total_qty, "gross": total_value,
+		"price": total_value / total_qty, "fee": float(receipt.get("fee", 0.0)) + float(fill["fee"]),
+		"weight": held * price / equity * 100.0 if equity > 0.0 else 0.0}
+
+
+func _record_intro_close() -> void:
+	if not has_intro_task() or intro["receipt"].is_empty() or not intro["review"].is_empty():
+		return
+	var equity := get_equity()
+	var cash_pct := get_cash() / equity * 100.0 if equity > 0.0 else 0.0
+	var session_fees := 0.0
+	for trade: Dictionary in exchange.state["account"]["trades"]:
+		if int(trade.get("day", -1)) == get_day():
+			session_fees += float(trade.get("fee", 0.0))
+	intro["review"] = {"day": get_day(), "equity": equity, "cashPct": cash_pct,
+		"fees": session_fees, "cashTargetMet": cash_pct >= INTRO_CASH_TARGET}
+	var first_trade_pnl: Variant = _first_trade_pnl_at_close()
+	if first_trade_pnl != null:
+		intro["review"]["firstTradePnl"] = first_trade_pnl
+
+
+func _first_trade_pnl_at_close() -> Variant:
+	var receipt: Dictionary = intro["receipt"]
+	if receipt["side"] not in ["buy", "short"]:
+		return null
+	var ticker := String(receipt["ticker"])
+	var is_short: bool = receipt["side"] == "short"
+	var close_action := "closeShort" if is_short else "closeLong"
+	var direction := -1.0 if is_short else 1.0
+	var opened := 0
+	var open_qty := 0
+	var open_cost := 0.0
+	var pnl := 0.0
+	for trade: Dictionary in exchange.state["account"]["trades"]:
+		if trade.get("ticker") != ticker or int(trade.get("day", -1)) != get_day():
+			continue
+		var qty := int(trade["qty"])
+		var price := float(trade["price"])
+		var fee := float(trade.get("fee", 0.0))
+		if trade.get("orderId") == receipt["orderId"]:
+			opened += qty
+			open_qty += qty
+			open_cost += qty * price
+			pnl -= fee
+		elif trade.get("action") == close_action and open_qty > 0:
+			var closed := mini(open_qty, qty)
+			var basis := open_cost / open_qty * closed
+			pnl += (closed * price - basis) * direction - fee * closed / qty
+			open_qty -= closed
+			open_cost -= basis
+	if opened != int(receipt["qty"]):
+		return null
+	var mark := float(exchange.state["companies"][ticker]["last"])
+	return SmaFormat.round_to(pnl + (open_qty * mark - open_cost) * direction, 2)
 
 
 func _check_price_alerts() -> void:
@@ -527,12 +654,8 @@ func submit_order(params: Dictionary) -> Dictionary:
 	var fills: Array = exchange.last_player_fills.slice(fill_start)
 	exchange.clear_player_fills()
 	for fill in fills:
-		trade_filled.emit(fill)
-		if narrative != null:
-			narrative.handle_event("trade_filled", fill)
-			if String(fill.get("side", "")) == "short" \
-					or String(fill.get("action", "")) == "openShort":
-				narrative.handle_event("short_opened", fill)
+		_record_intro_fill(fill)
+		_emit_trade_fill(fill)
 	if not fills.is_empty():
 		save_game(false)
 		academy_sync_practice()
@@ -871,8 +994,9 @@ func replay_max_day() -> int:
 func replay_snapshot(day: int) -> Dictionary:
 	if exchange == null:
 		return {}
-	return SmaReplay.snapshot(exchange.state,
-		clampi(day, 0, SmaReplay.max_day(exchange.state)))
+	var latest := SmaReplay.max_day(exchange.state)
+	var selected := clampi(day, 0, latest)
+	return SmaReplay.snapshot(exchange.state, selected, exchange.equity() if selected == latest else NAN)
 
 
 func market_index() -> float:
@@ -1090,12 +1214,8 @@ func submit_oco(params: Dictionary) -> Dictionary:
 	var fills: Array = exchange.last_player_fills.slice(fill_start)
 	exchange.clear_player_fills()
 	for fill in fills:
-		trade_filled.emit(fill)
-		if narrative != null:
-			narrative.handle_event("trade_filled", fill)
-			if String(fill.get("side", "")) == "short" \
-					or String(fill.get("action", "")) == "openShort":
-				narrative.handle_event("short_opened", fill)
+		_record_intro_fill(fill)
+		_emit_trade_fill(fill)
 	if not fills.is_empty():
 		save_game(false)
 		academy_sync_practice()
@@ -1692,6 +1812,17 @@ func select_ticker(ticker: String) -> void:
 		state_changed.emit("selection")
 
 
+func chart_timeframe() -> String:
+	var value := String(settings.get("chartTimeframe", "1m"))
+	return value if SmaMinuteSeries.CHART_TIMEFRAMES.has(value) else "1m"
+
+
+func set_chart_timeframe(value: String) -> void:
+	if SmaMinuteSeries.CHART_TIMEFRAMES.has(value) and value != chart_timeframe():
+		settings["chartTimeframe"] = value
+		state_changed.emit("chart_timeframe")
+
+
 # ---------------------------------------------------------------------------
 # Watchlist and price alerts
 # ---------------------------------------------------------------------------
@@ -2013,8 +2144,8 @@ func get_fund_drawdown() -> float:
 func start_sandbox(cash: float, seed_value: String, difficulty: String) -> Dictionary:
 	if sandbox_mode:
 		return {"ok": false, "error": "sandbox.errorActive"}
-	if started:
-		save_game(false)
+	if started and not save_game(false):
+		return {"ok": false, "error": "toast.saveFailed"}
 	var safe_difficulty := difficulty if ["easy", "normal", "hard"].has(difficulty) else "normal"
 	var commission := 0.0 if safe_difficulty == "easy" else (
 		3.0 if safe_difficulty == "hard" else 1.0)
@@ -2025,6 +2156,7 @@ func start_sandbox(cash: float, seed_value: String, difficulty: String) -> Dicti
 	sandbox_config = {"cash": safe_cash, "seed": safe_seed,
 		"difficulty": safe_difficulty, "commission": commission}
 	sandbox_mode = true
+	intro = {}
 	exchange = SmaExchange.new(safe_seed, safe_cash, commission)
 	academy = SmaAcademy.create_state()
 	history = SmaHistoryService.new()
@@ -2056,12 +2188,11 @@ func exit_sandbox() -> void:
 	if not sandbox_mode:
 		return
 	sandbox_mode = false
-	if has_save():
-		load_game()
-	else:
-		started = false
-		exchange = null
-		state_changed.emit("sandbox_exit")
+	if has_save() and load_game():
+		return
+	started = false
+	exchange = null
+	state_changed.emit("sandbox_exit")
 
 
 func restart_sandbox() -> void:
@@ -2078,12 +2209,15 @@ func save_now() -> bool:
 
 
 func save_info() -> Dictionary:
-	var exists := SmaSaveService.exists(save_path)
+	var path := save_path
+	if not SmaSaveService.exists(path) or _keep_save_backup:
+		path += ".bak"
+	var exists := SmaSaveService.exists(path)
 	var modified := 0
 	if exists:
-		modified = int(FileAccess.get_modified_time(save_path))
-	return {"exists": exists, "modified": modified, "path": save_path,
-		"bytes": FileAccess.get_file_as_bytes(save_path).size() if exists else 0}
+		modified = int(FileAccess.get_modified_time(path))
+	return {"exists": exists, "modified": modified, "path": path if exists else save_path,
+		"bytes": FileAccess.get_size(path) if exists else 0}
 
 
 func reset_progress() -> void:
@@ -2091,40 +2225,29 @@ func reset_progress() -> void:
 
 
 func export_save(target_path: String) -> bool:
-	if not has_save():
+	var payload := SmaSaveService.read(save_path + (".bak" if _keep_save_backup else ""))
+	if payload.is_empty() or not SmaSaveService.export_to(target_path, payload):
 		return false
-	var bytes := FileAccess.get_file_as_bytes(save_path)
-	if bytes.is_empty():
-		return false
-	var file := FileAccess.open(target_path, FileAccess.WRITE)
-	if file == null:
-		return false
-	file.store_buffer(bytes)
-	file.close()
 	toast_requested.emit(I18n.t("toast.exported"))
 	return true
 
 
 func import_save(source_path: String) -> bool:
-	var bytes := FileAccess.get_file_as_bytes(source_path)
-	if bytes.is_empty():
-		return false
-	var parsed: Variant = JSON.parse_string(bytes.get_string_from_utf8())
-	if typeof(parsed) != TYPE_DICTIONARY \
-			or int(parsed.get("version", 0)) != SAVE_VERSION:
+	var payload := SmaSaveService.read(source_path)
+	var loaded := _decode_save(payload)
+	if loaded.is_empty():
 		toast_requested.emit(I18n.t("toast.importInvalid"))
 		return false
-	var file := FileAccess.open(save_path, FileAccess.WRITE)
-	if file == null:
+	if not _write_save(payload):
+		toast_requested.emit(I18n.t("toast.saveFailed"))
 		return false
-	file.store_buffer(bytes)
-	file.close()
+	_apply_loaded_save(loaded)
 	toast_requested.emit(I18n.t("toast.importOk"))
-	return load_game()
+	return true
 
 
 func has_save() -> bool:
-	return SmaSaveService.exists(save_path)
+	return SmaSaveService.exists(save_path) or SmaSaveService.exists(save_path + ".bak")
 
 
 func save_game(manual: bool = true) -> bool:
@@ -2148,44 +2271,123 @@ func save_game(manual: bool = true) -> bool:
 		"quant": quant,
 		"fund": fund,
 		"alerts": alerts,
+		"intro": intro,
 	}
-	var ok := SmaSaveService.write(payload, save_path)
+	var ok := _write_save(payload)
 	if ok:
 		game_saved.emit()
 		if manual:
 			toast_requested.emit(I18n.t("toast.saved"))
+	elif manual:
+		toast_requested.emit(I18n.t("toast.saveFailed"))
 	return ok
 
 
+func _write_save(payload: Dictionary) -> bool:
+	if not SmaSaveService.write(payload, save_path, _keep_save_backup):
+		return false
+	_keep_save_backup = false
+	return true
+
+
 func load_game() -> bool:
-	var payload := SmaSaveService.read(save_path)
-	if payload.is_empty() or int(payload.get("version", 0)) != SAVE_VERSION:
+	var loaded := _decode_save(SmaSaveService.read(save_path))
+	_keep_save_backup = loaded.is_empty()
+	if _keep_save_backup:
+		loaded = _decode_save(SmaSaveService.read(save_path + ".bak"))
+	if loaded.is_empty():
 		toast_requested.emit(I18n.t("toast.no_save"))
 		return false
-	var saved_exchange: Variant = payload.get("exchange", {})
-	if typeof(saved_exchange) != TYPE_DICTIONARY:
-		return false
-	var engine := SmaExchange.from_dict(saved_exchange)
-	if engine == null:
-		toast_requested.emit(I18n.t("toast.no_save"))
-		return false
-	exchange = engine
-	academy = SmaAcademy.normalize_state(payload.get("academy", {}))
-	challenges = SmaChallenges.normalize_state(payload.get("challenges", {}))
-	career = SmaCareer.normalize_state(payload.get("career", {}),
-		int(payload.get("exchange", {}).get("dayIndex", 0)))
-	quant = SmaQuant.normalize_config(payload.get("quant", {}))
-	fund = SmaFund.normalize_state(payload.get("fund", {}),
-		int(payload.get("exchange", {}).get("dayIndex", 0)), DEFAULT_SEED)
-	alerts = SmaAlerts.normalize_state(payload.get("alerts", {}))
-	history = SmaHistoryService.new()
-	history.from_dict(payload.get("history", {}))
-	narrative = SmaStoryService.new()
-	narrative.setup(self)
-	narrative.load_content()
-	narrative.from_dict(payload.get("narrative", {}))
-	_connect_narrative()
+	_apply_loaded_save(loaded)
+	if _keep_save_backup:
+		toast_requested.emit(I18n.t("toast.backupLoaded"))
+	return true
+
+
+func _decode_save(payload: Dictionary) -> Dictionary:
+	if payload.get("version") != SAVE_VERSION \
+			or typeof(payload.get("exchange")) != TYPE_DICTIONARY:
+		return {}
+	for key in ["settings", "academy", "challenges", "career", "quant", "fund",
+			"alerts", "history", "narrative", "intro"]:
+		if typeof(payload.get(key, {})) != TYPE_DICTIONARY:
+			return {}
+	var saved_story: Dictionary = payload.get("narrative", {})
 	var saved_settings: Dictionary = payload.get("settings", {})
+	for key in ["locale", "layout", "theme", "displayMode", "windowPreset", "uiScale",
+			"chartTimeframe"]:
+		if typeof(saved_settings.get(key, "")) != TYPE_STRING:
+			return {}
+	for key in ["speed", "masterVolume", "musicVolume", "sfxVolume"]:
+		if typeof(saved_settings.get(key, 0)) not in [TYPE_INT, TYPE_FLOAT]:
+			return {}
+	if typeof(payload.get("selectedTicker", "")) != TYPE_STRING:
+		return {}
+	var saved_intro: Dictionary = payload.get("intro", {})
+	if not saved_intro.is_empty():
+		for key in ["plan", "receipt", "review"]:
+			if typeof(saved_intro.get(key)) != TYPE_DICTIONARY:
+				return {}
+	for key in ["flags", "seen"]:
+		if typeof(saved_story.get(key, {})) != TYPE_DICTIONARY:
+			return {}
+	for key in ["history", "queue"]:
+		if typeof(saved_story.get(key, [])) != TYPE_ARRAY:
+			return {}
+	var saved_history: Dictionary = payload.get("history", {})
+	if typeof(saved_history.get("runs", {})) != TYPE_DICTIONARY:
+		return {}
+	for run_data in saved_history.get("runs", {}).values():
+		if typeof(run_data) != TYPE_DICTIONARY:
+			return {}
+	var saved_academy: Dictionary = payload.get("academy", {})
+	if typeof(saved_academy.get("units", {})) != TYPE_DICTIONARY:
+		return {}
+	for unit in saved_academy.get("units", {}).values():
+		if typeof(unit) != TYPE_DICTIONARY:
+			return {}
+	var saved_quant: Dictionary = payload.get("quant", {})
+	if typeof(saved_quant.get("params", {})) != TYPE_DICTIONARY:
+		return {}
+	var engine := SmaExchange.from_dict(payload["exchange"])
+	if engine == null:
+		return {}
+	var saved_day := int(engine.state["dayIndex"])
+	var history_service := SmaHistoryService.new()
+	history_service.from_dict(saved_history)
+	var story_service := SmaStoryService.new()
+	story_service.setup(self)
+	if not story_service.load_content():
+		return {}
+	story_service.from_dict(saved_story)
+	if story_service.is_active() and story_service.current_node().is_empty():
+		return {}
+	return {
+		"exchange": engine, "history": history_service, "narrative": story_service,
+		"academy": SmaAcademy.normalize_state(saved_academy),
+		"challenges": SmaChallenges.normalize_state(payload.get("challenges", {})),
+		"career": SmaCareer.normalize_state(payload.get("career", {}), saved_day),
+		"quant": SmaQuant.normalize_config(saved_quant),
+		"fund": SmaFund.normalize_state(payload.get("fund", {}), saved_day, String(engine.state["seed"])),
+		"alerts": SmaAlerts.normalize_state(payload.get("alerts", {})),
+		"intro": saved_intro,
+		"settings": saved_settings, "selectedTicker": payload.get("selectedTicker", INTRO_TICKER),
+	}
+
+
+func _apply_loaded_save(loaded: Dictionary) -> void:
+	exchange = loaded["exchange"]
+	academy = loaded["academy"]
+	challenges = loaded["challenges"]
+	career = loaded["career"]
+	quant = loaded["quant"]
+	fund = loaded["fund"]
+	alerts = loaded["alerts"]
+	intro = loaded["intro"]
+	history = loaded["history"]
+	narrative = loaded["narrative"]
+	_connect_narrative()
+	var saved_settings: Dictionary = loaded["settings"]
 	for key in saved_settings.keys():
 		settings[key] = saved_settings[key]
 	I18n.set_locale(String(settings.get("locale", "zh_CN")))
@@ -2193,7 +2395,7 @@ func load_game() -> bool:
 	_apply_layout(String(settings.get("layout", "beginner")))
 	_apply_audio_settings()
 	apply_display()
-	selected_ticker = String(payload.get("selectedTicker", "APLA"))
+	selected_ticker = String(loaded["selectedTicker"])
 	if not exchange.state["companies"].has(selected_ticker):
 		selected_ticker = "APLA"
 	var known_tickers: Dictionary = exchange.state["companies"]
@@ -2208,6 +2410,7 @@ func load_game() -> bool:
 			kept_alerts.append(alert)
 	alerts["alerts"] = kept_alerts
 	started = true
+	sandbox_mode = false
 	paused = true
 	var saved_speed := int(settings.get("speed", 1))
 	speed = saved_speed if SPEEDS.has(saved_speed) else 1
@@ -2221,11 +2424,11 @@ func load_game() -> bool:
 	state_changed.emit("loaded")
 	if _story_pause:
 		story_changed.emit()
-	return true
 
 
 func delete_save() -> void:
 	SmaSaveService.clear(save_path)
+	_keep_save_backup = false
 	toast_requested.emit(I18n.t("toast.deleted"))
 
 

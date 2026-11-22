@@ -6,6 +6,8 @@ extends SmaScreen
 var _body: VBoxContainer
 var _selected_ticker := ""
 var _ticker_option: OptionButton
+var _research_chart: SmaCandleChart
+var _research_quote: Label
 
 
 func _build() -> void:
@@ -25,10 +27,12 @@ func refresh(_reason: String = "") -> void:
 		return
 	SmaKit.clear_children(_body)
 	_ticker_option = null
+	_research_chart = null
 	if game == null or not game.started:
 		return
 	_ensure_ticker()
 	_render_header()
+	_render_research()
 	_render_upcoming()
 	_render_recent()
 	_render_history()
@@ -36,11 +40,11 @@ func refresh(_reason: String = "") -> void:
 
 func _ensure_ticker() -> void:
 	var companies := SmaCompanyCatalog.load_companies()
-	if companies.has(_selected_ticker):
-		return
-	var preferred := String(game.selected_ticker) if game.selected_ticker != null else ""
+	var preferred := String(game.selected_ticker)
 	if companies.has(preferred):
 		_selected_ticker = preferred
+		return
+	if companies.has(_selected_ticker):
 		return
 	var tickers := companies.keys()
 	tickers.sort()
@@ -57,6 +61,54 @@ func _render_header() -> void:
 	header.add_child(SmaKit.button(I18n.t("earnings.openNews"), _go_news))
 	header.add_child(SmaKit.button(I18n.t("earnings.openStatements"), _go_statements))
 	_body.add_child(header)
+
+
+func _render_research() -> void:
+	var card := SmaKit.card(12)
+	var box := SmaKit.vbox(8)
+	card.add_child(box)
+	var controls := SmaKit.flow(8)
+	controls.add_child(SmaKit.label(I18n.t("earnings.research"), 15))
+	var companies := SmaCompanyCatalog.load_companies()
+	var tickers := companies.keys()
+	tickers.sort()
+	_ticker_option = OptionButton.new()
+	_ticker_option.custom_minimum_size.x = 180
+	for index in tickers.size():
+		var ticker := String(tickers[index])
+		_ticker_option.add_item("%s · %s" % [ticker, String(companies[ticker].get("name", ticker))])
+		_ticker_option.set_item_metadata(index, ticker)
+		if ticker == _selected_ticker:
+			_ticker_option.select(index)
+	_ticker_option.item_selected.connect(_on_ticker_changed)
+	controls.add_child(_ticker_option)
+	var timeframe_picker := OptionButton.new()
+	for timeframe: String in SmaMinuteSeries.CHART_TIMEFRAMES:
+		timeframe_picker.add_item(timeframe)
+	timeframe_picker.select(SmaMinuteSeries.CHART_TIMEFRAMES.find(game.chart_timeframe()))
+	timeframe_picker.item_selected.connect(func(index):
+		game.set_chart_timeframe(SmaMinuteSeries.CHART_TIMEFRAMES[index]))
+	controls.add_child(timeframe_picker)
+	controls.add_child(SmaKit.button(I18n.t("earnings.tradeSelected"), _go_trade, true))
+	box.add_child(controls)
+	_research_quote = SmaKit.muted("")
+	box.add_child(_research_quote)
+	_research_chart = SmaCandleChart.new()
+	_research_chart.custom_minimum_size.y = 180
+	box.add_child(_research_chart)
+	_body.add_child(card)
+	on_tick()
+
+
+func on_tick() -> void:
+	if _research_chart == null or _selected_ticker.is_empty():
+		return
+	var timeframe: String = game.chart_timeframe()
+	var quote: Dictionary = game.exchange.quote(_selected_ticker)
+	_research_quote.text = "%s · %s · %s" % [_selected_ticker, timeframe,
+		SmaFormat.money(float(quote.get("last", 0.0)))]
+	_research_chart.set_candles(game.exchange.get_candles(_selected_ticker, timeframe), timeframe,
+		"%s · %s" % [_selected_ticker, timeframe])
 
 
 func _render_upcoming() -> void:
@@ -151,23 +203,7 @@ func _render_history() -> void:
 	card.add_child(box)
 	var header := SmaKit.hbox(8)
 	header.add_child(SmaKit.label(I18n.t("earnings.historyTitle"), 15))
-	header.add_child(SmaKit.hspacer())
-	var companies := SmaCompanyCatalog.load_companies()
-	var tickers := companies.keys()
-	tickers.sort()
-	_ticker_option = OptionButton.new()
-	_ticker_option.custom_minimum_size.x = 220
-	var selected_index := 0
-	for index in tickers.size():
-		var ticker := String(tickers[index])
-		_ticker_option.add_item("%s · %s" % [ticker,
-			String(companies[ticker].get("name", ticker))])
-		_ticker_option.set_item_metadata(index, ticker)
-		if ticker == _selected_ticker:
-			selected_index = index
-	_ticker_option.select(selected_index)
-	_ticker_option.item_selected.connect(_on_ticker_changed)
-	header.add_child(_ticker_option)
+	header.add_child(SmaKit.muted(_selected_ticker))
 	box.add_child(header)
 	var history: Array = SmaFundamentals.history(_selected_ticker, 8, game.get_day())
 	if history.is_empty():
@@ -215,8 +251,7 @@ func _history_row(report: Dictionary) -> Control:
 func _on_ticker_changed(index: int) -> void:
 	if _ticker_option == null or index < 0:
 		return
-	_selected_ticker = String(_ticker_option.get_item_metadata(index))
-	refresh("earnings")
+	game.select_ticker(String(_ticker_option.get_item_metadata(index)))
 
 
 func _go_news() -> void:
@@ -227,5 +262,11 @@ func _go_news() -> void:
 
 func _go_statements() -> void:
 	var main := get_tree().get_first_node_in_group("main")
-	if main != null and main.has_method("navigate"):
-		main.navigate("statements")
+	if main != null and main.has_method("open_ticker"):
+		main.open_ticker(_selected_ticker, "statements")
+
+
+func _go_trade() -> void:
+	var main := get_tree().get_first_node_in_group("main")
+	if main != null and main.has_method("open_ticker"):
+		main.open_ticker(_selected_ticker)

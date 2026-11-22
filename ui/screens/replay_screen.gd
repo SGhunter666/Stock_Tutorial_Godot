@@ -140,10 +140,11 @@ func _render_stats(snapshot: Dictionary) -> void:
 		float(snapshot["equity"])))
 	grid.add_child(_stat("replay.dailyPnl", SmaFormat.signed_money(float(
 		snapshot["dailyPnl"])), float(snapshot["dailyPnl"])))
+	var has_positions := bool(snapshot.get("positionDataAvailable", true))
 	grid.add_child(_stat("replay.stockValue", SmaFormat.money(float(
-		snapshot["stockValue"])), 0.0))
+		snapshot["stockValue"])) if has_positions else "—", 0.0))
 	grid.add_child(_stat("replay.positions", SmaFormat.num(float(
-		snapshot["positions"].size()), 0), 0.0))
+		snapshot["positions"].size()), 0) if has_positions else "—", 0.0))
 	_body.add_child(grid)
 
 
@@ -184,7 +185,11 @@ func _render_positions(snapshot: Dictionary) -> void:
 	var box := SmaKit.vbox(4)
 	card.add_child(box)
 	box.add_child(SmaKit.label(I18n.t("replay.positionsTitle"), 14))
-	if positions.is_empty():
+	if not bool(snapshot.get("positionDataAvailable", true)):
+		var note := SmaKit.muted(I18n.t("replay.positionsUnavailable"), 11)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(note)
+	elif positions.is_empty():
 		box.add_child(SmaKit.muted(I18n.t("replay.noPositions"), 11))
 	else:
 		box.add_child(SmaKit.header_row(

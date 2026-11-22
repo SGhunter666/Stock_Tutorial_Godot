@@ -3,7 +3,6 @@
 class_name SmaTradeScreen
 extends SmaScreen
 
-const TIMEFRAMES := ["1m", "5m", "15m", "30m", "1h", "4h", "1D", "1W", "1M"]
 const RANGE_OPTIONS := [60, 120, 250]
 
 var _timeframe := "1m"
@@ -35,15 +34,18 @@ var _last_label: Label
 var _change_label: Label
 var _stat_labels: Dictionary = {}
 var _chart: SmaCandleChart
+var _start_chart: Button
 var _book_rows: Array = []
 var _book_meta: Label
 var _qty: SpinBox
 var _limit: SpinBox
+var _ticket_ticker := ""
 var _limit_row: HBoxContainer
 var _estimate_label: Label
 var _fee_label: Label
 var _available_label: Label
 var _feedback: Label
+var _intro_review: Button
 var _oco_card: PanelContainer
 var _oco_qty: SpinBox
 var _oco_tp: SpinBox
@@ -71,7 +73,7 @@ func _build() -> void:
 	add_child(root)
 
 	var quote_card := SmaKit.card(12)
-	var quote_head := SmaKit.hbox(18)
+	var quote_head := SmaKit.flow(14)
 	var identity := SmaKit.vbox(2)
 	_ticker_label = SmaKit.label("—", 24, SmaUiTheme.ACCENT)
 	_name_label = SmaKit.label("—", 14, SmaUiTheme.MUTED)
@@ -84,19 +86,19 @@ func _build() -> void:
 	_sensitivity_label = SmaKit.caption("")
 	identity.add_child(_sensitivity_label)
 	quote_head.add_child(identity)
-	quote_head.add_child(SmaKit.hspacer())
+	var quote_actions := SmaKit.hbox(8)
 	_watch_button = SmaKit.button(I18n.t("trade.watchAdd"), _toggle_watch)
 	_watch_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_watch_button.custom_minimum_size.x = 100
-	quote_head.add_child(_watch_button)
+	quote_actions.add_child(_watch_button)
 	var alert_button := SmaKit.button(I18n.t("trade.alertButton"), _open_alerts)
 	alert_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	alert_button.custom_minimum_size.x = 100
-	quote_head.add_child(alert_button)
+	quote_actions.add_child(alert_button)
 	var financials_button := SmaKit.button(I18n.t("financials.open"), _open_financials)
 	financials_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	financials_button.custom_minimum_size.x = 100
-	quote_head.add_child(financials_button)
+	quote_actions.add_child(financials_button)
 	var last_box := SmaKit.vbox(0)
 	_last_label = SmaKit.label("—", 30)
 	_change_label = SmaKit.label("—", 14)
@@ -105,13 +107,13 @@ func _build() -> void:
 	quote_head.add_child(last_box)
 	for key in ["high", "low", "bid", "ask", "volume"]:
 		var stat := SmaKit.vbox(1)
-		var caption_text := I18n.t("market.%s" % key) if key != "high" and key != "low" else I18n.t("market.%s" % key)
-		var caption := SmaKit.caption(caption_text)
+		var caption := SmaKit.caption(I18n.t("market.%s" % key))
 		var value := SmaKit.label("—", 13)
 		stat.add_child(caption)
 		stat.add_child(value)
 		_stat_labels[key] = value
 		quote_head.add_child(stat)
+	quote_head.add_child(quote_actions)
 	quote_card.add_child(quote_head)
 	root.add_child(quote_card)
 
@@ -148,7 +150,7 @@ func _build() -> void:
 	var chart_head := SmaKit.hbox(6)
 	chart_head.add_child(SmaKit.label(I18n.t("trade.chart"), 14))
 	chart_head.add_child(SmaKit.hspacer())
-	for timeframe in TIMEFRAMES:
+	for timeframe in SmaMinuteSeries.CHART_TIMEFRAMES:
 		var button := SmaKit.toggle(timeframe, _timeframe_group)
 		button.custom_minimum_size.x = 44
 		button.pressed.connect(_on_timeframe.bind(timeframe))
@@ -168,6 +170,9 @@ func _build() -> void:
 	range_row.add_child(SmaKit.hspacer())
 	range_row.add_child(SmaKit.caption(I18n.t("chart.hint")))
 	chart_box.add_child(range_row)
+	_start_chart = SmaKit.button(I18n.t("intro.chartAdvance"), game.step_minute)
+	_start_chart.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	chart_box.add_child(_start_chart)
 	_chart = SmaCandleChart.new()
 	_chart.custom_minimum_size.y = 300
 	_chart.visible_count_changed.connect(_on_chart_range_changed)
@@ -334,6 +339,9 @@ func _build() -> void:
 	_feedback = SmaKit.muted("")
 	_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ticket.add_child(_feedback)
+	_intro_review = SmaKit.button(I18n.t("intro.openReview"), _open_intro_review)
+	_intro_review.visible = false
+	ticket.add_child(_intro_review)
 	right.add_child(ticket_card)
 
 	_oco_card = SmaKit.card(12)
@@ -448,6 +456,11 @@ func refresh(reason: String = "") -> void:
 		return
 	_set_empty(false)
 	var ticker: String = game.selected_ticker
+	var timeframe: String = game.chart_timeframe()
+	if _timeframe != timeframe:
+		_timeframe = timeframe
+		_timeframe_buttons[_timeframe].set_pressed_no_signal(true)
+	_intro_review.visible = game.has_intro_task() and not game.intro["receipt"].is_empty()
 	var lock: Dictionary = game.market_lock_info(ticker)
 	var locked := bool(lock.get("locked", false))
 	if _lock_card != null:
@@ -497,8 +510,9 @@ func refresh(reason: String = "") -> void:
 	_stat_labels["bid"].text = _price_text(quote.get("bid", null))
 	_stat_labels["ask"].text = _price_text(quote.get("ask", null))
 	_stat_labels["volume"].text = SmaFormat.compact(float(quote.get("volume", 0)))
-	if _limit != null and _order_type == "limit" and _limit.value <= 0.01:
-		_limit.value = maxf(0.01, last)
+	if _order_type == "limit" and _ticket_ticker != ticker:
+		_limit.set_value_no_signal(maxf(0.01, SmaFormat.round_to(last, 2)))
+	_ticket_ticker = ticker
 	if _order_type == "stop" and _stop_ticker != ticker:
 		_reset_stop_price()
 	_update_book(ticker)
@@ -582,6 +596,7 @@ func _update_book(ticker: String) -> void:
 
 func _update_chart(ticker: String) -> void:
 	var candles: Array = game.exchange.get_candles(ticker, _timeframe)
+	_start_chart.visible = candles.is_empty()
 	var title := "%s · %s" % [ticker, _timeframe]
 	_chart.set_candles(candles, _timeframe, title)
 	var account: Dictionary = game.exchange.state["account"]
@@ -797,7 +812,7 @@ func _update_estimate() -> void:
 	if _estimate_label == null or game == null or not game.started:
 		return
 	var value := _current_price() * _qty.value
-	var fee := SmaFormat.round_to(value * SmaExchange.FEE_BPS / 10000.0, 2)
+	var fee := SmaFormat.round_to(value * float(game.exchange.fee_bps) / 10000.0, 2)
 	_estimate_label.text = SmaFormat.money(value)
 	_fee_label.text = SmaFormat.money(fee)
 
@@ -836,8 +851,13 @@ func _reset_stop_price() -> void:
 
 
 func _on_timeframe(timeframe: String) -> void:
-	_timeframe = timeframe
-	_update_chart(game.selected_ticker)
+	game.set_chart_timeframe(timeframe)
+
+
+func _open_intro_review() -> void:
+	var main := get_tree().get_first_node_in_group("main")
+	if main != null and main.has_method("navigate"):
+		main.navigate("dashboard")
 
 
 func _submit() -> void:

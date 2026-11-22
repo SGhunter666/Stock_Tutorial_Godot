@@ -13,8 +13,8 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "成交了。现在做一件比下单更重要百倍的事：复盘。你为什么在这个价格做这笔交易？如果行情朝反方向走，什么情况下你会承认自己错了？",
-        "en": "Filled. Now do something a hundred times more important than ordering: review. Why did you make this trade at this price? And if it goes against you, when will you admit you were wrong?"
+        "zh_CN": "成交了。打开交易台里的「查看首笔成交与复盘」，看看你实际付了多少钱、占用多少仓位。再想一想，什么情况会让你离场？",
+        "en": "Your order filled. Open “Review your first fill” at the trade desk to see what you paid and how large the position is. Then decide what would make you exit."
       },
       "next": "gu_yan_brag"
     },
@@ -109,8 +109,8 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "很好。成本基础决定了你真正的盈亏底线，持仓占比决定了你今晚能不能睡着。把这两个数字写进交易日志。",
-        "en": "Good. Cost basis defines your real P&L baseline; position weight defines whether you can sleep tonight. Put both numbers in your journal."
+        "zh_CN": "很好。成本基础决定了你真正的盈亏底线，持仓占比决定了你今晚能不能睡着。打开成交复盘，把这两个数字和你的计划对照一下。",
+        "en": "Good. Cost basis defines your real P&L baseline; position weight defines whether you can sleep tonight. Compare those two numbers with your plan in the fill review."
       },
       "next": "end"
     },

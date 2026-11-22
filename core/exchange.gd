@@ -82,6 +82,7 @@ func _init(seed_value: String = "sim-exchange-v1", cash: float = START_CASH,
 			"dividends": [],
 			"adjustments": [],
 			"equityHistory": [{"day": 0, "equity": cash}],
+			"replayHistory": [],
 			"margin": SmaMargin.create_state(),
 			"options": [],
 			"optionTrades": [],
@@ -370,6 +371,8 @@ func submit_order(params: Dictionary) -> Dictionary:
 		return {"ok": false, "error": "order.delisted"}
 	if is_trading_halted(symbol):
 		return {"ok": false, "error": "order.halted"}
+	if order_owner == "player" and not _has_valid_position_for_order(symbol, order_action):
+		return {"ok": false, "error": "order.invalidPosition"}
 	var order_type := String(params.get("type", "market"))
 	if not ["limit", "stop", "stopLimit", "trailing"].has(order_type):
 		order_type = "market"
@@ -597,7 +600,8 @@ func _apply_fills(order: Dictionary, fills: Array, rest: bool = false,
 				_apply_order_fill(counterpart, fill)
 	var remaining := int(order.get("qty", 0)) - int(order.get("filledQty", 0))
 	var blocked := ["insufficientCash", "insufficientShares", "insufficientMargin",
-		"insufficientShortShares", "noShortPosition"].has(String(order.get("reason", "")))
+		"insufficientShortShares", "noShortPosition", "order.invalidPosition"].has(
+			String(order.get("reason", "")))
 	var can_rest := (rest or keep_resting) and String(order.get("type", "")) == "limit" and not blocked
 	if remaining > 0 and can_rest:
 		order["status"] = "partiallyFilled" if int(order.get("filledQty", 0)) > 0 else "open"
@@ -652,15 +656,25 @@ func _apply_order_fill(order: Dictionary, fill: Dictionary) -> void:
 	order["status"] = "filled" if remaining <= 0 else "partiallyFilled"
 
 
+func _has_valid_position_for_order(ticker: String, action: String) -> bool:
+	var is_short := action in ["openShort", "closeShort"]
+	var holdings: Dictionary = state["account"]["shorts" if is_short else "positions"]
+	return not holdings.has(ticker) or _valid_stock_position(holdings[ticker],
+		"avgPrice" if is_short else "avgCost")
+
+
 func _apply_account_fill(order: Dictionary, qty: int, price: float, fee: float) -> bool:
 	var account: Dictionary = state["account"]
 	var ticker := String(order["ticker"])
 	var action := action_for_order(order)
+	if not _has_valid_position_for_order(ticker, action):
+		order["status"] = "rejected"
+		order["reason"] = "order.invalidPosition"
+		return false
 	var gross := qty * price
 	var realized := 0.0
 	if action == "openLong":
 		var position: Dictionary = account["positions"].get(ticker, {"qty": 0, "avgCost": 0.0})
-		account["cash"] = float(account["cash"]) - gross - fee
 		var next_qty := int(position["qty"]) + qty
 		if next_qty > 0:
 			position["avgCost"] = (float(position["avgCost"]) * int(position["qty"]) + gross) / next_qty
@@ -668,10 +682,10 @@ func _apply_account_fill(order: Dictionary, qty: int, price: float, fee: float) 
 			position["avgCost"] = 0.0
 		position["qty"] = next_qty
 		account["positions"][ticker] = position
+		account["cash"] = float(account["cash"]) - gross - fee
 	elif action == "openShort":
 		var short: Dictionary = account["shorts"].get(ticker,
 			{"qty": 0, "avgPrice": 0.0, "openedDay": int(state["dayIndex"])})
-		account["cash"] = float(account["cash"]) + gross - fee
 		var next_qty := int(short["qty"]) + qty
 		if next_qty > 0:
 			short["avgPrice"] = (float(short["avgPrice"]) * int(short["qty"]) + gross) / next_qty
@@ -681,14 +695,15 @@ func _apply_account_fill(order: Dictionary, qty: int, price: float, fee: float) 
 		if not short.has("openedDay"):
 			short["openedDay"] = int(state["dayIndex"])
 		account["shorts"][ticker] = short
+		account["cash"] = float(account["cash"]) + gross - fee
 	elif action == "closeShort":
 		var short: Dictionary = account["shorts"].get(ticker, {})
 		if short.is_empty() or int(short.get("qty", 0)) < qty:
 			order["status"] = "rejected"
 			order["reason"] = "insufficientShortShares"
 			return false
-		account["cash"] = float(account["cash"]) - gross - fee
 		realized = (float(short["avgPrice"]) - price) * qty
+		account["cash"] = float(account["cash"]) - gross - fee
 		account["realizedPnl"] = float(account["realizedPnl"]) + realized
 		short["qty"] = int(short["qty"]) - qty
 		if int(short["qty"]) <= 0:
@@ -699,8 +714,8 @@ func _apply_account_fill(order: Dictionary, qty: int, price: float, fee: float) 
 			order["status"] = "rejected"
 			order["reason"] = "insufficientShares"
 			return false
-		account["cash"] = float(account["cash"]) + gross - fee
 		realized = (price - float(position["avgCost"])) * qty
+		account["cash"] = float(account["cash"]) + gross - fee
 		account["realizedPnl"] = float(account["realizedPnl"]) + realized
 		position["qty"] = int(position["qty"]) - qty
 		if int(position["qty"]) <= 0:
@@ -1046,6 +1061,7 @@ func _clock_text() -> String:
 func _close_session(rng: SmaRng) -> void:
 	var session_day := int(state["dayIndex"])
 	var date := SmaCalendar.iso_date(session_day)
+	_record_replay_close(session_day)
 	for order in state["orders"]:
 		if String(order.get("owner", "")) == "player":
 			continue
@@ -1241,6 +1257,20 @@ func record_equity_snapshot() -> void:
 	if history.size() > HISTORY_LIMIT:
 		history = history.slice(history.size() - HISTORY_LIMIT)
 		state["account"]["equityHistory"] = history
+
+
+func _record_replay_close(day: int) -> void:
+	var account: Dictionary = state["account"]
+	var marks := {}
+	for holdings: Dictionary in [account["positions"], account["shorts"]]:
+		for ticker in holdings:
+			marks[ticker] = float(state["companies"][ticker]["last"])
+	var history: Array = account["replayHistory"]
+	history.append({"day": day, "equity": equity(),
+		"positions": account["positions"].duplicate(true),
+		"shorts": account["shorts"].duplicate(true), "marks": marks})
+	if history.size() > HISTORY_LIMIT:
+		history.pop_front()
 
 
 func position_rows() -> Array:
@@ -1859,11 +1889,74 @@ func to_dict() -> Dictionary:
 
 
 static func from_dict(data: Dictionary) -> SmaExchange:
-	if int(data.get("version", 0)) != SAVE_VERSION or typeof(data.get("companies")) != TYPE_DICTIONARY:
+	if data.get("version") != SAVE_VERSION or typeof(data.get("companies")) != TYPE_DICTIONARY:
+		return null
+	var saved_companies: Dictionary = data["companies"]
+	var account_data: Variant = data.get("account")
+	if typeof(account_data) != TYPE_DICTIONARY or not account_data.has("cash") \
+			or saved_companies.is_empty():
+		return null
+	for key in ["sectorFactors", "stats", "rngState"]:
+		if typeof(data.get(key, {})) != TYPE_DICTIONARY:
+			return null
+	for key in ["orders", "trades", "news", "corporateActions", "rightsOfferings"]:
+		var records: Variant = data.get(key, [])
+		if typeof(records) != TYPE_ARRAY:
+			return null
+		for record in records:
+			if typeof(record) != TYPE_DICTIONARY:
+				return null
+	for key in ["positions", "shorts"]:
+		var positions: Variant = account_data.get(key, {})
+		if typeof(positions) != TYPE_DICTIONARY:
+			return null
+		for position in positions.values():
+			if not _valid_stock_position(position, "avgPrice" if key == "shorts" else "avgCost"):
+				return null
+	for key in ["trades", "equityHistory", "dividends", "adjustments", "options",
+			"optionTrades", "futures", "futuresTrades", "bonds", "fx", "commodities", "crypto",
+			"replayHistory"]:
+		var rows: Variant = account_data.get(key, [])
+		if typeof(rows) != TYPE_ARRAY:
+			return null
+		for row in rows:
+			if typeof(row) != TYPE_DICTIONARY:
+				return null
+	for company in saved_companies.values():
+		if typeof(company) != TYPE_DICTIONARY or typeof(company.get("book", {})) != TYPE_DICTIONARY \
+				or typeof(company.get("series", {})) != TYPE_DICTIONARY:
+			return null
+		for side in ["mmBids", "mmAsks"]:
+			if typeof(company.get("book", {}).get(side, [])) != TYPE_ARRAY:
+				return null
+	for order in data.get("orders", []):
+		if not order.has("ticker") or not order.has("id"):
+			return null
+	for key in ["cash", "fees", "realizedPnl"]:
+		if typeof(account_data.get(key, 0.0)) not in [TYPE_INT, TYPE_FLOAT]:
+			return null
+	if typeof(data.get("seed", "")) != TYPE_STRING:
 		return null
 	var seed_value := String(data.get("seed", "sim-exchange-v1"))
-	var cash := float(data.get("account", {}).get("cash", START_CASH))
+	var cash := float(account_data.get("cash", START_CASH))
 	var engine := SmaExchange.new(seed_value, cash)
+	if not saved_companies.keys().any(func(ticker): return engine.state["companies"].has(ticker)):
+		return null
+	for key in ["positions", "shorts"]:
+		for ticker in account_data.get(key, {}):
+			if not engine.state["companies"].has(ticker):
+				return null
+	for point in account_data.get("replayHistory", []):
+		if typeof(point.get("day")) not in [TYPE_INT, TYPE_FLOAT] \
+				or typeof(point.get("equity")) not in [TYPE_INT, TYPE_FLOAT] \
+				or typeof(point.get("marks")) != TYPE_DICTIONARY:
+			return null
+		for key in ["positions", "shorts"]:
+			if typeof(point.get(key)) != TYPE_DICTIONARY:
+				return null
+			for position in point[key].values():
+				if not _valid_stock_position(position, "avgPrice" if key == "shorts" else "avgCost"):
+					return null
 	engine.fee_bps = float(data.get("feeBps", FEE_BPS))
 	engine.state["quotes"] = {}
 	engine._dirty_liquidity.clear()
@@ -1887,14 +1980,13 @@ static func from_dict(data: Dictionary) -> SmaExchange:
 	engine.state["newsSeq"] = int(data.get("newsSeq", 1))
 	engine.state["corporateActions"] = data.get("corporateActions", []).duplicate(true)
 	engine.state["rightsOfferings"] = data.get("rightsOfferings", []).duplicate(true)
-	var saved_account: Dictionary = data.get("account", {}).duplicate(true)
+	var saved_account: Dictionary = account_data.duplicate(true)
 	var defaults: Dictionary = engine.state["account"]
 	for key in defaults.keys():
 		if not saved_account.has(key):
 			saved_account[key] = defaults[key]
 	engine.state["account"] = SmaMargin.normalize_account(saved_account)
 	engine.state["stats"] = data.get("stats", engine.state["stats"]).duplicate(true)
-	var saved_companies: Dictionary = data["companies"]
 	for ticker in engine.state["companies"].keys():
 		var cs: Dictionary = engine.state["companies"][ticker]
 		var saved: Dictionary = saved_companies.get(ticker, {})
@@ -1934,6 +2026,16 @@ static func from_dict(data: Dictionary) -> SmaExchange:
 			"action": String(order.get("action", "")),
 		})
 	return engine
+
+
+static func _valid_stock_position(position: Variant, cost_key: String) -> bool:
+	if typeof(position) != TYPE_DICTIONARY:
+		return false
+	var qty: Variant = position.get("qty")
+	var cost: Variant = position.get(cost_key)
+	return typeof(qty) in [TYPE_INT, TYPE_FLOAT] and typeof(cost) in [TYPE_INT, TYPE_FLOAT] \
+		and is_finite(float(qty)) and float(qty) >= 0.0 and floorf(float(qty)) == float(qty) \
+		and is_finite(float(cost)) and float(cost) >= 0.0
 
 
 static func _finite(value: Variant) -> bool:

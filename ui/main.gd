@@ -34,11 +34,21 @@ const NAV_ITEMS := [
 	["settings", "nav.settings"],
 	["story", "nav.story"],
 ]
+const CORE_NAV := ["dashboard", "market", "watchlist", "trade", "portfolio", "academy",
+	"story", "settings"]
+const COMPACT_WIDTH := 1360.0
 
 var _screens: Dictionary = {}
 var _nav_buttons: Dictionary = {}
+var _more_nav: VBoxContainer
+var _more_nav_button: Button
+var _more_nav_open := false
 var _current_screen := "market"
 var _screen_host: Control
+var _sidebar: Control
+var _nav_menu: MenuButton
+var _speed_box: HBoxContainer
+var _speed_picker: OptionButton
 var _dialogue: SmaDialoguePanel
 var _start_overlay: Control
 var _ff_overlay: Control
@@ -87,6 +97,7 @@ func _ready() -> void:
 		_play_sound("achievement" if status == "completed" else "reject"))
 	Game.game_started.connect(func(): _play_sound("story"))
 	Game.game_loaded.connect(func(): _play_sound("story"))
+	resized.connect(_sync_compact_layout)
 	_build_ui()
 	if not Game.started:
 		_show_start_overlay()
@@ -135,7 +146,8 @@ func _build_ui() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 0)
 	root.add_child(body)
-	body.add_child(_build_sidebar())
+	_sidebar = _build_sidebar()
+	body.add_child(_sidebar)
 
 	var content_margin := MarginContainer.new()
 	content_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -154,6 +166,7 @@ func _build_ui() -> void:
 	add_child(_dialogue)
 	_build_fast_forward_overlay()
 	_build_toast()
+	_sync_compact_layout()
 	_update_topbar()
 	_refresh_nav()
 
@@ -173,9 +186,19 @@ func _build_topbar() -> Control:
 	for side in ["top", "bottom"]:
 		margin.add_theme_constant_override("margin_%s" % side, 10)
 	bar.add_child(margin)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	margin.add_child(row)
+	var toolbar := SmaKit.flow(14)
+	margin.add_child(toolbar)
+	var row := SmaKit.hbox(12)
+	toolbar.add_child(row)
+
+	_nav_menu = MenuButton.new()
+	_nav_menu.text = I18n.t("nav.menu")
+	_nav_menu.focus_mode = Control.FOCUS_ALL
+	var navigation := _nav_menu.get_popup()
+	for index in NAV_ITEMS.size():
+		navigation.add_radio_check_item(I18n.t(String(NAV_ITEMS[index][1])), index)
+	navigation.id_pressed.connect(func(id): navigate(String(NAV_ITEMS[id][0])))
+	row.add_child(_nav_menu)
 
 	var brand := VBoxContainer.new()
 	brand.add_theme_constant_override("separation", 0)
@@ -207,10 +230,10 @@ func _build_topbar() -> Control:
 	_equity_label = _top_metrics["equity"]
 	_pnl_label = _top_metrics["pnl"]
 
-	row.add_child(SmaKit.hspacer())
-
-	var speed_box := HBoxContainer.new()
-	speed_box.add_theme_constant_override("separation", 3)
+	var actions := SmaKit.hbox(8)
+	toolbar.add_child(actions)
+	_speed_box = HBoxContainer.new()
+	_speed_box.add_theme_constant_override("separation", 3)
 	var group := ButtonGroup.new()
 	for value in Game.SPEEDS:
 		var button := SmaKit.toggle("%d×" % value, group)
@@ -218,33 +241,49 @@ func _build_topbar() -> Control:
 		button.add_theme_font_size_override("font_size", 11)
 		button.pressed.connect(_on_speed.bind(int(value)))
 		_speed_buttons[int(value)] = button
-		speed_box.add_child(button)
-	row.add_child(speed_box)
+		_speed_box.add_child(button)
+	actions.add_child(_speed_box)
+
+	_speed_picker = OptionButton.new()
+	for value in Game.SPEEDS:
+		_speed_picker.add_item("%d×" % value)
+	_speed_picker.item_selected.connect(func(index): _on_speed(int(Game.SPEEDS[index])))
+	actions.add_child(_speed_picker)
 
 	_pause_button = SmaKit.button(I18n.t("header.pause"), _toggle_pause)
 	_pause_button.custom_minimum_size.x = 64
-	row.add_child(_pause_button)
+	actions.add_child(_pause_button)
 
 	var minute_button := SmaKit.button(I18n.t("header.step_minute"), _step_minute)
 	minute_button.add_theme_font_size_override("font_size", 10)
 	minute_button.tooltip_text = I18n.t("header.step_minute")
 	_step_buttons.append(minute_button)
-	row.add_child(minute_button)
+	actions.add_child(minute_button)
 
 	var day_button := SmaKit.button(I18n.t("header.step_day"), _step_day)
 	day_button.add_theme_font_size_override("font_size", 10)
 	day_button.tooltip_text = I18n.t("header.step_day")
 	_step_buttons.append(day_button)
-	row.add_child(day_button)
+	actions.add_child(day_button)
 
 	var save_button := SmaKit.button(I18n.t("header.save"), func(): Game.save_game(true))
 	save_button.add_theme_font_size_override("font_size", 11)
-	row.add_child(save_button)
+	actions.add_child(save_button)
 
 	var language := SmaKit.button("中 / EN", _toggle_language)
 	language.add_theme_font_size_override("font_size", 11)
-	row.add_child(language)
+	actions.add_child(language)
 	return bar
+
+
+func _sync_compact_layout() -> void:
+	if _sidebar == null:
+		return
+	var compact := size.x < COMPACT_WIDTH
+	_sidebar.visible = not compact
+	_nav_menu.visible = compact
+	_speed_box.visible = not compact
+	_speed_picker.visible = compact
 
 
 func _build_sidebar() -> Control:
@@ -268,14 +307,32 @@ func _build_sidebar() -> Control:
 	nav_box.add_theme_constant_override("separation", 4)
 	nav_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nav_scroll.add_child(nav_box)
+	var more_nav := SmaKit.vbox(4)
 	var group := ButtonGroup.new()
+	var beginner_nav: bool = Game.settings.get("layout", "beginner") == "beginner"
 	for entry in NAV_ITEMS:
 		var button := SmaKit.toggle(I18n.t(String(entry[1])), group)
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.custom_minimum_size.y = 32
 		button.pressed.connect(func(): navigate(String(entry[0])))
 		_nav_buttons[String(entry[0])] = button
-		nav_box.add_child(button)
+		if beginner_nav and not CORE_NAV.has(entry[0]):
+			more_nav.add_child(button)
+		else:
+			nav_box.add_child(button)
+	_more_nav = more_nav
+	_more_nav_button = null
+	if beginner_nav:
+		_more_nav_button = SmaKit.toggle(I18n.t("nav.moreTools"))
+		_more_nav_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_more_nav_button.custom_minimum_size.y = 32
+		_more_nav_button.button_pressed = _more_nav_open
+		_more_nav_button.toggled.connect(func(expanded: bool):
+			_more_nav_open = expanded
+			_more_nav.visible = expanded)
+		nav_box.add_child(_more_nav_button)
+		more_nav.visible = _more_nav_open
+	nav_box.add_child(more_nav)
 	_story_badge = SmaKit.caption("")
 	nav_box.add_child(_story_badge)
 	var disclaimer := SmaKit.caption(I18n.t("app.disclaimer"))
@@ -360,6 +417,11 @@ func navigate(screen_id: String, force: bool = false) -> void:
 	if not _screens.has(screen_id):
 		return
 	_current_screen = screen_id
+	var navigation := _nav_menu.get_popup()
+	for index in NAV_ITEMS.size():
+		navigation.set_item_checked(index, NAV_ITEMS[index][0] == screen_id)
+	if _more_nav_button != null and not CORE_NAV.has(screen_id):
+		_more_nav_button.button_pressed = true
 	for id in _screens.keys():
 		_screens[id].visible = id == screen_id
 	for id in _nav_buttons.keys():
@@ -369,6 +431,11 @@ func navigate(screen_id: String, force: bool = false) -> void:
 		screen.setup(Game)
 	else:
 		screen.refresh("nav")
+
+
+func open_ticker(ticker: String, screen_id: String = "trade") -> void:
+	Game.select_ticker(ticker)
+	navigate(screen_id)
 
 
 func _refresh_nav() -> void:
@@ -410,7 +477,7 @@ func _on_academy_changed() -> void:
 func _on_game_started() -> void:
 	if _start_overlay != null:
 		_start_overlay.visible = false
-	navigate("market", false)
+	navigate("dashboard" if Game.has_intro_task() else "market")
 
 
 func _on_game_loaded() -> void:
@@ -418,7 +485,7 @@ func _on_game_loaded() -> void:
 		_start_overlay.visible = false
 	# A save carries its own theme and layout, so rebuild before showing it.
 	_build_ui()
-	navigate("market", false)
+	navigate("dashboard" if Game.has_intro_task() else "market")
 
 
 func _build_fast_forward_overlay() -> void:
@@ -510,6 +577,8 @@ func _update_topbar() -> void:
 	for value in _speed_buttons.keys():
 		_speed_buttons[value].button_pressed = int(Game.speed) == int(value)
 		_speed_buttons[value].disabled = fast_forwarding
+	_speed_picker.select(Game.SPEEDS.find(int(Game.speed)))
+	_speed_picker.disabled = fast_forwarding
 	for button in _step_buttons:
 		button.disabled = Game.is_story_paused() or fast_forwarding
 
@@ -620,7 +689,7 @@ func _show_start_overlay() -> void:
 	footer.add_child(SmaKit.caption(I18n.t("start.footer")))
 	footer.add_child(SmaKit.hspacer())
 	footer.add_child(SmaKit.caption(I18n.t("app.version", {
-		"version": String(ProjectSettings.get_setting("application/config/version", "beta-01")),
+		"version": String(ProjectSettings.get_setting("application/config/version", "beta-02.1")),
 	})))
 	footer.add_child(SmaKit.button(I18n.t("start.language"), _toggle_language))
 	box.add_child(footer)
@@ -630,8 +699,21 @@ func _show_start_overlay() -> void:
 
 
 func _start_new_game() -> void:
+	if Game.has_save():
+		var dialog := ConfirmationDialog.new()
+		dialog.title = I18n.t("start.replaceTitle")
+		dialog.dialog_text = I18n.t("start.replaceMessage")
+		dialog.ok_button_text = I18n.t("start.new_game")
+		dialog.get_cancel_button().text = I18n.t("start.cancel")
+		dialog.canceled.connect(dialog.queue_free)
+		dialog.confirmed.connect(func():
+			dialog.queue_free()
+			Game.new_game())
+		add_child(dialog)
+		dialog.popup_centered()
+		dialog.get_cancel_button().grab_focus()
+		return
 	Game.new_game()
-	_start_overlay.visible = false
 
 
 func _continue_game() -> void:

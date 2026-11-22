@@ -43,6 +43,17 @@ func run() -> void:
 	check(bad == null, "unsupported save version is rejected")
 	var bad2 := SmaExchange.from_dict({"version": 1})
 	check(bad2 == null, "missing companies are rejected")
+	var missing_cost := exchange.to_dict().duplicate(true)
+	missing_cost["account"]["positions"]["GOGL"].erase("avgCost")
+	check(SmaExchange.from_dict(missing_cost) == null, "missing position cost is rejected")
+	var broken_exchange := SmaExchange.from_dict(exchange.to_dict())
+	broken_exchange.state["account"]["positions"]["GOGL"].erase("avgCost")
+	var balance := float(broken_exchange.state["account"]["cash"])
+	var rejected := broken_exchange.submit_order(
+		{"ticker": "GOGL", "side": "sell", "type": "market", "qty": 1})
+	eq(rejected.get("error"), "order.invalidPosition", "invalid holding rejects an order")
+	approx(float(broken_exchange.state["account"]["cash"]), balance, 0.0,
+		"rejected sale leaves the balance intact")
 
 	describe("save-file-service")
 	var test_path := "user://saves/test-save.json"
@@ -51,5 +62,11 @@ func run() -> void:
 	check(ok, "save service writes a file")
 	var loaded := SmaSaveService.read(test_path)
 	eq(loaded.get("hello", ""), "world", "save service reads it back")
+	check(SmaSaveService.write({"version": 1, "hello": "new"}, test_path), "save can be replaced")
+	eq(SmaSaveService.read(test_path + ".bak").get("hello"), "world", "previous save kept")
+	check(SmaSaveService.write({"version": 1, "hello": "recovered"}, test_path, true),
+		"write after recovery succeeds")
+	eq(SmaSaveService.read(test_path + ".bak").get("hello"), "world", "recovery preserves backup")
 	SmaSaveService.clear(test_path)
 	check(not SmaSaveService.exists(test_path), "save service clears the slot")
+	check(not SmaSaveService.exists(test_path + ".bak"), "clearing a slot also clears its backup")

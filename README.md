@@ -2,13 +2,15 @@
 
 一个使用 **Godot 4** 开发的单机金融教学与交易模拟游戏。玩家从个人投资者起步，在确定性的模拟市场中学习交易、风控、期权、期货、多资产、量化、基金管理和职业决策，并在一段完整的职场剧情中从学徒成长为基金掌舵人。
 
-- 当前版本：`beta-01`
+- 当前版本：`beta-02.1`
 - 引擎：Godot `4.7+`（已在 `4.7.2` 测试）
 - 渲染：GL Compatibility
 - 语言：简体中文 / English
 - 平台：Windows（已导出）、macOS / Linux 可从源码运行
 - 仓库：<https://github.com/SGhunter666/Stock_Tutorial_Godot>
 - 原始项目：<https://github.com/SGhunter666/STOCK_Tutorial>
+
+在 [GitHub Releases](https://github.com/SGhunter666/Stock_Tutorial_Godot/releases) 查看公开发布的 Windows 版本。下载 ZIP 后解压，再双击游戏程序。
 
 > **免责声明**
 >
@@ -150,13 +152,14 @@ macOS 如果使用官方应用包：
 - **继续游戏**：读取 `user://saves/career.json`。
 
 游戏默认在开始时暂停，剧情结束后可继续推进时间。
+新职业从仪表盘的「今日任务」开始。玩家可以先写交易计划，完成第一笔模拟交易后查看成交回执，并在收盘时对照费用、仓位和现金比例完成复盘。
 
 ### Windows 可执行文件
 
 已导出的版本位于：
 
 ```text
-build/windows/StockMarketAcademy_beta-01.exe
+build/windows/StockMarketAcademy_beta-02.1.exe
 ```
 
 该目录在 `.gitignore` 中，不会提交到 Git。
@@ -542,11 +545,11 @@ build/windows/StockMarketAcademy_beta-01.exe
   - Linux：`~/.local/share/godot/app_userdata/Stock Market Academy/saves/career.json`
 - 自动保存间隔：**20 秒**。
 - 手动保存：`Ctrl + S` / `Cmd + S`，或顶部“保存”按钮。
-- 保存采用临时文件 + 重命名，降低写入中断导致存档损坏的风险。
+- 保存时保留上一次成功写入的 `career.json.bak`。主档无法读取时，游戏会尝试恢复备份。
 - 存档格式：JSON，当前 `version = 1`。
 - 保存内容包括：设置、当前标的、交易所状态、剧情、学院、历史实验室、挑战、职业、量化配置、基金、自选股与价格提醒。
 - 旧存档缺少新字段时会进行归一化兼容。
-- 设置页支持导出/导入 JSON 存档。
+- 设置页支持导出/导入 JSON 存档。导入会在通过验证后替换当前职业进度。
 - 沙盒模式不会覆盖职业存档。
 
 ---
@@ -566,7 +569,7 @@ godot --headless --path . --script res://tests/run_tests.gd
 期望输出类似：
 
 ```text
-ALL TESTS PASSED (30072 checks)
+ALL TESTS PASSED (30169 checks)
 ```
 
 ### 集成测试
@@ -607,21 +610,21 @@ macOS 官方应用包示例：
 导出预设名称：`Windows Desktop`
 
 ```bash
-godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-01.exe
+godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-02.1.exe
 ```
 
 macOS 官方应用包：
 
 ```bash
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . \
-  --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-01.exe
+  --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-02.1.exe
 ```
 
 注意事项：
 
 - 需要先在 Godot 中安装 Windows 导出模板。
 - `build/` 已加入 `.gitignore`，不会提交到仓库。
-- 当前版本号来自 `project.godot` 的 `config/version = "beta-01"`。
+- 当前版本号来自 `project.godot` 的 `config/version = "beta-02.1"`。
 - 导出文件约 122 MB。
 
 ---
@@ -765,6 +768,6 @@ macOS 官方应用包：
 
 ---
 
-- **版本**：`beta-01`
+- **版本**：`beta-02.1`
 - **引擎**：Godot 4.7+
 - **语言**：简体中文 / English

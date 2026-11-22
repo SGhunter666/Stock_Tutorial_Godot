@@ -28,6 +28,9 @@ func refresh(_reason: String = "") -> void:
 		return
 	var tickers: Array = SmaCompanyCatalog.load_companies().keys()
 	tickers.sort()
+	if tickers.has(game.selected_ticker) and _ticker != game.selected_ticker:
+		_ticker = game.selected_ticker
+		_quarter_index = 0
 	if not tickers.has(_ticker):
 		_ticker = String(tickers[0])
 	var history: Array = game.statement_history(_ticker, 8)
@@ -55,9 +58,8 @@ func _render_header(tickers: Array, history: Array, report: Dictionary) -> void:
 			ticker_select.selected = index
 	ticker_select.custom_minimum_size.x = 110
 	ticker_select.item_selected.connect(func(index):
-		_ticker = String(tickers[index])
 		_quarter_index = 0
-		refresh())
+		game.select_ticker(String(tickers[index])))
 	header.add_child(ticker_select)
 	var quarter_select := OptionButton.new()
 	for index in history.size():

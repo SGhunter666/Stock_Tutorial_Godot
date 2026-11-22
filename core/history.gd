@@ -65,32 +65,39 @@ func dataset_loaded(scenario_id: String) -> bool:
 	return _datasets.has(scenario_id)
 
 
-func create_run(scenario_id: String, start_cash: float = -1.0) -> Dictionary:
+func create_run(scenario_id: String, start_cash: float = -1.0,
+		daily_mode: bool = false) -> Dictionary:
 	var cash := start_cash
 	if cash < 0.0:
 		cash = float(catalog.get("startCash", 10000))
 	var dataset := load_dataset(scenario_id)
 	var max_index := bar_count(dataset) - 1
 	var warmup := mini(int(catalog.get("warmupDays", 20)), maxi(0, max_index))
+	var first_tick := TICKS_PER_DAY - 1 if daily_mode else 0
 	return {
 		"scenarioId": scenario_id,
 		"dayIndex": warmup,
 		"startIndex": warmup,
-		"tick": 0,
+		"tick": first_tick,
+		"startTick": first_tick,
+		"dailyMode": daily_mode,
 		"selectedTicker": "",
 		"account": _create_account(cash),
 		"equityHistory": [{"day": warmup, "equity": cash}],
 	}
 
 
-func ensure_run(scenario_id: String, dataset: Dictionary) -> Dictionary:
+func ensure_run(scenario_id: String, dataset: Dictionary,
+		daily_mode: bool = false) -> Dictionary:
 	if not runs.has(scenario_id):
-		runs[scenario_id] = create_run(scenario_id)
+		runs[scenario_id] = create_run(scenario_id, -1.0, daily_mode)
 	var run: Dictionary = runs[scenario_id]
 	var max_index := maxi(0, bar_count(dataset) - 1)
 	run["dayIndex"] = clampi(int(run.get("dayIndex", 0)), 0, max_index)
 	run["startIndex"] = clampi(int(run.get("startIndex", 0)), 0, int(run["dayIndex"]))
 	run["tick"] = clampi(int(run.get("tick", 0)), 0, TICKS_PER_DAY - 1)
+	run["startTick"] = clampi(int(run.get("startTick", 0)), 0, TICKS_PER_DAY - 1)
+	run["dailyMode"] = bool(run.get("dailyMode", int(run["tick"]) == TICKS_PER_DAY - 1))
 	run["account"] = _normalize_account(run.get("account", {}))
 	if not run.has("equityHistory"):
 		run["equityHistory"] = [{"day": int(run["startIndex"]),
@@ -98,13 +105,18 @@ func ensure_run(scenario_id: String, dataset: Dictionary) -> Dictionary:
 	return run
 
 
-func reset_run(scenario_id: String) -> Dictionary:
-	runs[scenario_id] = create_run(scenario_id)
+func reset_run(scenario_id: String, daily_mode: bool = false) -> Dictionary:
+	runs[scenario_id] = create_run(scenario_id, -1.0, daily_mode)
 	return runs[scenario_id]
 
 
 func run(scenario_id: String) -> Dictionary:
 	return runs.get(scenario_id, {})
+
+
+func set_daily_mode(scenario_id: String, enabled: bool) -> void:
+	if runs.has(scenario_id):
+		runs[scenario_id]["dailyMode"] = enabled
 
 
 func _create_account(cash: float) -> Dictionary:
@@ -368,14 +380,15 @@ func advance_tick(scenario_id: String, dataset: Dictionary) -> Dictionary:
 	var day_closed := false
 	var reached_end := false
 	if tick >= TICKS_PER_DAY:
-		tick = 0
 		day_closed = true
 		var max_index := bar_count(dataset) - 1
 		if int(run_data["dayIndex"]) >= max_index:
+			tick = TICKS_PER_DAY - 1
 			reached_end = true
 		else:
-			run_data["dayIndex"] = int(run_data["dayIndex"]) + 1
 			_record_equity(run_data, dataset)
+			run_data["dayIndex"] = int(run_data["dayIndex"]) + 1
+			tick = 0
 	run_data["tick"] = tick
 	return {"run": run_data, "dayClosed": day_closed, "reachedEnd": reached_end}
 
@@ -384,6 +397,9 @@ func advance_day(scenario_id: String, dataset: Dictionary,
 		daily_mode: bool = false) -> Dictionary:
 	var run_data := ensure_run(scenario_id, dataset)
 	var max_index := bar_count(dataset) - 1
+	if int(run_data["dayIndex"]) >= max_index:
+		return {"run": run_data, "reachedEnd": true}
+	run_data["dailyMode"] = daily_mode
 	var next_index := mini(max_index, int(run_data["dayIndex"]) + 1)
 	run_data["dayIndex"] = next_index
 	run_data["tick"] = TICKS_PER_DAY - 1 if daily_mode else 0
@@ -407,6 +423,7 @@ func advance_to_event(scenario_id: String, dataset: Dictionary,
 	for index in bars.size():
 		if String(bars[index][0]) >= target:
 			run_data["dayIndex"] = index
+			run_data["dailyMode"] = daily_mode
 			run_data["tick"] = TICKS_PER_DAY - 1 if daily_mode else 0
 			_record_equity(run_data, dataset)
 			return {"run": run_data, "reachedEnd": false}
@@ -418,8 +435,8 @@ func trade(scenario_id: String, dataset: Dictionary, payload: Dictionary) -> Dic
 	var symbol := String(payload.get("symbol", "")).to_upper()
 	var side := String(payload.get("side", ""))
 	var qty := int(floor(float(payload.get("qty", 0))))
-	var tick := int(payload.get("tick", run_data.get("tick", 0)))
-	if qty <= 0 or not ["buy", "sell"].has(side):
+	var tick := int(run_data["tick"])
+	if qty <= 0 or not ["buy", "sell"].has(side) or int(payload.get("tick", tick)) != tick:
 		return {"ok": false, "error": "history.invalid"}
 	var quote := quote_at_tick(dataset, symbol, int(run_data["dayIndex"]), tick)
 	if quote.is_empty():
@@ -536,8 +553,8 @@ func _benchmark_return(run_data: Dictionary, dataset: Dictionary) -> float:
 	var benchmark := String(dataset.get("benchmark", "QQQ"))
 	var start := int(run_data.get("startIndex", 0))
 	var current := int(run_data.get("dayIndex", start))
-	var start_quote := quote_at(dataset, benchmark, start)
-	var current_quote := quote_at(dataset, benchmark, current)
+	var start_quote := quote_at_tick(dataset, benchmark, start, int(run_data["startTick"]))
+	var current_quote := quote_at_tick(dataset, benchmark, current, int(run_data["tick"]))
 	if start_quote.is_empty() or current_quote.is_empty():
 		return 0.0
 	var start_price := float(start_quote["last"])

@@ -324,8 +324,9 @@ static func _equity_metrics(curve: Array, initial_cash: float, trades: Array,
 
 
 static func run_backtest(candles: Array, strategy_id: String, params: Dictionary,
-		initial_cash: float = 100000.0, commission: float = 1.0) -> Dictionary:
-	if candles.size() < MIN_BARS:
+		initial_cash: float = 100000.0, commission: float = 1.0,
+		test_start: int = 0) -> Dictionary:
+	if test_start < 0 or candles.size() - test_start < MIN_BARS:
 		return {"ok": false, "error": "quant.error.history"}
 	if not STRATEGIES.has(strategy_id):
 		return {"ok": false, "error": "quant.error.strategy"}
@@ -338,9 +339,9 @@ static func run_backtest(candles: Array, strategy_id: String, params: Dictionary
 	var exposure_bars := 0
 	var trades: Array = []
 	var curve: Array = [cash_start]
-	for index in range(1, candles.size()):
-		var next_signal: String = signal_at(strategy_id, normalized,
-			candles.slice(0, index), index - 1)
+	var first_bar := maxi(1, test_start)
+	for index in range(first_bar, candles.size()):
+		var next_signal := signal_at(strategy_id, normalized, candles, index - 1)
 		var open_price := float(candles[index].get("o", 0.0))
 		if next_signal == "buy" and qty == 0 and open_price > 0.0:
 			var quantity := int(floor((cash - fee) / open_price))
@@ -377,19 +378,22 @@ static func run_backtest(candles: Array, strategy_id: String, params: Dictionary
 			"fee": float(entry["fee"]), "open": true,
 		})
 		cash += float(qty) * final_close
-	var metrics := _equity_metrics(curve, cash_start, trades, candles.size() - 1)
-	metrics["exposurePct"] = float(exposure_bars) / float(maxi(1, candles.size() - 1)) * 100.0
+	var scored_bars := candles.size() - first_bar
+	var metrics := _equity_metrics(curve, cash_start, trades, scored_bars)
+	metrics["exposurePct"] = float(exposure_bars) / float(scored_bars) * 100.0
 	metrics["finalEquity"] = cash
 	var benchmark := 0.0
-	if float(candles[0].get("c", 0.0)) > 0.0:
-		benchmark = (final_close / float(candles[0]["c"]) - 1.0) * 100.0
+	var benchmark_entry := float(candles[test_start].get("o" if test_start > 0 else "c", 0.0))
+	if benchmark_entry > 0.0:
+		benchmark = (final_close / benchmark_entry - 1.0) * 100.0
 	metrics["benchmarkReturnPct"] = benchmark
 	metrics["excessReturnPct"] = float(metrics["totalReturnPct"]) - benchmark
 	metrics["openPosition"] = qty > 0
 	var points: Array = []
 	for index in curve.size():
-		points.append({"index": index,
-			"day": String(candles[mini(index, candles.size() - 1)].get("d", "")),
+		var candle_index := first_bar - 1 + index
+		points.append({"index": candle_index,
+			"day": String(candles[maxi(test_start, candle_index)].get("d", "")),
 			"equity": SmaFormat.round_to(float(curve[index]), 2)})
 	return {"ok": true, "strategy": strategy_id, "params": normalized,
 		"metrics": metrics, "trades": trades, "equityCurve": points,
@@ -410,7 +414,6 @@ static func _score_for(metrics: Dictionary, objective: String) -> float:
 
 
 const _GRIDS := {
-	"buyHold": [{}],
 	"smaCross": {"fast": [5, 10, 20, 30, 40], "slow": [30, 50, 80, 120, 160]},
 	"rsiReversion": {"rsiPeriod": [7, 14, 21], "rsiEntry": [20, 30, 40],
 		"rsiExit": [60, 70, 80]},
@@ -421,8 +424,6 @@ const _GRIDS := {
 
 static func _parameter_grid(strategy_id: String) -> Array:
 	var grid: Dictionary = _GRIDS.get(strategy_id, {})
-	if strategy_id == "buyHold":
-		return [{}]
 	var keys: Array = grid.keys()
 	keys.sort()
 	var combos: Array = [{}]
@@ -437,16 +438,17 @@ static func _parameter_grid(strategy_id: String) -> Array:
 	return combos
 
 
-static func optimize(candles: Array, strategy_id: String, base_params: Dictionary,
+static func optimize(candles: Array, strategy_id: String, _base_params: Dictionary,
 		initial_cash: float, commission: float, split_pct: int,
 		objective: String) -> Dictionary:
 	if candles.size() < MIN_BARS * 2:
 		return {"ok": false, "error": "quant.error.history"}
+	if not STRATEGIES.has(strategy_id):
+		return {"ok": false, "error": "quant.error.strategy"}
 	var split := clampi(split_pct, 50, 90)
 	var split_index := clampi(int(float(candles.size()) * float(split) / 100.0),
 		MIN_BARS, candles.size() - MIN_BARS)
 	var in_sample := candles.slice(0, split_index)
-	var out_sample := candles.slice(maxi(0, split_index - 60))
 	var candidates: Array = []
 	for params in _parameter_grid(strategy_id):
 		var normalized := normalize_params(strategy_id, params)
@@ -462,17 +464,33 @@ static func optimize(candles: Array, strategy_id: String, base_params: Dictionar
 		return {"ok": false, "error": "quant.error.history"}
 	candidates.sort_custom(func(a, b): return float(a["score"]) > float(b["score"]))
 	var best: Dictionary = candidates[0]
+	var params: Dictionary = best["params"]
+	var warmup_bars := 2
+	match strategy_id:
+		"smaCross": warmup_bars = int(params["slow"]) + 1
+		"rsiReversion": warmup_bars = int(params["rsiPeriod"]) + 1
+		"momentum", "breakout": warmup_bars = int(params["lookback"]) + 1
+	var warmup_start := maxi(0, split_index - warmup_bars)
+	var out_sample := candles.slice(warmup_start)
+	var test_start := split_index - warmup_start
 	var out_result := run_backtest(out_sample, strategy_id, best["params"],
-		initial_cash, commission)
-	var baseline := run_backtest(out_sample, strategy_id,
-		normalize_params(strategy_id, {}), initial_cash, commission)
+		initial_cash, commission, test_start)
+	var baseline := run_backtest(out_sample, "buyHold", {}, initial_cash, commission, test_start)
 	var out_metrics: Dictionary = out_result.get("metrics", {}) if bool(out_result.get("ok", false)) else {}
 	var baseline_metrics: Dictionary = baseline.get("metrics", {}) if bool(baseline.get("ok", false)) else {}
 	var overfit := false
-	if not out_metrics.is_empty() and not baseline_metrics.is_empty():
+	if strategy_id != "buyHold" and not out_metrics.is_empty() and not baseline_metrics.is_empty():
 		overfit = float(out_metrics["sharpe"]) < float(baseline_metrics["sharpe"]) \
 			and float(best["inSample"]["sharpe"]) > 0.5
 	return {"ok": true, "strategy": strategy_id, "splitPct": split,
+		"windows": [
+			{"from": candles[0].get("d", ""), "to": candles[split_index - 1].get("d", ""),
+				"bars": split_index},
+			{"from": candles[warmup_start].get("d", ""), "to": candles[split_index - 1].get("d", ""),
+				"bars": test_start},
+			{"from": candles[split_index].get("d", ""), "to": candles[-1].get("d", ""),
+				"bars": candles.size() - split_index},
+		],
 		"comboCount": candidates.size(), "best": best,
 		"outSample": {"metrics": out_metrics} if not out_metrics.is_empty() else {},
 		"baselineOut": {"metrics": baseline_metrics} if not baseline_metrics.is_empty() else {},

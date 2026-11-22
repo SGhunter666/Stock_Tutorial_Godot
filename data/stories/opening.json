@@ -81,8 +81,8 @@
       "type": "line",
       "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
       "text": {
-        "zh_CN": "去行情页选一家公司，读完它的资料卡，然后下你的第一笔单。别用满仓证明勇气——仓位管理才是职业和业余的分界线。",
-        "en": "Pick a company on the Market screen, read its profile, then place your first order. Don't prove courage with full size — position sizing is the line between professional and amateur."
+        "zh_CN": "打开仪表盘的「今日任务」。先对照 APLA 的买价和卖价，给自己定个仓位，再下第一笔模拟单。",
+        "en": "Open Today’s Task on the dashboard. Compare APLA’s bid and ask, choose a position size, then place your first simulated order."
       },
       "next": "end"
     },

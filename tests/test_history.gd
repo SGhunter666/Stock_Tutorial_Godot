@@ -95,6 +95,23 @@ func run() -> void:
 		int(daily_run["dayIndex"])]
 	approx(float(daily_quote["last"]), float(daily_bar[4]), 0.0001,
 		"daily mode quote equals the real daily close")
+	daily_service.set_daily_mode("2008-crisis", false)
+	eq(int(daily_run["tick"]), 7, "switching to intraday keeps today's closing tick")
+	var stale_order := daily_service.trade("2008-crisis", daily_dataset,
+		{"symbol": daily_symbol, "side": "buy", "qty": 1, "tick": 0})
+	check(not bool(stale_order["ok"]), "orders cannot execute at a previous tick")
+	daily_service.advance_tick("2008-crisis", daily_dataset)
+	eq(int(daily_run["tick"]), 0, "advancing from close opens the next day")
+	var benchmark := String(daily_dataset["benchmark"])
+	var start_quote := SmaHistoryService.quote_at_tick(daily_dataset, benchmark,
+		int(daily_run["startIndex"]), int(daily_run["startTick"]))
+	var current_quote := SmaHistoryService.quote_at_tick(daily_dataset, benchmark,
+		int(daily_run["dayIndex"]), 0)
+	approx(float(daily_service.summary("2008-crisis", daily_dataset)["benchmarkPct"]),
+		(float(current_quote["last"]) / float(start_quote["last"]) - 1.0) * 100.0, 0.0001,
+		"benchmark uses the same opening tick as the account")
+	daily_service.set_daily_mode("2008-crisis", true)
+	eq(int(daily_run["tick"]), 0, "switching to daily does not reveal today's close")
 
 	describe("history-events")
 	var event_result := service.advance_to_event("2008-crisis", dataset)

@@ -1,7 +1,5 @@
-## Read-only portfolio replay. It rebuilds stock positions and stock exposure at
-## any past day from the trade ledger, combines that with the recorded equity
-## curve and the historical daily closes, and lists that day's events. Options
-## and futures are reflected in equity but not reconstructed contract by contract.
+## Read-only portfolio replay. Closed sessions use recorded holdings and prices.
+## Older saves can fall back to their retained stock trades and corporate actions.
 class_name SmaReplay
 extends RefCounted
 
@@ -11,11 +9,16 @@ static func max_day(state: Dictionary) -> int:
 
 
 static func equity_curve(state: Dictionary) -> Array:
+	var account: Dictionary = state["account"]
+	var points := {}
+	for entries: Array in [account.get("equityHistory", []), account.get("replayHistory", [])]:
+		for entry in entries:
+			points[int(entry["day"])] = float(entry["equity"])
+	var days := points.keys()
+	days.sort()
 	var curve: Array = []
-	for entry in state["account"].get("equityHistory", []):
-		curve.append({"day": int(entry.get("day", 0)),
-			"equity": float(entry.get("equity", 0.0))})
-	curve.sort_custom(func(a, b): return int(a["day"]) < int(b["day"]))
+	for day in days:
+		curve.append({"day": day, "equity": points[day]})
 	return curve
 
 
@@ -28,18 +31,24 @@ static func _equity_at(curve: Array, day: int, fallback: float) -> float:
 	return value
 
 
-static func _close_at(state: Dictionary, ticker: String, day: int) -> float:
+static func _close_at(state: Dictionary, ticker: String, day: int,
+		adjustment: float, fallback: float) -> float:
 	var date := SmaCalendar.iso_date(day)
 	var cs: Dictionary = state["companies"].get(ticker, {})
 	if cs.is_empty():
 		return 0.0
-	for bar in cs.get("series", {}).get("daily", []):
-		if String(bar.get("d", "")) == date:
-			return float(bar.get("c", 0.0))
-	return float(cs.get("last", cs.get("fairValue", 0.0)))
+	var daily: Array = cs.get("series", {}).get("daily", [])
+	for index in range(daily.size() - 1, -1, -1):
+		if String(daily[index].get("d", "")) <= date:
+			if String(daily[index].get("d", "")) == date or day < int(state.get("dayIndex", day)):
+				return float(daily[index].get("c", 0.0)) * adjustment
+			break
+	if day >= int(state.get("dayIndex", day)):
+		return float(cs.get("last", cs.get("fairValue", 0.0)))
+	return fallback
 
 
-static func _apply_trade(positions: Dictionary, trade: Dictionary) -> void:
+static func _apply_trade(longs: Dictionary, shorts: Dictionary, trade: Dictionary) -> void:
 	var ticker := String(trade.get("ticker", ""))
 	var action := String(trade.get("action", ""))
 	var side := String(trade.get("side", ""))
@@ -56,78 +65,121 @@ static func _apply_trade(positions: Dictionary, trade: Dictionary) -> void:
 			action = "closeShort"
 	if qty <= 0 or price <= 0.0:
 		return
-	if action == "openLong":
-		var position: Dictionary = positions.get(ticker, {"qty": 0, "avgCost": 0.0})
-		var total := float(position["avgCost"]) * float(position["qty"]) + float(qty) * price
-		position["qty"] = int(position["qty"]) + qty
-		position["avgCost"] = total / float(maxi(1, int(position["qty"])))
-		positions[ticker] = position
-	elif action == "closeLong":
-		if not positions.has(ticker):
-			return
+	var positions := shorts if action in ["openShort", "closeShort"] else longs
+	if action in ["openLong", "openShort", "rights"]:
+		var previous: Dictionary = positions.get(ticker, {"qty": 0, "avgCost": 0.0})
+		var total_qty := int(previous["qty"]) + qty
+		positions[ticker] = {"qty": total_qty,
+			"avgCost": (float(previous["avgCost"]) * int(previous["qty"]) + qty * price)
+				/ float(total_qty)}
+	elif action in ["closeLong", "closeShort"] and positions.has(ticker):
 		var position: Dictionary = positions[ticker]
-		position["qty"] = maxi(0, int(position["qty"]) - qty)
+		position["qty"] = int(position["qty"]) - qty
 		if int(position["qty"]) <= 0:
 			positions.erase(ticker)
-		else:
-			positions[ticker] = position
-	elif action == "openShort":
-		var short: Dictionary = positions.get(ticker, {"qty": 0, "avgPrice": 0.0,
-			"short": true})
-		var total := float(short["avgPrice"]) * float(short["qty"]) + float(qty) * price
-		short["qty"] = int(short["qty"]) + qty
-		short["avgPrice"] = total / float(maxi(1, int(short["qty"])))
-		short["short"] = true
-		positions[ticker] = short
-	elif action == "closeShort":
+
+
+static func _apply_corporate_action(longs: Dictionary, shorts: Dictionary, action: Dictionary) -> void:
+	var ticker := String(action.get("ticker", ""))
+	var ratio := float(action.get("ratio", 0.0))
+	for positions: Dictionary in [longs, shorts]:
 		if not positions.has(ticker):
-			return
-		var short: Dictionary = positions[ticker]
-		short["qty"] = maxi(0, int(short["qty"]) - qty)
-		if int(short["qty"]) <= 0:
+			continue
+		if action.get("type") == "delisting":
 			positions.erase(ticker)
-		else:
-			positions[ticker] = short
+		elif ratio > 0.0:
+			var position: Dictionary = positions[ticker]
+			position["qty"] = roundi(float(position["qty"]) * ratio)
+			position["avgCost"] = float(position["avgCost"]) / ratio
+			if int(position["qty"]) <= 0:
+				positions.erase(ticker)
 
 
-static func snapshot(state: Dictionary, day: int) -> Dictionary:
+static func snapshot(state: Dictionary, day: int, live_equity: float = NAN) -> Dictionary:
+	var account: Dictionary = state["account"]
+	var is_live := day == max_day(state) and account.has("positions") and account.has("shorts")
+	var close_record: Dictionary = {}
+	for entry in account.get("replayHistory", []):
+		if int(entry["day"]) == day:
+			close_record = entry
+			break
+	var position_data_available: bool = is_live or not close_record.is_empty() \
+		or account.get("trades", []).size() < SmaExchange.ACCOUNT_TRADE_LIMIT
+	var rebuild_positions := position_data_available and not is_live and close_record.is_empty()
 	var curve := equity_curve(state)
-	var current_equity := float(state["account"].get("cash", 0.0))
+	if is_live and is_finite(live_equity):
+		if not curve.is_empty() and int(curve[-1]["day"]) == day:
+			curve[-1]["equity"] = live_equity
+		else:
+			curve.append({"day": day, "equity": live_equity})
+	var current_equity := float(account.get("cash", 0.0))
 	var equity := _equity_at(curve, day, current_equity)
-	var previous_equity := _equity_at(curve, maxi(0, day - 1), equity)
-	var positions: Dictionary = {}
+	var previous_equity := float(account.get("initialCash", equity)) if day == 0 \
+		else _equity_at(curve, day - 1, equity)
+	var longs: Dictionary = {}
+	var shorts: Dictionary = {}
+	var marks: Dictionary = close_record.get("marks", {})
+	if is_live or not close_record.is_empty():
+		var inventory := account if is_live else close_record
+		longs = inventory["positions"]
+		shorts = inventory["shorts"]
 	var trades_today: Array = []
 	var dividends_today: Array = []
-	for trade in state["account"].get("trades", []):
+	var position_actions: Array = []
+	var later_splits := {}
+	for action in state.get("corporateActions", []) if rebuild_positions else []:
+		var kind := String(action.get("type", ""))
+		if int(action.get("day", -1)) <= day:
+			if kind in ["split", "delisting"]:
+				position_actions.append(action)
+		elif kind == "split" and float(action.get("ratio", 0.0)) > 0.0:
+			# The exchange back-adjusts its stored candles when a split occurs.
+			var ticker := String(action.get("ticker", ""))
+			later_splits[ticker] = float(later_splits.get(ticker, 1.0)) * float(action["ratio"])
+	position_actions.sort_custom(func(a, b): return int(a["day"]) < int(b["day"]))
+	var next_action := 0
+	for trade in account.get("trades", []):
 		var trade_day := int(trade.get("day", 0))
 		if trade_day > day:
 			continue
-		_apply_trade(positions, trade)
+		while next_action < position_actions.size() and int(position_actions[next_action]["day"]) <= trade_day:
+			_apply_corporate_action(longs, shorts, position_actions[next_action])
+			next_action += 1
+		if rebuild_positions:
+			_apply_trade(longs, shorts, trade)
 		if trade_day == day:
 			trades_today.append(trade)
+	for index in range(next_action, position_actions.size()):
+		_apply_corporate_action(longs, shorts, position_actions[index])
 	for dividend in state["account"].get("dividends", []):
 		if int(dividend.get("day", 0)) == day:
 			dividends_today.append(dividend)
 	var rows: Array = []
 	var long_value := 0.0
 	var short_value := 0.0
-	for ticker in positions.keys():
-		var position: Dictionary = positions[ticker]
-		var close := _close_at(state, String(ticker), day)
-		var qty := int(position.get("qty", 0))
-		var value := float(qty) * close
-		if bool(position.get("short", false)):
-			short_value += absf(value)
-		else:
-			long_value += value
-		rows.append({
-			"ticker": String(ticker), "qty": qty,
-			"avgCost": float(position.get("avgCost", position.get("avgPrice", 0.0))),
-			"close": close, "value": SmaFormat.round_to(value, 2),
-			"short": bool(position.get("short", false)),
-			"pnl": SmaFormat.round_to(value - float(position.get("avgCost",
-				position.get("avgPrice", 0.0))) * float(qty), 2),
-		})
+	for is_short: bool in [false, true]:
+		var positions := shorts if is_short else longs
+		for ticker in positions:
+			var position: Dictionary = positions[ticker]
+			var avg_cost := float(position.get("avgPrice", position.get("avgCost", 0.0)))
+			var close := avg_cost
+			if is_live:
+				close = float(state["companies"].get(ticker, {}).get("last", avg_cost))
+			elif marks.has(ticker):
+				close = float(marks[ticker])
+			else:
+				close = _close_at(state, String(ticker), day,
+					float(later_splits.get(ticker, 1.0)), avg_cost)
+			var qty := int(position["qty"])
+			var value := float(qty) * close
+			var pnl := float(qty) * (close - avg_cost)
+			if is_short:
+				short_value += value
+			else:
+				long_value += value
+			rows.append({"ticker": String(ticker), "qty": qty, "avgCost": avg_cost,
+				"close": close, "value": SmaFormat.round_to(value, 2), "short": is_short,
+				"pnl": SmaFormat.round_to(-pnl if is_short else pnl, 2)})
 	rows.sort_custom(func(a, b): return absf(float(a["value"])) > absf(float(b["value"])))
 	var events: Array = []
 	for trade in trades_today:
@@ -155,6 +207,7 @@ static func snapshot(state: Dictionary, day: int) -> Dictionary:
 		"shortValue": SmaFormat.round_to(short_value, 2),
 		"stockValue": SmaFormat.round_to(long_value - short_value, 2),
 		"positions": rows, "events": events,
+		"positionDataAvailable": position_data_available,
 		"curve": curve_to_day,
 		"tradeCount": trades_today.size(),
 	}

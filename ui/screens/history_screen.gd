@@ -176,9 +176,8 @@ func _start_scenario(scenario_id: String) -> void:
 		return
 	_dataset = dataset
 	_scenario_id = scenario_id
-	var run_data: Dictionary = Game.history.ensure_run(scenario_id, dataset)
-	if _daily_mode:
-		run_data["tick"] = SmaHistoryService.TICKS_PER_DAY - 1
+	var run_data: Dictionary = Game.history.ensure_run(scenario_id, dataset, true)
+	_daily_mode = bool(run_data["dailyMode"])
 	_selected_symbol = String(run_data.get("selectedTicker", ""))
 	if _selected_symbol == "" and not dataset.get("tickers", []).is_empty():
 		_selected_symbol = String(dataset["tickers"][0]["symbol"])
@@ -525,9 +524,7 @@ func _on_daily_mode_toggled(value: bool) -> void:
 		_play_button.disabled = _daily_mode
 	if _advance_tick_button != null:
 		_advance_tick_button.disabled = _daily_mode
-	var run_data: Dictionary = Game.history.run(_scenario_id)
-	if not run_data.is_empty():
-		run_data["tick"] = SmaHistoryService.TICKS_PER_DAY - 1 if _daily_mode else 0
+	Game.history.set_daily_mode(_scenario_id, _daily_mode)
 	Game.history_commit()
 	_update_all()
 
@@ -563,9 +560,7 @@ func _next_event() -> void:
 func _reset() -> void:
 	_playing = false
 	_play_button.text = I18n.t("history.play")
-	var run_data: Dictionary = Game.history.reset_run(_scenario_id)
-	if _daily_mode:
-		run_data["tick"] = SmaHistoryService.TICKS_PER_DAY - 1
+	var run_data: Dictionary = Game.history.reset_run(_scenario_id, _daily_mode)
 	_selected_symbol = String(run_data.get("selectedTicker", ""))
 	if _selected_symbol == "" and not _dataset.get("tickers", []).is_empty():
 		_selected_symbol = String(_dataset["tickers"][0]["symbol"])
@@ -616,7 +611,8 @@ func _update_all() -> void:
 	var tick := int(run_data.get("tick", 0))
 	_date_label.text = SmaHistoryService.current_date(_dataset, day)
 	_tick_label.text = I18n.t("history.dailyLabel") if _daily_mode \
-		else I18n.t("history.tickOf", {"tick": tick + 1, "total": 8})
+		and tick == SmaHistoryService.TICKS_PER_DAY - 1 else I18n.t("history.tickOf", {
+			"tick": tick + 1, "total": SmaHistoryService.TICKS_PER_DAY})
 	if _play_button != null:
 		_play_button.disabled = _daily_mode
 	if _advance_tick_button != null:

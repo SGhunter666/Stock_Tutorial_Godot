@@ -1,5 +1,4 @@
-## Atomic JSON save files under user://. The game uses one career slot by
-## default; tests and future sandbox modes can pass an explicit path.
+## Staged JSON writes with one recoverable previous save.
 class_name SmaSaveService
 extends RefCounted
 
@@ -17,25 +16,45 @@ static func exists(path: String = SAVE_PATH) -> bool:
 	return FileAccess.file_exists(path)
 
 
-static func write(payload: Dictionary, path: String = SAVE_PATH) -> bool:
+static func write(payload: Dictionary, path: String = SAVE_PATH,
+		keep_backup: bool = false) -> bool:
 	var dir_path := path.get_base_dir()
 	if not _ensure_dir(dir_path):
 		push_error("SmaSaveService: cannot create save directory %s" % dir_path)
 		return false
-	var tmp_path := path + ".tmp"
+	var temporary_suffix := ".%d.%d.tmp" % [OS.get_process_id(), Time.get_ticks_usec()]
+	var tmp_path := path + temporary_suffix
 	var file := FileAccess.open(tmp_path, FileAccess.WRITE)
 	if file == null:
 		push_error("SmaSaveService: cannot open temp save %s" % tmp_path)
 		return false
-	file.store_string(JSON.stringify(payload))
+	var stored := file.store_string(JSON.stringify(payload))
+	file.flush()
+	stored = stored and file.get_error() == OK
 	file.close()
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
 		return false
 	var file_name := path.get_file()
-	if dir.file_exists(file_name):
-		dir.remove(file_name)
-	return dir.rename(file_name + ".tmp", file_name) == OK
+	var backup := file_name + ".bak"
+	var tmp_name := tmp_path.get_file()
+	if stored and not keep_backup and dir.file_exists(file_name):
+		var backup_stage := backup + temporary_suffix
+		var backup_stage_path := dir_path.path_join(backup_stage)
+		stored = dir.copy(path, backup_stage_path) == OK \
+			and FileAccess.get_size(backup_stage_path) == FileAccess.get_size(path) \
+			and dir.rename(backup_stage, backup) == OK
+		if not stored and dir.file_exists(backup_stage):
+			dir.remove(backup_stage)
+	if stored and dir.rename(tmp_name, file_name) == OK:
+		return true
+	if dir.file_exists(tmp_name):
+		dir.remove(tmp_name)
+	# On Windows, Godot may remove the destination before completing a rename.
+	# The backup remains readable even when restoring the primary file fails.
+	if not dir.file_exists(file_name) and dir.file_exists(backup):
+		dir.copy(dir_path.path_join(backup), path)
+	return false
 
 
 static func read(path: String = SAVE_PATH) -> Dictionary:
@@ -51,20 +70,23 @@ static func read(path: String = SAVE_PATH) -> Dictionary:
 
 
 static func clear(path: String = SAVE_PATH) -> void:
-	if not exists(path):
-		return
 	var dir := DirAccess.open(path.get_base_dir())
 	if dir != null:
-		dir.remove(path.get_file())
+		for suffix: String in ["", ".bak", ".tmp", ".bak.tmp"]:
+			var name := path.get_file() + suffix
+			if dir.file_exists(name):
+				dir.remove(name)
 
 
 static func export_to(path: String, payload: Dictionary) -> bool:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return false
-	file.store_string(JSON.stringify(payload))
+	var ok := file.store_string(JSON.stringify(payload))
+	file.flush()
+	ok = ok and file.get_error() == OK
 	file.close()
-	return true
+	return ok
 
 
 static func import_from(path: String) -> Dictionary:
