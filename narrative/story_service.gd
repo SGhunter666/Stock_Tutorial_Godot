@@ -12,10 +12,13 @@ signal story_started(story_id: String)
 signal story_finished(story_id: String)
 
 const MANIFEST_PATH := "res://data/stories/manifest.json"
+const CHARACTERS_PATH := "res://data/stories/characters.json"
 const HISTORY_LIMIT := 200
 
 var host: Object = null
 var stories: Dictionary = {}
+var characters: Dictionary = {}
+var speaker_lookup: Dictionary = {}
 var triggers: Array = []
 var flags: Dictionary = {}
 var seen: Dictionary = {}
@@ -30,6 +33,12 @@ var last_finished_id: String = ""
 
 func setup(target_host: Object) -> void:
 	host = target_host
+
+
+func set_flag(flag_name: String, value: Variant = true) -> void:
+	if flag_name.is_empty():
+		return
+	flags[flag_name] = value
 
 
 func load_content() -> bool:
@@ -61,7 +70,29 @@ func load_content() -> bool:
 			var parsed: Variant = JSON.parse_string(handle.get_as_text())
 			if typeof(parsed) == TYPE_DICTIONARY:
 				triggers = parsed.get("triggers", [])
+	_load_characters()
 	return not stories.is_empty()
+
+
+func _load_characters() -> void:
+	characters.clear()
+	speaker_lookup.clear()
+	var file := FileAccess.open(CHARACTERS_PATH, FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	for id in parsed:
+		var entry: Variant = parsed[id]
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var data: Dictionary = entry
+		if String(data.get("portrait", "")) == "":
+			continue
+		characters[String(id)] = data
+		for alias in data.get("aliases", []):
+			speaker_lookup[String(alias)] = String(id)
 
 
 func is_active() -> bool:
@@ -145,16 +176,31 @@ func current_view() -> Dictionary:
 	if node_type == "choice":
 		for choice in _available_choices(node):
 			choices.append({"index": int(choice["index"]), "text": _resolve(choice["text"])})
+	var speaker := _resolve(node.get("speaker", ""))
+	var character_id := ""
+	var portrait := String(node.get("portrait", ""))
+	var portrait_color := String(node.get("portraitColor", ""))
+	if speaker != "":
+		var speaker_name := speaker.get_slice(" · ", 0).strip_edges()
+		if speaker_lookup.has(speaker_name):
+			character_id = String(speaker_lookup[speaker_name])
+			var character: Dictionary = characters.get(character_id, {})
+			if portrait.is_empty():
+				portrait = String(character.get("portrait", ""))
+			if portrait_color.is_empty():
+				portrait_color = String(character.get("color", ""))
 	return {
 		"active": true,
 		"story_id": active_id,
 		"title": _resolve(active_story.get("title", "")),
-		"speaker": _resolve(node.get("speaker", "")),
+		"speaker": speaker,
 		"text": _node_text(node),
 		"type": node_type,
 		"choices": choices,
 		"background": String(node.get("background", "")),
-		"portrait": String(node.get("portrait", "")),
+		"portrait": portrait,
+		"portraitColor": portrait_color,
+		"character": character_id,
 		"can_continue": node_type == "line",
 		"node_id": node_id,
 	}
@@ -298,7 +344,9 @@ func _apply_effects(effects: Array) -> void:
 			if typeof(client) == TYPE_DICTIONARY and host != null \
 					and host.has_method("story_add_fund_client"):
 				host.story_add_fund_client(String(client.get("name", "")),
-					float(client.get("principal", 0.0)))
+					float(client.get("principal", 0.0)),
+					String(client.get("tag", "")),
+					String(client.get("risk", "medium")))
 
 
 ## A node may carry flag-specific variants of its narration. The first matching

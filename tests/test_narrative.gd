@@ -48,8 +48,9 @@ class FakeHost:
 	func toast(message: String) -> void:
 		messages.append(message)
 
-	func story_add_fund_client(client_name: String, principal: float) -> void:
-		story_clients.append([client_name, principal])
+	func story_add_fund_client(client_name: String, principal: float,
+			tag: String = "", risk: String = "medium") -> void:
+		story_clients.append([client_name, principal, tag, risk])
 
 	func localize(value: Variant) -> String:
 		if typeof(value) == TYPE_DICTIONARY:
@@ -82,6 +83,12 @@ func run() -> void:
 	var service := _make_service(host)
 	eq(service.stories.size(), 16, "sixteen stories registered")
 	eq(service.triggers.size(), 36, "thirty-six trigger definitions registered")
+	eq(service.characters.size(), 7, "seven character portraits registered")
+	check(service.speaker_lookup.has("Lin Lan"), "english character alias registered")
+	check(service.speaker_lookup.has("Mr. Wang"), "client character alias registered")
+	for character_id in service.characters:
+		check(ResourceLoader.exists(String(service.characters[character_id].get("portrait", ""))),
+			"portrait asset exists: " + String(character_id))
 
 	describe("story-opening")
 	service.handle_event("game_new")
@@ -89,6 +96,10 @@ func run() -> void:
 	var view := service.current_view()
 	check(String(view.get("text", "")).contains("远望"), "opening text resolves zh_CN")
 	eq(String(view.get("speaker", "")).contains("林岚"), true, "speaker resolves")
+	eq(String(view.get("character", "")), "lin_lan", "opening resolves Lin Lan")
+	eq(String(view.get("portrait", "")), "res://assets/portraits/lin_lan.jpg",
+		"opening uses Lin Lan portrait")
+	check(String(view.get("portraitColor", "")) != "", "speaker accent color resolves")
 	view = _advance_to_choice(service)
 	eq(String(view.get("type", "")), "choice", "opening reaches a choice")
 	eq(view["choices"].size(), 2, "opening offers two choices")
@@ -99,6 +110,14 @@ func run() -> void:
 			break
 		service.advance()
 	check(not service.is_active(), "opening finishes")
+
+	describe("story-system-speaker")
+	var system_host := FakeHost.new()
+	var system_service := _make_service(system_host)
+	system_service.start_story("black_friday")
+	var system_view: Dictionary = system_service.current_view()
+	eq(String(system_view.get("portrait", "")), "", "system speaker has no portrait")
+	eq(String(system_view.get("character", "")), "", "system speaker has no character")
 
 	describe("story-trigger-once")
 	service.handle_event("trade_filled", {"ticker": "APLA"})
@@ -291,7 +310,7 @@ func run() -> void:
 	service18.start_story("epilogue")
 	service18.advance()
 	var default_view: Dictionary = service18.current_view()
-	check(String(default_view.get("text", "")).contains("没有完美的预测"),
+	check(String(default_view.get("text", "")).contains("档案只记录"),
 		"default epilogue text used when no flag matches")
 
 	describe("story-client-subscription")
@@ -304,10 +323,13 @@ func run() -> void:
 	eq(host19.story_clients.size(), 1, "high-trust choice subscribes the client")
 	eq(String(host19.story_clients[0][0]), "王先生", "client name forwarded")
 	approx(float(host19.story_clients[0][1]), 50000.0, 0.001, "principal forwarded")
+	eq(String(host19.story_clients[0][2]), "client_trust", "client story tag forwarded")
+	eq(String(host19.story_clients[0][3]), "low", "client risk profile forwarded")
 
 	describe("story-epilogue-branching")
 	var host9 := FakeHost.new()
 	var service9 := _make_service(host9)
+	service9.flags["ending_path"] = "manager"
 	service9.flags["client_trust"] = "high"
 	service9.flags["crisis_choice"] = "protect"
 	service9.start_story("epilogue")
@@ -315,3 +337,85 @@ func run() -> void:
 	var epilogue_view := _advance_to_choice(service9)
 	eq(String(epilogue_view.get("type", "")), "choice", "epilogue presents branch choice")
 	check(epilogue_view["choices"].size() >= 2, "manager choice is available")
+
+	describe("story-post-epilogue-guard")
+	var host20 := FakeHost.new()
+	host20.completed_units["u29"] = true
+	host20.fund_active = true
+	var service20 := _make_service(host20)
+	service20.seen["client_trust"] = true
+	service20.seen["epilogue"] = true
+	service20.handle_event("unit_completed", {"unit_id": "u29"})
+	check(not service20.is_active(), "crisis eve is blocked after the epilogue")
+
+	var host21 := FakeHost.new()
+	host21.completed_units["u31"] = true
+	host21.fund_active = true
+	var service21 := _make_service(host21)
+	service21.seen["client_trust"] = true
+	service21.seen["crisis_eve"] = true
+	service21.seen["epilogue"] = true
+	service21.handle_event("unit_completed", {"unit_id": "u31"})
+	check(not service21.is_active(), "black friday is blocked after the epilogue")
+
+	describe("story-low-trust-call")
+	var host22 := FakeHost.new()
+	var service22 := _make_service(host22)
+	service22.flags["client_trust"] = "low"
+	service22.start_story("black_friday")
+	for i in 8:
+		if String(service22.current_view().get("node_id", "")) == "mr_wang_call":
+			break
+		service22.advance()
+	var low_view: Dictionary = service22.current_view()
+	check(String(low_view.get("text", "")).contains("不会亏"),
+		"low-trust client recalls the overpromise")
+
+	var host23 := FakeHost.new()
+	var service23 := _make_service(host23)
+	service23.flags["client_trust"] = "high"
+	service23.start_story("black_friday")
+	for i in 8:
+		if String(service23.current_view().get("node_id", "")) == "mr_wang_call":
+			break
+		service23.advance()
+	var high_view: Dictionary = service23.current_view()
+	check(String(high_view.get("text", "")).contains("两成"),
+		"high-trust client recalls the honest disclosure")
+
+	describe("story-career-ending-separation")
+	var host24 := FakeHost.new()
+	var service24 := _make_service(host24)
+	service24.flags["ending_path"] = "mentor"
+	service24.flags["crisis_choice"] = "attack"
+	service24.start_story("epilogue")
+	var career_view: Dictionary = _advance_to_choice(service24)
+	var has_manager := false
+	var has_star := false
+	for choice in career_view["choices"]:
+		var label := String(choice["text"])
+		if label.contains("稳健掌舵人"):
+			has_manager = true
+		if label.contains("明星交易员"):
+			has_star = true
+	check(not has_manager, "manager file follows the manager ending path")
+	check(not has_star, "star file follows the star ending path")
+
+	describe("story-low-trust-manager-ending")
+	var host25 := FakeHost.new()
+	var service25 := _make_service(host25)
+	service25.flags["ending_path"] = "manager"
+	service25.flags["client_trust"] = "low"
+	service25.start_story("epilogue")
+	var manager_choice: Dictionary = _advance_to_choice(service25)
+	var manager_index := -1
+	for choice in manager_choice["choices"]:
+		if String(choice["text"]).contains("稳健掌舵人"):
+			manager_index = int(choice["index"])
+	if manager_index >= 0:
+		service25.choose(manager_index)
+		var manager_low_view: Dictionary = service25.current_view()
+		check(String(manager_low_view.get("text", "")).contains("没有寄过桂花茶"),
+			"low-trust manager ending reflects the lost trust")
+	else:
+		check(false, "manager ending available for the manager path")

@@ -39,6 +39,7 @@ var challenges: Dictionary = SmaChallenges.create_state()
 var career: Dictionary = SmaCareer.create_state()
 var quant: Dictionary = SmaQuant.default_config()
 var fund: Dictionary = SmaFund.create_state()
+var alerts: Dictionary = SmaAlerts.create_state()
 var started := false
 var paused := true
 var speed := 1
@@ -113,6 +114,7 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	career = SmaCareer.create_state()
 	quant = SmaQuant.default_config()
 	fund = SmaFund.create_state()
+	alerts = SmaAlerts.create_state()
 	narrative = SmaStoryService.new()
 	narrative.setup(self)
 	narrative.load_content()
@@ -176,6 +178,7 @@ func _advance_steps(steps: int) -> void:
 	var call_before := _current_call_id()
 	for index in steps:
 		exchange.advance_second()
+		_check_price_alerts()
 		if not exchange.last_player_fills.is_empty():
 			fills.append_array(exchange.last_player_fills)
 	for fill in fills:
@@ -238,6 +241,43 @@ func _advance_steps(steps: int) -> void:
 	if not fills.is_empty():
 		state_changed.emit("trade")
 		academy_sync_practice()
+
+
+func _check_price_alerts() -> void:
+	if exchange == null:
+		return
+	if int(exchange.state.get("second", 0)) % 10 != 0:
+		return
+	if SmaAlerts.active_count(alerts) <= 0:
+		return
+	var prices: Dictionary = {}
+	for entry in SmaAlerts.all(alerts):
+		if not bool(entry.get("active", false)):
+			continue
+		var ticker := String(entry.get("ticker", ""))
+		if ticker == "" or prices.has(ticker):
+			continue
+		var company: Dictionary = exchange.state["companies"].get(ticker, {})
+		if company.is_empty():
+			continue
+		prices[ticker] = float(company.get("last", 0.0))
+	if prices.is_empty():
+		return
+	var triggered := SmaAlerts.check(alerts, prices,
+		int(exchange.state["dayIndex"]), int(exchange.state["second"]))
+	if triggered.is_empty():
+		return
+	if triggered.size() == 1:
+		var alert: Dictionary = triggered[0]
+		toast_requested.emit(I18n.t("toast.priceAlert", {
+			"ticker": String(alert.get("ticker", "")),
+			"direction": I18n.t("alerts.%s" % String(alert.get("side", "above"))),
+			"price": SmaFormat.money(float(alert.get("price", 0.0))),
+		}))
+	else:
+		toast_requested.emit(I18n.t("toast.priceAlertsMultiple", {
+			"count": triggered.size()}))
+	state_changed.emit("alerts")
 
 
 func set_speed(next_speed: int) -> void:
@@ -1360,6 +1400,8 @@ func create_fund(input: Dictionary) -> Dictionary:
 		order_rejected.emit(last_error)
 		return result
 	fund = result["fund"]
+	if narrative != null:
+		narrative.set_flag("had_fund", true)
 	toast_requested.emit(I18n.t("toast.fundCreated", {"name": String(fund["name"])}))
 	save_game(false)
 	_sync_achievements()
@@ -1651,6 +1693,75 @@ func select_ticker(ticker: String) -> void:
 
 
 # ---------------------------------------------------------------------------
+# Watchlist and price alerts
+# ---------------------------------------------------------------------------
+
+func is_watched(ticker: String) -> bool:
+	return SmaAlerts.is_watched(alerts, ticker)
+
+
+func toggle_watch(ticker: String) -> bool:
+	if exchange == null:
+		return false
+	var symbol := ticker.strip_edges().to_upper()
+	if not exchange.state["companies"].has(symbol):
+		return false
+	var watched := SmaAlerts.toggle_watch(alerts, symbol)
+	save_game(false)
+	state_changed.emit("alerts")
+	return watched
+
+
+func watchlist() -> Array:
+	return SmaAlerts.watchlist(alerts)
+
+
+func price_alerts() -> Array:
+	return SmaAlerts.all(alerts)
+
+
+func add_price_alert(ticker: String, side: String, price: float) -> Dictionary:
+	if exchange == null:
+		return {"ok": false, "alert": {}, "error": "alerts.invalidTicker"}
+	var symbol := ticker.strip_edges().to_upper()
+	var company: Dictionary = exchange.state["companies"].get(symbol, {})
+	if company.is_empty():
+		return {"ok": false, "alert": {}, "error": "alerts.invalidTicker"}
+	var direction := side.strip_edges().to_lower()
+	if not SmaAlerts.SIDES.has(direction):
+		return {"ok": false, "alert": {}, "error": "alerts.invalidDirection"}
+	var last := float(company.get("last", 0.0))
+	if price <= 0.0 or not is_finite(price) or last <= 0.0:
+		return {"ok": false, "alert": {}, "error": "alerts.invalidPrice"}
+	if direction == "above" and price <= last:
+		return {"ok": false, "alert": {}, "error": "alerts.aboveMustBeHigher"}
+	if direction == "below" and price >= last:
+		return {"ok": false, "alert": {}, "error": "alerts.belowMustBeLower"}
+	var result := SmaAlerts.add_alert(alerts, symbol, direction, price,
+		int(exchange.state["dayIndex"]))
+	if bool(result.get("ok", false)):
+		save_game(false)
+		state_changed.emit("alerts")
+	return result
+
+
+func remove_price_alert(alert_id: String) -> bool:
+	var removed := SmaAlerts.remove_alert(alerts, alert_id)
+	if removed:
+		save_game(false)
+		state_changed.emit("alerts")
+	return removed
+
+
+func clear_triggered_alerts() -> int:
+	var removed := SmaAlerts.remove_triggered(alerts)
+	if removed > 0:
+		save_game(false)
+		state_changed.emit("alerts")
+	return removed
+
+
+# ---------------------------------------------------------------------------
 # Academy
 # ---------------------------------------------------------------------------
 
@@ -1832,18 +1943,24 @@ func story_add_cash(amount: float, memo: String = "story") -> void:
 
 ## Story-driven subscription: a named client really joins the active fund,
 ## bringing principal and units into the simulated AUM.
-func story_add_fund_client(client_name: String, principal: float) -> bool:
+func story_add_fund_client(client_name: String, principal: float,
+		tag: String = "", risk: String = "medium") -> bool:
 	if exchange == null or not is_fund_active():
 		return false
+	if tag != "":
+		for entry in fund.get("clients", []):
+			if String(entry.get("storyTag", "")) == tag:
+				return false
 	var day := int(exchange.state["dayIndex"])
 	var candidate_id := "story-client-%d-%d" % [day, fund.get("clients", []).size()]
 	var candidates: Array = fund.get("candidates", [])
 	for entry in candidates:
 		if String(entry.get("id", "")) == candidate_id:
 			return false
+	var risk_profile := risk if ["low", "medium", "high"].has(risk) else "medium"
 	candidates.append({
 		"id": candidate_id, "name": client_name, "typeKey": "individual",
-		"risk": "balanced", "horizon": "long", "liquidity": "medium",
+		"risk": risk_profile, "horizon": "long", "liquidity": "medium",
 		"principal": maxf(1000.0, principal),
 	})
 	fund["candidates"] = candidates
@@ -1855,7 +1972,13 @@ func story_add_fund_client(client_name: String, principal: float) -> bool:
 				remaining.append(entry)
 		fund["candidates"] = remaining
 		return false
-	save_game(false)
+	if tag != "":
+		var accepted: Dictionary = result.get("client", {})
+		var accepted_id := String(accepted.get("id", ""))
+		for entry in fund.get("clients", []):
+			if String(entry.get("id", "")) == accepted_id:
+				entry["storyTag"] = tag
+				break
 	state_changed.emit("fund")
 	return true
 
@@ -1909,6 +2032,7 @@ func start_sandbox(cash: float, seed_value: String, difficulty: String) -> Dicti
 	career = SmaCareer.create_state()
 	quant = SmaQuant.default_config()
 	fund = SmaFund.create_state()
+	alerts = SmaAlerts.create_state()
 	narrative = SmaStoryService.new()
 	narrative.setup(self)
 	narrative.load_content()
@@ -2023,6 +2147,7 @@ func save_game(manual: bool = true) -> bool:
 		"career": career,
 		"quant": quant,
 		"fund": fund,
+		"alerts": alerts,
 	}
 	var ok := SmaSaveService.write(payload, save_path)
 	if ok:
@@ -2052,6 +2177,7 @@ func load_game() -> bool:
 	quant = SmaQuant.normalize_config(payload.get("quant", {}))
 	fund = SmaFund.normalize_state(payload.get("fund", {}),
 		int(payload.get("exchange", {}).get("dayIndex", 0)), DEFAULT_SEED)
+	alerts = SmaAlerts.normalize_state(payload.get("alerts", {}))
 	history = SmaHistoryService.new()
 	history.from_dict(payload.get("history", {}))
 	narrative = SmaStoryService.new()
@@ -2070,6 +2196,17 @@ func load_game() -> bool:
 	selected_ticker = String(payload.get("selectedTicker", "APLA"))
 	if not exchange.state["companies"].has(selected_ticker):
 		selected_ticker = "APLA"
+	var known_tickers: Dictionary = exchange.state["companies"]
+	var kept_watch: Array = []
+	for symbol in alerts["watchlist"]:
+		if known_tickers.has(String(symbol)):
+			kept_watch.append(String(symbol))
+	alerts["watchlist"] = kept_watch
+	var kept_alerts: Array = []
+	for alert in alerts["alerts"]:
+		if known_tickers.has(String(alert.get("ticker", ""))):
+			kept_alerts.append(alert)
+	alerts["alerts"] = kept_alerts
 	started = true
 	paused = true
 	var saved_speed := int(settings.get("speed", 1))

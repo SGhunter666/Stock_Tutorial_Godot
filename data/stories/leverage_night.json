@@ -67,8 +67,8 @@
       "choices": [
         {
           "text": {
-            "zh_CN": "主动斩仓高风险敞口，立刻降低财务杠杆，退出危险区。",
-            "en": "Voluntarily slash vulnerable risk assets; derisk leverage immediately."
+            "zh_CN": "计划主动斩仓高风险敞口，降低财务杠杆，退出危险区。",
+            "en": "Plan to cut vulnerable risk assets and reduce leverage before leaving the danger zone."
           },
           "next": "reduce_reply",
           "effects": [
@@ -78,16 +78,16 @@
             },
             {
               "toast": {
-                "zh_CN": "风控决断：主动减仓，解除杠杆警戒",
-                "en": "Risk Action: Deleveraged positions to safety"
+                "zh_CN": "风控决断：选择主动减仓（需自行执行）",
+                "en": "Risk decision: Chose to deleverage (execute manually)"
               }
             }
           ]
         },
         {
           "text": {
-            "zh_CN": "追加防守备用金维持现有仓位，赌行情在次日迅速修复。",
-            "en": "Wire reserve collateral to defend positions; bet on morning bounce."
+            "zh_CN": "计划追加防守备用金维持现有仓位，赌行情在次日迅速修复。",
+            "en": "Plan to add reserve collateral to defend positions; bet on a morning bounce."
           },
           "next": "add_reply",
           "effects": [
@@ -97,8 +97,8 @@
             },
             {
               "toast": {
-                "zh_CN": "风控决断：追加保证金，维持杠杆敞口",
-                "en": "Risk Action: Injected collateral to maintain leverage"
+                "zh_CN": "风控决断：选择追加保证金（需自行执行）",
+                "en": "Risk decision: Chose to add collateral (execute manually)"
               }
             }
           ]
@@ -116,8 +116,8 @@
             },
             {
               "toast": {
-                "zh_CN": "风控决断：拒绝干预，硬扛保证金压力",
-                "en": "Risk Action: Held through margin pressure"
+                "zh_CN": "风控决断：选择硬扛波动（不追加、不减仓）",
+                "en": "Risk decision: Chose to ride it out (no add, no cut)"
               }
             }
           ]
@@ -131,8 +131,8 @@
         "en": "Su He · Risk & Compliance Officer"
       },
       "text": {
-        "zh_CN": "极其果断。虽然承认了账面亏损，但你拿回了主动权。市场永远不会给你体面退出的机会，除非你主动把刹车踩到底。",
-        "en": "Decisive execution. Realizing a paper loss stings, but you reclaimed control. The market never grants a graceful exit unless you slam the brakes yourself."
+        "zh_CN": "极其果断。虽然承认了账面亏损，但你选择先拿回主动权。市场永远不会给你体面退出的机会，除非你主动把刹车踩到底。",
+        "en": "Decisive. You accept the mark-to-market loss, but you choose to take back control first. The market never gives you a graceful exit unless you hit the brake yourself."
       },
       "next": "wrap"
     },
@@ -167,8 +167,8 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "检查你的维持担保比例。在金融世界里，杠杆不是不能用，但你必须随时清楚：最坏的一刀砍下来时，你能不能活命。",
-        "en": "Audit your maintenance margin. Leverage isn't inherently evil, but you must answer at all times: when the worst-case axe drops, can you survive?"
+        "zh_CN": "检查你的维持担保比例，并执行你的决定。在金融世界里，杠杆不是不能用，但你必须随时清楚：最坏的一刀砍下来时，你能不能活命。",
+        "en": "Audit your maintenance margin and execute your decision. Leverage is not inherently evil, but you must always know: when the worst-case axe drops, can you survive?"
       },
       "next": "end"
     },

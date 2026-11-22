@@ -41,7 +41,29 @@
         "zh_CN": "【情景来电】经理……新闻里全在说金融海啸，很多基金都要关门……我老伴看到数字后一直睡不着……你当初答应过我，最坏的时候会守住……我们的养老钱还能拿出来吗？",
         "en": "[Scenario call] Manager... the news is calling it a financial crisis. They say funds are shutting down... my wife has been up all night after seeing the numbers. You told me you'd hold the line at the worst... can we still get our retirement savings out?"
       },
-      "next": "su_he_run"
+      "next": "su_he_run",
+      "text_by_flag": [
+        {
+          "condition": {
+            "flag": "client_trust",
+            "value": "high"
+          },
+          "text": {
+            "zh_CN": "【情景来电】经理……新闻里全在说金融海啸，很多基金都要关门……我老伴看到数字后一直睡不着……你当初跟我说过，最坏可能亏两成甚至更多……我知道现在很难，但我信你。我们的养老钱，还能拿出来吗？",
+            "en": "[Scenario call] Manager... the news is calling it a financial crisis. They say funds are shutting down... my wife has been up all night after seeing the numbers. You told me the worst could be 20% or more... I know it's hard now, but I trust you. Can we still get our retirement savings out?"
+          }
+        },
+        {
+          "condition": {
+            "flag": "client_trust",
+            "value": "low"
+          },
+          "text": {
+            "zh_CN": "【情景来电】经理……新闻里全在说金融海啸，很多基金都要关门……我老伴看到数字后一直睡不着……你当初说不会亏的……现在怎么办？我和老伴的养老钱还在里面……",
+            "en": "[Scenario call] Manager... the news is calling it a financial crisis. They say funds are shutting down... my wife has been up all night after seeing the numbers. You told me we wouldn't lose money... what now? Our retirement savings are still in there..."
+          }
+        }
+      ]
     },
     "su_he_run": {
       "type": "line",
@@ -140,15 +162,27 @@
     "protect_reply": {
       "type": "line",
       "speaker": {
-        "zh_CN": "王先生 · 退休教师",
-        "en": "Mr. Wang · Retired Teacher"
+        "zh_CN": "王先生 · 情景客户",
+        "en": "Mr. Wang · Scenario Client"
       },
       "text": {
         "zh_CN": "【电话那头声音发哑】谢谢你，经理……虽然亏了一点，但我和老伴的养老钱保住了……你是个讲良心、守信用的人……",
         "en": "[Voice hoarse] Thank you, Manager... We took a small loss, but our retirement savings survived... You're an honest man who kept his word...",
         "portrait": ""
       },
-      "next": "protect_lin"
+      "next": "protect_lin",
+      "text_by_flag": [
+        {
+          "condition": {
+            "flag": "client_trust",
+            "value": "low"
+          },
+          "text": {
+            "zh_CN": "【电话那头声音发哑】钱是拿回来了……可我这心里，再也睡不踏实了……经理，你是个聪明人，可我以后还敢信你吗？",
+            "en": "[Voice hoarse] The money is back... but I don't think I'll ever sleep easy again... Manager, you're clever, but can I still trust you?"
+          }
+        }
+      ]
     },
     "protect_lin": {
       "type": "line",
@@ -157,8 +191,8 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "林岚轻轻点头：“你做到了我七年前没能做到的事。市场可以拿走一时的收益，但只要守住对客户的底线，你就还有资格继续做下去。”",
-        "en": "Lin Lan nods slowly. 'You did what I couldn't do seven years ago. The market can take a year's gains, but if you keep faith with clients, you earn the right to keep going.'"
+        "zh_CN": "我轻轻点头：“你做到了我七年前没能做到的事。市场可以拿走一时的收益，但只要守住对客户的底线，你就还有资格继续做下去。”",
+        "en": "I nod slowly: 'You did what I could not do seven years ago. The market can take away a year's returns, but as long as you hold the line with clients, you still have the right to keep going.'"
       },
       "next": "wrap"
     },
@@ -169,8 +203,8 @@
         "en": "Su He · Risk & Compliance Officer"
       },
       "text": {
-        "zh_CN": "苏禾面无表情地合上了文件夹：“你在拿普通客户的养老钱，为你的赌性买单。就算这笔暴跌反弹让你侥幸翻倍，作为受托人，你也已经输了。”",
-        "en": "Su He snaps her binder shut with ice-cold detachment: 'You are gambling ordinary families' retirement savings on your appetite for risk. Even if a snapback doubles your capital, you have already failed as a fiduciary.'"
+        "zh_CN": "我面无表情地合上文件夹：“你在拿普通客户的养老钱，为你的赌性买单。就算这笔暴跌反弹让你侥幸翻倍，作为受托人，你也已经输了。”",
+        "en": "I close the folder without expression: 'You are using ordinary clients' retirement money to pay for your gambling. Even if this crash rebounds and doubles your book, as a fiduciary you have already lost.'"
       },
       "next": "wrap"
     },
@@ -181,8 +215,8 @@
         "en": "Su He · Risk & Compliance Officer"
       },
       "text": {
-        "zh_CN": "电话那头沉默了很久。苏禾在报告上盖下红章：“法律允许门槛条款（Gate Clause），但客户信任一旦破裂，就很难再修补。”",
-        "en": "The line goes silent. Su He stamps the report: 'The charter allows a gate clause, but trust, once broken, is hard to repair.'"
+        "zh_CN": "电话那头沉默了很久。我在报告上盖下红章：“法律允许门槛条款（Gate Clause），但客户信任一旦破裂，就很难再修补。”",
+        "en": "The line is silent for a long time. I stamp the report in red: 'The law allows a gate clause, but once client trust breaks, it is very hard to repair.'"
       },
       "next": "wrap"
     },

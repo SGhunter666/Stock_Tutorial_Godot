@@ -25,8 +25,8 @@
         "en": "Gu Yan · Star Trainee"
       },
       "text": {
-        "zh_CN": "王老师，何必那么悲观！看看我们策略的回测，年化收益超过 35%！远望交易学院的量化动量系统全行业顶尖，只要大势在，跑赢通胀轻轻松松！放心把规模交给我们，绝不让您吃亏！",
-        "en": "Mr. Wang, why so gloomy? Look at the backtest of our strategy: over 35% annualized! Farview's quantitative momentum engine is industry-best. As long as macro trends hold, beating inflation is child's play! Trust us with full allocation; we'll treat you like royalty!"
+        "zh_CN": "王老师，何必那么悲观！看看这位新经理的策略回测，年化收益超过 35%！远望交易学院的量化动量系统全行业顶尖，只要大势在，跑赢通胀轻轻松松！放心把规模交给这位经理，绝不让您吃亏！",
+        "en": "Mr. Wang, why so gloomy? Look at the new manager's backtest: over 35% annualized! Farview's quantitative momentum engine is industry-best. As long as macro trends hold, beating inflation is child's play! Trust the new manager with the allocation; the fund won't let you down!"
       },
       "next": "su_he_intervene"
     },
@@ -67,8 +67,8 @@
       "choices": [
         {
           "text": {
-            "zh_CN": "据实说明最坏极端情景（回撤可能达 15%），降低客户预期，坚守诚实底线。",
-            "en": "Disclose worst-case drawdowns honestly (up to 15%); temper expectations and uphold fiduciary duty."
+            "zh_CN": "据实说明极端情景（回撤可能达到 20%，极端情况下更高），降低客户预期，坚守诚实底线。",
+            "en": "Disclose the extreme scenario honestly (drawdowns could reach 20%, and more in a tail event); temper expectations and uphold fiduciary duty."
           },
           "next": "high_trust_reply",
           "effects": [
@@ -79,7 +79,9 @@
             {
               "add_fund_client": {
                 "name": "王先生",
-                "principal": 50000
+                "principal": 50000,
+                "tag": "client_trust",
+                "risk": "low"
               }
             },
             {
@@ -104,7 +106,9 @@
             {
               "add_fund_client": {
                 "name": "王先生",
-                "principal": 80000
+                "principal": 80000,
+                "tag": "client_trust",
+                "risk": "low"
               }
             },
             {
@@ -124,8 +128,8 @@
         "en": "Mr. Wang · Retired Teacher"
       },
       "text": {
-        "zh_CN": "谢谢你……你是第一个愿意看着我的眼睛，跟我讲最坏会亏多少的人。知道最坏只有 15%，我心里就有数了。我信你，请替我们看好这笔钱。",
-        "en": "Thank you. You're the first manager willing to look me in the eye and state how much I could lose. Knowing the bottom line is 15% gives me peace of mind. I trust you. Please guard our nest egg."
+        "zh_CN": "谢谢你……你是第一个愿意看着我的眼睛，跟我讲最坏会亏多少的人。知道最坏可能亏两成甚至更多，我心里就有数了。我信你，请替我们看好这笔钱。",
+        "en": "Thank you. You're the first manager willing to look me in the eye and tell me how much I could lose. Knowing the worst could be 20% or more gives me peace of mind. I trust you. Please guard our nest egg."
       },
       "next": "wrap"
     },

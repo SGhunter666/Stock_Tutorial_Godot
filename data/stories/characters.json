@@ -1,0 +1,37 @@
+{
+  "lin_lan": {
+    "portrait": "res://assets/portraits/lin_lan.jpg",
+    "color": "#4fb3a8",
+    "aliases": ["林岚", "Lin Lan"]
+  },
+  "gu_yan": {
+    "portrait": "res://assets/portraits/gu_yan.jpg",
+    "color": "#d98c5f",
+    "aliases": ["顾言", "Gu Yan"]
+  },
+  "su_he": {
+    "portrait": "res://assets/portraits/su_he.jpg",
+    "color": "#8c9bb5",
+    "aliases": ["苏禾", "Su He"]
+  },
+  "zhou_heng": {
+    "portrait": "res://assets/portraits/zhou_heng.jpg",
+    "color": "#b08d57",
+    "aliases": ["周衡", "Zhou Heng"]
+  },
+  "wang": {
+    "portrait": "res://assets/portraits/wang.jpg",
+    "color": "#c7a76b",
+    "aliases": ["王先生", "Mr. Wang"]
+  },
+  "chen_xi": {
+    "portrait": "res://assets/portraits/chen_xi.jpg",
+    "color": "#6fa8dc",
+    "aliases": ["陈曦", "Chen Xi"]
+  },
+  "lao_chen": {
+    "portrait": "res://assets/portraits/lao_chen.jpg",
+    "color": "#a0a0a0",
+    "aliases": ["老陈", "Lao Chen"]
+  }
+}

@@ -19,6 +19,8 @@ func _ready() -> void:
 		failures.append("game did not start")
 	if Game.narrative == null or not Game.narrative.is_active():
 		failures.append("opening story did not start")
+	if main._dialogue == null or not main._dialogue._portrait_frame.visible:
+		failures.append("opening dialogue portrait is not visible")
 	# Walk the opening story to the first choice and pick a path.
 	for i in 8:
 		if not Game.narrative.is_active():
@@ -100,6 +102,41 @@ func _ready() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 
+	main.navigate("market")
+	await get_tree().process_frame
+	var market_screen = main._screens["market"]
+	if market_screen._heat_tiles.size() < 2:
+		failures.append("sector heatmap did not render")
+	else:
+		market_screen._on_heatmap_sector("technology")
+		if market_screen._sector_filter.selected <= 0:
+			failures.append("heatmap click did not select a sector")
+		market_screen._sector_filter.select(0)
+		market_screen._apply_filter()
+	market_screen._on_watch_pressed("APLA")
+	if not Game.is_watched("APLA"):
+		failures.append("market star did not add to watchlist")
+	market_screen._watch_only.button_pressed = true
+	market_screen._apply_filter()
+	await get_tree().process_frame
+	var visible_rows := 0
+	var visible_unwatched := 0
+	for ticker in market_screen._rows.keys():
+		var row: Dictionary = market_screen._rows[ticker]
+		if row["panel"].visible:
+			visible_rows += 1
+			if not Game.is_watched(String(ticker)):
+				visible_unwatched += 1
+	if visible_rows != 1 or visible_unwatched != 0:
+		failures.append("watch-only filter did not isolate the watchlist")
+	market_screen._watch_only.button_pressed = false
+	market_screen._apply_filter()
+	market_screen._on_watch_pressed("APLA")
+	if Game.is_watched("APLA"):
+		failures.append("market star did not remove from watchlist")
+	main.navigate("trade")
+	await get_tree().process_frame
+
 	main.navigate("academy")
 	await get_tree().process_frame
 	var section_result := Game.academy_mark_section_read("u1", "s1")
@@ -164,6 +201,78 @@ func _ready() -> void:
 	await get_tree().process_frame
 	if not bool(SmaAcademy.evaluate_practice(Game.academy, SmaAcademy.unit("u11"), {})["done"]):
 		failures.append("two financials views did not satisfy u11 practice")
+
+	Game.toggle_watch("APLA")
+	if not Game.is_watched("APLA"):
+		failures.append("watchlist toggle failed")
+	main.navigate("watchlist")
+	await get_tree().process_frame
+	var watchlist_screen = main._screens["watchlist"]
+	if not watchlist_screen._watch_rows.has("APLA"):
+		failures.append("watchlist page did not render the followed ticker")
+	if watchlist_screen.get_child_count() == 0:
+		failures.append("watchlist page did not render")
+	main.navigate("trade")
+	await get_tree().process_frame
+	trade_screen = main._screens["trade"]
+	var alert_reference := float(Game.exchange.quote("APLA").get("last", 0.0))
+	var alert_added := Game.add_price_alert("APLA", "above", alert_reference + 1.0)
+	if not bool(alert_added.get("ok", false)):
+		failures.append("price alert creation failed")
+	trade_screen._open_alerts()
+	await get_tree().process_frame
+	var alert_dialog: SmaPriceAlertDialog = null
+	for child in main.get_children():
+		if child is SmaPriceAlertDialog:
+			alert_dialog = child
+	if alert_dialog == null:
+		failures.append("price alert dialog did not open")
+	else:
+		var dialog_price := alert_dialog._current_price()
+		alert_dialog._side_option.select(1)
+		alert_dialog._price_spin.value = dialog_price * 0.9
+		var alerts_before_dialog := Game.price_alerts().size()
+		alert_dialog._add_alert()
+		if Game.price_alerts().size() != alerts_before_dialog + 1:
+			failures.append("price alert dialog did not add an alert")
+		else:
+			var dialog_alert_id := String(Game.price_alerts()[-1]["id"])
+			alert_dialog._remove_alert(dialog_alert_id)
+			if Game.price_alerts().size() != alerts_before_dialog:
+				failures.append("price alert dialog did not remove an alert")
+		alert_dialog._close()
+	await get_tree().process_frame
+
+	var trigger_reference := float(Game.exchange.quote("APLA").get("last", 0.0))
+	var trigger_result := Game.add_price_alert("APLA", "above", trigger_reference + 0.01)
+	if not bool(trigger_result.get("ok", false)):
+		failures.append("triggerable price alert creation failed")
+	else:
+		var trigger_id := String(trigger_result["alert"]["id"])
+		var company_state: Dictionary = Game.exchange.state["companies"]["APLA"]
+		var original_last := float(company_state["last"])
+		var original_second := int(Game.exchange.state["second"])
+		company_state["last"] = trigger_reference + 0.02
+		Game.exchange.state["second"] = 10
+		Game._check_price_alerts()
+		var trigger_fired := false
+		for entry in Game.price_alerts():
+			if String(entry.get("id", "")) == trigger_id:
+				trigger_fired = not bool(entry.get("active", true))
+		if not trigger_fired:
+			failures.append("price alert did not trigger on threshold")
+		company_state["last"] = original_last
+		Game.exchange.state["second"] = original_second
+		Game.remove_price_alert(trigger_id)
+
+	main.navigate("watchlist")
+	await get_tree().process_frame
+	watchlist_screen = main._screens["watchlist"]
+	if watchlist_screen._alerts_box == null \
+			or watchlist_screen._alerts_box.get_child_count() == 0:
+		failures.append("watchlist page did not render the alert list")
+	main.navigate("trade")
+	await get_tree().process_frame
 
 	for demo_id in ["macro", "allocation", "risk", "strategies"]:
 		academy_screen._open_demo(demo_id)
@@ -545,6 +654,8 @@ func _ready() -> void:
 	})
 	if not bool(fund_created.get("ok", false)):
 		failures.append("fund creation failed")
+	if not bool(Game.narrative.flags.get("had_fund", false)):
+		failures.append("fund creation did not set had_fund")
 	var fund_clients_before: int = Game.fund.get("clients", []).size()
 	if not bool(Game.fund_buy("APLA", 10).get("ok", false)):
 		failures.append("fund purchase failed")
@@ -586,7 +697,7 @@ func _ready() -> void:
 
 	for screen_id in ["etf", "challenges", "career", "fund", "quant", "tax",
 			"statements", "glossary", "sandbox", "roadmap", "boundaries", "settings",
-			"replay", "news"]:
+			"replay", "news", "watchlist", "screener", "earnings"]:
 		if not main._screens.has(screen_id):
 			failures.append("screen not registered: %s" % screen_id)
 			continue
@@ -616,6 +727,10 @@ func _ready() -> void:
 		failures.append("demo completion was not restored")
 	if not Game.academy["financialsViewed"].has("NVDO"):
 		failures.append("financials views were not restored")
+	if not Game.is_watched("APLA"):
+		failures.append("watchlist was not restored")
+	if Game.price_alerts().size() != 1:
+		failures.append("price alert was not restored")
 	if not bool(Game.academy["demosCompleted"].get("greeks", false)):
 		failures.append("greeks demo completion was not restored")
 	var restored_short := false
@@ -658,6 +773,11 @@ func _ready() -> void:
 	if bool(Game.narrative.seen.get("client_trust", false)) \
 			and Game.fund.get("clients", []).size() <= fund_clients_before:
 		failures.append("client trust did not create a real fund client")
+	if bool(Game.narrative.seen.get("client_trust", false)):
+		var clients_before_retry: int = Game.fund.get("clients", []).size()
+		Game.story_add_fund_client("王先生", 50000.0, "client_trust", "low")
+		if Game.fund.get("clients", []).size() != clients_before_retry:
+			failures.append("story client subscription was not idempotent")
 
 	# Full-day fast-forward runs in chunks so the UI stays responsive.
 	Game.step_day()
@@ -770,6 +890,31 @@ func _ready() -> void:
 		await get_tree().process_frame
 	if statements_screen._quarter_index >= statement_history.size():
 		failures.append("statement quarter selection is out of range")
+
+	main.navigate("screener")
+	await get_tree().process_frame
+	var screener_screen = main._screens["screener"]
+	var all_screener_rows: int = screener_screen._rows.size()
+	if all_screener_rows <= 0:
+		failures.append("screener did not render any rows")
+	screener_screen._pe_spin.value = 20.0
+	screener_screen._apply()
+	if screener_screen._rows.size() >= all_screener_rows:
+		failures.append("screener P/E filter did not narrow the results")
+	screener_screen._reset()
+	if screener_screen._rows.size() != all_screener_rows:
+		failures.append("screener reset did not restore all rows")
+
+	main.navigate("earnings")
+	await get_tree().process_frame
+	var earnings_screen = main._screens["earnings"]
+	if earnings_screen._ticker_option == null or earnings_screen._selected_ticker == "":
+		failures.append("earnings center did not render the company selector")
+	else:
+		earnings_screen._on_ticker_changed(1)
+		await get_tree().process_frame
+		if earnings_screen._selected_ticker == "":
+			failures.append("earnings ticker switch lost the selection")
 
 	main.navigate("history")
 	await get_tree().process_frame

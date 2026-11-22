@@ -78,16 +78,16 @@
             },
             {
               "toast": {
-                "zh_CN": "宏观响应：削减权益敞口套现",
-                "en": "Macro stance: De-risking to Cash"
+                "zh_CN": "宏观响应：计划削减权益敞口",
+                "en": "Macro response: Plan to trim equity exposure"
               }
             }
           ]
         },
         {
           "text": {
-            "zh_CN": "启动衍生品与对冲工具，锁定净值，保持底仓不割肉。",
-            "en": "Deploy derivative hedges to lock in net asset value without realizing losses."
+            "zh_CN": "制定衍生品与对冲方案，锁定净值，保持底仓不割肉。",
+            "en": "Design a derivative hedge to lock in NAV without selling the core holdings."
           },
           "next": "hedge_reply",
           "effects": [
@@ -97,8 +97,8 @@
             },
             {
               "toast": {
-                "zh_CN": "宏观响应：构建系统性风险对冲",
-                "en": "Macro stance: Hedging Systematic Risk"
+                "zh_CN": "宏观响应：计划构建系统性风险对冲",
+                "en": "Macro response: Plan a systematic hedge"
               }
             }
           ]
@@ -116,8 +116,8 @@
             },
             {
               "toast": {
-                "zh_CN": "宏观响应：坚守现有持仓敞口",
-                "en": "Macro stance: Riding Out Volatility"
+                "zh_CN": "宏观响应：选择坚守现有敞口",
+                "en": "Macro response: Chose to hold exposure"
               }
             }
           ]
@@ -167,8 +167,8 @@
         "en": "Zhou Heng · Macroeconomics Professor"
       },
       "text": {
-        "zh_CN": "去宏观指标面板观察利率与通胀的后续变化。记住：在宏观周期面前，没有个股能永远独善其身。",
-        "en": "Review the macro indicators panel as rate and inflation prints develop. Remember: in the presence of macro cycles, no stock is an island forever."
+        "zh_CN": "去宏观指标面板观察利率与通胀的后续变化，并在交易台执行你的策略。记住：在宏观周期面前，没有个股能永远独善其身。",
+        "en": "Review the macro indicators panel as rate and inflation prints develop, and execute your plan on the trading desk. Remember: no stock is an island forever."
       },
       "next": "end"
     },

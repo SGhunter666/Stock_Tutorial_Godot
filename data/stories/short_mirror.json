@@ -67,8 +67,8 @@
       "choices": [
         {
           "text": {
-            "zh_CN": "融券建仓做空，严格设置止损，参与价值回归。",
-            "en": "Borrow shares and short with strict stops; monetize the inevitable mean reversion."
+            "zh_CN": "计划融券做空，严格设置止损，参与价值回归。",
+            "en": "Plan a short sale with strict stops; monetize the mean reversion."
           },
           "next": "short_reply",
           "effects": [
@@ -78,8 +78,8 @@
             },
             {
               "toast": {
-                "zh_CN": "交易决断：借券建立做空仓位",
-                "en": "Trade executed: Opened Short Position"
+                "zh_CN": "交易决断：计划借券建立做空仓位（需自行执行）",
+                "en": "Trade decision: Planned short position (execute manually)"
               }
             }
           ]
@@ -97,8 +97,8 @@
             },
             {
               "toast": {
-                "zh_CN": "交易决断：发布预警，回避有毒标的",
-                "en": "Stance taken: Published Warning Memo"
+                "zh_CN": "研究决断：计划发布风险预警",
+                "en": "Research decision: Planned risk warning"
               }
             }
           ]
@@ -139,7 +139,29 @@
         "zh_CN": "去交易台查看借券费率与做空机制说明。永远记住：在市场上，‘证明自己是对的’远没有‘保全账户活下去’来得重要。",
         "en": "Inspect borrow rates and mechanics on the trade ticket. Never forget: in this market, 'proving you are right' matters infinitely less than keeping your capital alive."
       },
-      "next": "end"
+      "next": "end",
+      "text_by_flag": [
+        {
+          "condition": {
+            "flag": "ethics",
+            "value": "short"
+          },
+          "text": {
+            "zh_CN": "你已经决定做空。去交易台查看借券费率、保证金与做空机制，再决定是否执行这笔交易。永远记住：在市场上，‘证明自己是对的’远没有‘保全账户活下去’来得重要。",
+            "en": "You have decided to short. Check borrow rates, margin, and short mechanics on the trade ticket, then decide whether to execute. Never forget: in this market, 'proving you are right' matters infinitely less than keeping your capital alive."
+          }
+        },
+        {
+          "condition": {
+            "flag": "ethics",
+            "value": "report"
+          },
+          "text": {
+            "zh_CN": "你选择了先写研报。去研报页把你的证据链写清楚——做空可以等，预警不能等。永远记住：在市场上，‘证明自己是对的’远没有‘保全账户活下去’来得重要。",
+            "en": "You chose the research memo first. Write the evidence chain clearly on the research page—a short can wait; a warning cannot. Never forget: in this market, 'proving you are right' matters infinitely less than keeping your capital alive."
+          }
+        }
+      ]
     },
     "end": {
       "type": "end"

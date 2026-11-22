@@ -7,10 +7,13 @@ var _rows: Dictionary = {}
 var _search: LineEdit
 var _sector_filter: OptionButton
 var _sector_values: Array[String] = [""]
+var _watch_only: Button
 var _list: VBoxContainer
 var _count_label: Label
 var _index_label: Label
 var _index_change: Label
+var _heat_tiles: Dictionary = {}
+var _heat_buckets: Dictionary = {}
 
 
 func _build() -> void:
@@ -54,22 +57,28 @@ func _build() -> void:
 		_sector_values.append(String(sector))
 	_sector_filter.item_selected.connect(func(_index): _apply_filter())
 	filters.add_child(_sector_filter)
+	_watch_only = SmaKit.toggle(I18n.t("market.watchOnly"))
+	_watch_only.toggled.connect(func(_pressed): _apply_filter())
+	filters.add_child(_watch_only)
 	filters.add_child(SmaKit.hspacer())
 	_count_label = SmaKit.muted("")
 	filters.add_child(_count_label)
 	root.add_child(filters)
+	root.add_child(_build_heatmap())
 
 	var table_card := SmaKit.card(0)
 	table_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var table := SmaKit.vbox(0)
 	table_card.add_child(table)
 	var header := SmaKit.header_row(
-		["market.ticker", "market.company", "market.sector", "market.last",
+		["market.watch", "market.ticker", "market.company", "market.sector", "market.last",
 			"market.change", "market.bid", "market.ask", "market.volume"],
-		[0.7, 2.1, 1.0, 0.9, 0.9, 0.8, 0.8, 1.0],
-		[HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT,
+		[0.35, 0.7, 2.1, 1.0, 0.9, 0.9, 0.8, 0.8, 1.0],
+		[HORIZONTAL_ALIGNMENT_CENTER, HORIZONTAL_ALIGNMENT_LEFT,
+			HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT,
 			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
-			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT])
+			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
+			HORIZONTAL_ALIGNMENT_RIGHT])
 	var header_texts: Array = header.get_children()
 	for index in header_texts.size():
 		var label: Label = header_texts[index]
@@ -108,6 +117,21 @@ func _create_row(ticker: String, company: Dictionary, sector: String,
 	panel.mouse_exited.connect(func(): panel.self_modulate = Color.WHITE)
 	var row := SmaKit.hbox(8)
 	panel.add_child(row)
+	var watch_cell := SmaKit.hbox(0)
+	watch_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	watch_cell.size_flags_stretch_ratio = 0.35
+	var watch_button := Button.new()
+	watch_button.text = "☆"
+	watch_button.flat = true
+	watch_button.focus_mode = Control.FOCUS_NONE
+	watch_button.custom_minimum_size = Vector2(26, 26)
+	watch_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	watch_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	watch_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	watch_button.tooltip_text = I18n.t("market.watchAdd", {"ticker": ticker})
+	watch_button.pressed.connect(_on_watch_pressed.bind(ticker))
+	watch_cell.add_child(watch_button)
+	row.add_child(watch_cell)
 	var cells := {
 		"ticker": SmaKit.cell(ticker, 0.7),
 		"name": SmaKit.cell(String(company.get("name", ticker)), 2.1),
@@ -122,7 +146,98 @@ func _create_row(ticker: String, company: Dictionary, sector: String,
 		row.add_child(cells[key])
 	_list.add_child(panel)
 	_rows[ticker] = {"panel": panel, "cells": cells, "sector": sector,
-		"is_etf": is_etf, "locked": false}
+		"is_etf": is_etf, "locked": false, "watch": watch_button}
+
+
+func _build_heatmap() -> Control:
+	var card := SmaKit.card(10)
+	var box := SmaKit.vbox(6)
+	card.add_child(box)
+	var header := SmaKit.hbox(8)
+	header.add_child(SmaKit.label(I18n.t("market.heatmapTitle"), 14))
+	header.add_child(SmaKit.hspacer())
+	header.add_child(SmaKit.muted(I18n.t("market.heatmapHint"), 10))
+	box.add_child(header)
+	var grid := GridContainer.new()
+	grid.columns = 6
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	box.add_child(grid)
+	var sectors: Array = SmaCompanyCatalog.sectors()
+	sectors.append(SmaEtfs.ETF_SECTOR)
+	sectors.sort()
+	for sector in sectors:
+		var button := Button.new()
+		button.text = SmaKit.sector_label(String(sector))
+		button.focus_mode = Control.FOCUS_NONE
+		button.clip_text = true
+		button.custom_minimum_size.y = 36
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", 11)
+		button.tooltip_text = I18n.t("market.heatmapTooltip", {
+			"sector": SmaKit.sector_label(String(sector))})
+		button.pressed.connect(_on_heatmap_sector.bind(String(sector)))
+		grid.add_child(button)
+		_heat_tiles[String(sector)] = button
+		_heat_buckets[String(sector)] = -999
+		_apply_heat_style(button, 0.0)
+	return card
+
+
+func _update_heatmap() -> void:
+	if _heat_tiles.is_empty() or game == null or game.exchange == null:
+		return
+	var totals: Dictionary = {}
+	var counts: Dictionary = {}
+	for ticker in _rows.keys():
+		var sector := String(_rows[ticker]["sector"])
+		var quote: Dictionary = game.exchange.quote(String(ticker))
+		totals[sector] = float(totals.get(sector, 0.0)) \
+			+ float(quote.get("changePct", 0.0))
+		counts[sector] = int(counts.get(sector, 0)) + 1
+	for sector in _heat_tiles.keys():
+		var count := int(counts.get(sector, 0))
+		var average := 0.0
+		if count > 0:
+			average = float(totals.get(sector, 0.0)) / float(count)
+		var button: Button = _heat_tiles[sector]
+		button.text = "%s  %s" % [SmaKit.sector_label(String(sector)),
+			SmaFormat.pct(average, 2) if count > 0 else "—"]
+		button.add_theme_color_override("font_color",
+			SmaUiTheme.TEXT if count == 0 else SmaKit.value_color(average))
+		var bucket := int(round(average * 2.0))
+		if int(_heat_buckets.get(sector, -999)) != bucket:
+			_heat_buckets[sector] = bucket
+			_apply_heat_style(button, average)
+
+
+func _apply_heat_style(button: Button, average: float) -> void:
+	var tint := SmaUiTheme.PANEL_ALT
+	if average > 0.01:
+		tint = SmaUiTheme.PANEL.lerp(SmaUiTheme.POSITIVE,
+			clampf(average / 4.0, 0.08, 0.45))
+	elif average < -0.01:
+		tint = SmaUiTheme.PANEL.lerp(SmaUiTheme.NEGATIVE,
+			clampf(-average / 4.0, 0.08, 0.45))
+	var style := StyleBoxFlat.new()
+	style.bg_color = tint
+	style.border_color = SmaUiTheme.BORDER
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.set_content_margin_all(5)
+	button.add_theme_stylebox_override("normal", style)
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = tint.lightened(0.08)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", hover)
+
+
+func _on_heatmap_sector(sector: String) -> void:
+	var index := _sector_values.find(sector)
+	if index < 0:
+		return
+	_sector_filter.select(index)
+	_apply_filter()
 
 
 func refresh(_reason: String = "") -> void:
@@ -147,11 +262,22 @@ func _update_rows() -> void:
 		_index_label.text = SmaFormat.num(float(game.market_index()), 2)
 		_index_change.text = SmaFormat.pct(index_change, 2)
 		_index_change.add_theme_color_override("font_color", SmaKit.value_color(index_change))
+	_update_heatmap()
 	var visible_count := 0
 	var locked_count := 0
 	for ticker in _rows.keys():
 		var entry: Dictionary = _rows[ticker]
 		var panel: PanelContainer = entry["panel"]
+		var watch_button: Button = entry["watch"]
+		var watched: bool = game.is_watched(String(ticker))
+		var watch_text := "★" if watched else "☆"
+		if watch_button.text != watch_text:
+			watch_button.text = watch_text
+			watch_button.add_theme_color_override("font_color",
+				SmaUiTheme.ACCENT if watched else SmaUiTheme.MUTED)
+			watch_button.tooltip_text = I18n.t(
+				"market.watchRemove" if watched else "market.watchAdd",
+				{"ticker": ticker})
 		if not panel.visible:
 			continue
 		visible_count += 1
@@ -185,8 +311,11 @@ func _update_rows() -> void:
 		cells["ask"].text = SmaFormat.num(float(ask), 2) if ask != null else "—"
 		cells["volume"].text = SmaFormat.compact(float(quote.get("volume", 0)))
 	if _count_label != null:
-		_count_label.text = "%d / %d · %s %d" % [visible_count, _rows.size(),
+		var count_text := "%d / %d · %s %d" % [visible_count, _rows.size(),
 			I18n.t("market.lockedCount"), locked_count]
+		if _watch_only != null and _watch_only.button_pressed and visible_count == 0:
+			count_text = I18n.t("market.watchEmpty")
+		_count_label.text = count_text
 
 
 func _apply_filter() -> void:
@@ -195,6 +324,7 @@ func _apply_filter() -> void:
 	var selected := _sector_filter.selected if _sector_filter != null else 0
 	if selected > 0 and selected < _sector_values.size():
 		sector = _sector_values[selected]
+	var watch_only := _watch_only != null and _watch_only.button_pressed
 	var companies := SmaCompanyCatalog.load_companies()
 	var etfs := SmaEtfs.instruments()
 	for ticker in _rows.keys():
@@ -203,8 +333,16 @@ func _apply_filter() -> void:
 		var matches_query: bool = query == "" or symbol.to_lower().contains(query) \
 			or String(company.get("name", "")).to_lower().contains(query)
 		var matches_sector: bool = sector == "" or String(company.get("sector", "")) == sector
-		_rows[symbol]["panel"].visible = matches_query and matches_sector
+		var matches_watch: bool = not watch_only or game.is_watched(symbol)
+		_rows[symbol]["panel"].visible = matches_query and matches_sector and matches_watch
 	_update_rows()
+
+
+func _on_watch_pressed(ticker: String) -> void:
+	if game == null:
+		return
+	game.toggle_watch(ticker)
+	_apply_filter()
 
 
 func _on_row_input(event: InputEvent, ticker: String) -> void:

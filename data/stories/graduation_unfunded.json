@@ -1,38 +1,65 @@
 {
   "id": "graduation_unfunded",
-  "title": { "zh_CN": "毕业答辩", "en": "The Grand Defense" },
+  "title": {
+    "zh_CN": "毕业答辩 · 另一条路",
+    "en": "Graduation Defense · Another Path"
+  },
   "start": "hall",
   "nodes": {
     "hall": {
       "type": "line",
-      "speaker": { "zh_CN": "周衡 · 宏观教授", "en": "Zhou Heng · Macroeconomics Professor" },
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
       "text": {
         "zh_CN": "答辩大厅很安静。大屏幕上回放着你在远望的完整记录：第一笔成交、第一笔股息、利率冲击、做空、期权与杠杆，直到 32 个单元全部结业。你目前没有在管理的基金，但每一笔自己的交易，你都走完了。",
         "en": "The defense hall is quiet. The screen replays your complete record at Farview: first fill, first dividend, rate shocks, shorting, options, leverage, all the way through 32 units. You are not managing a fund right now, but you saw every one of your own trades through."
       },
-      "next": "lin_lan_truth"
+      "next": "lin_lan_truth",
+      "text_by_flag": [
+        {
+          "condition": {
+            "flag": "had_fund",
+            "value": true
+          },
+          "text": {
+            "zh_CN": "答辩大厅很安静。大屏幕上回放着你在远望的完整记录：第一笔成交、第一笔股息、利率冲击、做空、期权与杠杆，直到 32 个单元全部结业。你曾经管理过一只基金，但它已经结束；现在，你重新回到自己的账户前。",
+            "en": "The defense hall is quiet. The screen replays your complete record at Farview: first fill, first dividend, the rate shock, shorts, options and leverage, all the way through 32 units. You once ran a fund, but it is closed now; today you stand before your own account again."
+          }
+        }
+      ]
     },
     "lin_lan_truth": {
       "type": "line",
-      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
       "text": {
-        "zh_CN": "七年前，我管理的旧基金在这里清盘。外面一直说我输给了市场，其实我是输给了不肯认错。今天我站在这儿，不是要你复制我的路，而是想看你带着这条教训往下走。",
-        "en": "Seven years ago, the old fund I managed was liquidated here. People say I lost to the market; in truth I lost to my refusal to admit I was wrong. I'm not here to make you copy my path. I want to see you carry that lesson forward."
+        "zh_CN": "七年前，我管理的旧基金在这里清盘。外面一直说我输给了市场。其实我输给的，是那个以为看对了方向就能扛住一切的自己。今天我站在这儿，不是要你复制我的路，而是想看你带着这条教训往下走。",
+        "en": "Seven years ago, the old fund I managed was liquidated here. People still say I lost to the market. What I really lost to was the self that believed a correct call was enough to endure anything. I stand here today not to make you copy my path, but to see you carry that lesson forward."
       },
       "next": "gu_yan_nod"
     },
     "gu_yan_nod": {
       "type": "line",
-      "speaker": { "zh_CN": "顾言 · 同届学员", "en": "Gu Yan · Fellow Trainee" },
+      "speaker": {
+        "zh_CN": "远望档案室",
+        "en": "Farview Archives"
+      },
       "text": {
         "zh_CN": "台下的顾言安静地听着。他没有再争，只朝你点了点头。",
-        "en": "Gu Yan listens in silence. He doesn't argue this time; he just nods."
+        "en": "In the audience, Gu Yan listens quietly. He does not argue; he simply gives you a small nod."
       },
       "next": "lin_lan_verdict"
     },
     "lin_lan_verdict": {
       "type": "line",
-      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
       "text": {
         "zh_CN": "你完成了全部 32 个单元，也证明了自己能按规则活下来。远望学院准予你毕业。接下来，你想把这段经验用在什么地方？",
         "en": "You completed all 32 units and proved you can survive by your own rules. Farview grants you graduation. Where do you want to put that experience next?"
@@ -41,8 +68,14 @@
     },
     "choice": {
       "type": "choice",
-      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
-      "text": { "zh_CN": "选择你的毕业去向：", "en": "Choose your path after graduation:" },
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "选择你的毕业去向：",
+        "en": "Choose your path after graduation:"
+      },
       "choices": [
         {
           "text": {
@@ -86,7 +119,10 @@
     },
     "mentor_reply": {
       "type": "line",
-      "speaker": { "zh_CN": "周衡 · 宏观教授", "en": "Zhou Heng · Macroeconomics Professor" },
+      "speaker": {
+        "zh_CN": "周衡 · 宏观教授",
+        "en": "Zhou Heng · Macroeconomics Professor"
+      },
       "text": {
         "zh_CN": "愿意把自己踩过的坑讲给别人听，比独自赚钱更难。远望的讲台，从今天起有你一个位置。",
         "en": "Telling others about the mistakes you survived is harder than making money alone. There is a place for you at Farview's podium."
@@ -95,22 +131,30 @@
     },
     "trader_reply": {
       "type": "line",
-      "speaker": { "zh_CN": "顾言 · 同届学员", "en": "Gu Yan · Fellow Trainee" },
+      "speaker": {
+        "zh_CN": "顾言 · 同届学员",
+        "en": "Gu Yan · Fellow Trainee"
+      },
       "text": {
-        "zh_CN": "没有基金，没有客户，只有你自己的账户。那就用结果说话。",
-        "en": "No fund, no clients, just your own account. Then let the results speak."
+        "zh_CN": "现在没有基金，没有客户，只有你自己的账户。那就用结果说话。",
+        "en": "No fund, no clients now — just your own account. Let the results speak."
       },
       "next": "wrap"
     },
     "wrap": {
       "type": "line",
-      "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
       "text": {
         "zh_CN": "答辩委员会一致通过。祝贺你，交易员。愿你记住：先活下来，再谈收益。",
         "en": "The committee affirms with unanimous consent. Congratulations, trader. Remember: survive first, then talk returns."
       },
       "next": "end"
     },
-    "end": { "type": "end" }
+    "end": {
+      "type": "end"
+    }
   }
 }

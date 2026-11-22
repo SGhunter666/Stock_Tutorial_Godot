@@ -25,8 +25,8 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "七年来，学院里一直有传言，说我当年看错宏观周期，才导致旧基金清盘。今天我可以把真相说出来：那一年我没有看错趋势。在清盘前的最后一分钟，我知道只要再扛三天，市场反弹就能让我翻身。",
-        "en": "For seven years, the academy has whispered that I misread the macro cycle and caused the old fund's liquidation. Today I can tell you the truth: I did not misread the trend. In the final minute before liquidation, I knew that three more days of holding could have saved me."
+        "zh_CN": "七年来，学院里一直有传言，说我当年看错宏观周期，才导致旧基金清盘。今天我可以把真相说出来：那一年我没有看错趋势。市场只需要再多三天，就会证明我的判断是对的。",
+        "en": "For seven years, the academy has whispered that I misread the macro cycle and caused the old fund's liquidation. Today I can tell you the truth: I did not misread the trend. The market needed only three more days to prove my call right."
       },
       "next": "lin_lan_choice"
     },
@@ -37,20 +37,20 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "但我面对的是数百个普通家庭。如果我赌输了，他们的生活会被彻底打乱。在最后一刻，我签下了清盘清算单，把每一分能找回的现金还给了他们。那年我不是输给市场，我是输给了‘不肯认错’的执念。但至少，我保住了受托人的良知。",
-        "en": "But I was responsible for hundreds of ordinary families. If I lost the bet, their lives would be upended. In that last minute, I signed the liquidation order and returned every dollar I could. I didn't lose to the market; I lost to a stubborn refusal to admit I was wrong. But I kept my conscience as a fiduciary."
+        "zh_CN": "但我把每一分钱都加上了三倍杠杆。我的保证金撑不到那三天。与其等着被强制平仓，我选择主动清盘，把每一分能找回的现金还给数百个普通家庭。那年我不是输给市场，也不是输给判断——我输给了杠杆，和那个以为只要看对方向就能扛住一切的自己。",
+        "en": "But I had put every dollar on three times leverage. My margin could not last those three days. Rather than wait for a forced liquidation, I chose to wind down the fund myself and return every dollar I could recover to hundreds of ordinary families. I did not lose to the market that year, and I did not lose to my call — I lost to leverage, and to the self that believed being right meant being able to endure anything."
       },
       "next": "gu_yan_head"
     },
     "gu_yan_head": {
       "type": "line",
       "speaker": {
-        "zh_CN": "顾言 · 同届学员",
-        "en": "Gu Yan · Fellow Trainee"
+        "zh_CN": "远望档案室",
+        "en": "Farview Archives"
       },
       "text": {
-        "zh_CN": "台下的顾言神情疲惫，锋芒收敛了许多。他默默看着你，微微点头。他在这场危机里摔了一跤，也第一次学会了敬畏。",
-        "en": "Gu Yan looks tired, his sharp edges worn down. He meets your eyes and nods. The crisis cost him dearly, but it taught him respect."
+        "zh_CN": "台下的顾言神情疲惫，锋芒收敛了许多。他默默看着你，微微点头。他在这场压力测试里摔了一跤，也第一次学会了敬畏。",
+        "en": "Gu Yan sits in the audience, worn down, his edge tempered. He watches you and gives a small nod. The stress test cost him dearly, and taught him awe for the first time."
       },
       "next": "lin_lan_verdict"
     },
@@ -142,14 +142,26 @@
     "manager_reply": {
       "type": "line",
       "speaker": {
-        "zh_CN": "王先生 · 退休教师",
-        "en": "Mr. Wang · Retired Teacher"
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "王先生在台下带头起立鼓掌。林岚走上前，郑重地将一枚刻着远望罗盘的掌舵人印章交到你的手中：“从今天起，远望一期的这艘大船，交给你了。”",
-        "en": "Mr. Wang rises to lead a standing ovation. Lin Lan steps forward and presents the brass Farview compass seal into your hands: 'From this day onward, Farview's flagship belongs to you.'"
+        "zh_CN": "王先生在台下带头起立鼓掌。我走上前，把一枚刻着远望罗盘的掌舵人印章交到你手中：“从今天起，远望一期的这艘大船，交给你了。”",
+        "en": "Mr. Wang rises to lead the applause. I step forward and place the brass Farview compass seal in your hands: 'From this day onward, Farview's flagship belongs to you.'"
       },
-      "next": "wrap"
+      "next": "wrap",
+      "text_by_flag": [
+        {
+          "condition": {
+            "flag": "client_trust",
+            "value": "low"
+          },
+          "text": {
+            "zh_CN": "台下没有掌声。王先生坐在后排，远远看了你一眼。我走上前，把印章交到你手中：“船交给你了。但记住，印章不等于信任。”",
+            "en": "There is no applause. Mr. Wang watches from the back row, then looks away. I step forward and place the seal in your hands: 'The ship is yours. But remember: a seal is not trust.'"
+          }
+        }
+      ]
     },
     "mentor_reply": {
       "type": "line",
@@ -158,8 +170,8 @@
         "en": "Zhou Heng · Macroeconomics Professor"
       },
       "text": {
-        "zh_CN": "周衡教授抚掌微笑：“教人避开深渊，往往比自己跨越深渊功德无量。远望的讲台，从此多了一位真正懂得市场的引路人。”",
-        "en": "Professor Zhou smiles warmly: 'Guiding others away from the abyss is an honor far surpassing leaping it alone. Farview's lecture hall welcomes a navigator who truly understands the sea.'"
+        "zh_CN": "我抚掌微笑：“教人避开深渊，往往比自己跨越深渊更难。远望的讲台，从此多了一位真正懂得市场的引路人。”",
+        "en": "I clap and smile: 'Teaching others to avoid the abyss is often harder than crossing it yourself. Farview's podium now has a guide who truly understands the market.'"
       },
       "next": "wrap"
     },
@@ -170,8 +182,8 @@
         "en": "Gu Yan · Fellow Trainee"
       },
       "text": {
-        "zh_CN": "顾言在台下站起身，眼神中重新燃起锐利的光芒：“我等你。在深水区里，也许你真能走出一条既有进攻性、又能活着回来的新路。”",
-        "en": "Gu Yan stands, a renewed and sober sharpness igniting his eyes: 'I'll see you in the deep. Perhaps you will forge a path that attacks fiercely yet returns alive.'"
+        "zh_CN": "我在台下站起身，眼神里重新燃起锐利的光：“我等你。在深水区里，也许你真能走出一条既有进攻性、又能活着回来的新路。”",
+        "en": "I rise from my seat, a sharp light returning to my eyes: 'I'll be waiting. In the deep water, maybe you can carve a path that is both aggressive and survivable.'"
       },
       "next": "wrap"
     },

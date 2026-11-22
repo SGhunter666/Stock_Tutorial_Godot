@@ -7,12 +7,15 @@ extends Control
 const NAV_ITEMS := [
 	["dashboard", "nav.dashboard"],
 	["market", "nav.market"],
+	["watchlist", "nav.watchlist"],
+	["screener", "nav.screener"],
 	["etf", "nav.etf"],
 	["trade", "nav.trade"],
 	["options", "nav.options"],
 	["futures", "nav.futures"],
 	["multiasset", "nav.multiasset"],
 	["news", "nav.news"],
+	["earnings", "nav.earnings"],
 	["macro", "nav.macro"],
 	["portfolio", "nav.portfolio"],
 	["academy", "nav.academy"],
@@ -293,12 +296,15 @@ func _build_screens() -> void:
 	_screens.clear()
 	_screens["dashboard"] = SmaDashboardScreen.new()
 	_screens["market"] = SmaMarketScreen.new()
+	_screens["watchlist"] = SmaWatchlistScreen.new()
+	_screens["screener"] = SmaScreenerScreen.new()
 	_screens["etf"] = SmaEtfScreen.new()
 	_screens["trade"] = SmaTradeScreen.new()
 	_screens["options"] = SmaOptionsScreen.new()
 	_screens["futures"] = SmaFuturesScreen.new()
 	_screens["multiasset"] = SmaMultiAssetScreen.new()
 	_screens["news"] = SmaNewsScreen.new()
+	_screens["earnings"] = SmaEarningsCenterScreen.new()
 	_screens["macro"] = SmaMacroScreen.new()
 	_screens["portfolio"] = SmaPortfolioScreen.new()
 	_screens["academy"] = SmaAcademyScreen.new()

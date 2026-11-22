@@ -25,8 +25,8 @@
         "en": "Gu Yan · Star Trainee"
       },
       "text": {
-        "zh_CN": "每次牛市见顶前都有人在喊崩盘。盘面资金还在买入，这时候用股指期货做套保，每月展期基差和保证金就要损耗近 1.5%。如果市场没崩，这笔对冲费用就是白烧，排名会被对手超过。",
-        "en": "Someone always calls a crash at every bull-market top. The tape is still printing buys. Hedging with index futures costs us nearly 1.5% a month in roll basis and margin carry. If the market doesn't crash, that's money burned, and rivals will pass us in the rankings."
+        "zh_CN": "每次牛市见顶前都有人在喊崩盘。盘面资金还在买入，这时候用股指期货做套保，每月展期基差和资金占用成本大约 0.3%–0.5%，年化拖累接近 2%。如果市场没崩，这笔对冲费用就是白花，你的排名会被对手超过。",
+        "en": "Someone always calls a crash at every bull-market top. The tape is still printing buys. Hedging with index futures costs about 0.3–0.5% a month in roll basis and capital charges—roughly 2% a year. If the market doesn't crash, that's money burned, and rivals will pass your fund in the rankings."
       },
       "next": "lin_lan_define"
     },
@@ -55,8 +55,8 @@
       "choices": [
         {
           "text": {
-            "zh_CN": "利用股指期货进行 100% 充分套期保值，甘愿牺牲基差成本。",
-            "en": "Implement 100% full hedge via index futures, willingly absorbing basis drag."
+            "zh_CN": "制定 100% 股指期货套保方案，接受基差与资金占用成本。",
+            "en": "Design a 100% index-futures hedge, accepting basis and capital costs."
           },
           "next": "full_reply",
           "effects": [
@@ -66,16 +66,16 @@
             },
             {
               "toast": {
-                "zh_CN": "宏观防线：已建立 100% 股指期货全额对冲",
-                "en": "Perimeter secured: 100% Index Futures Hedge"
+                "zh_CN": "宏观防线：已确定 100% 股指期货对冲方案（需自行执行）",
+                "en": "Perimeter plan: 100% Index Futures Hedge (execute manually)"
               }
             }
           ]
         },
         {
           "text": {
-            "zh_CN": "对冲 50% 核心风险敞口，兼顾下行防守与潜在反弹。",
-            "en": "Deploy 50% partial hedge; balance downside buffer against upside participation."
+            "zh_CN": "制定 50% 股指期货对冲方案，保留一半敞口。",
+            "en": "Design a 50% index-futures hedge; keep half the exposure."
           },
           "next": "partial_reply",
           "effects": [
@@ -85,8 +85,8 @@
             },
             {
               "toast": {
-                "zh_CN": "宏观防线：已建立 50% 核心敞口对冲",
-                "en": "Perimeter secured: 50% Balanced Hedge"
+                "zh_CN": "宏观防线：已确定 50% 核心敞口对冲方案（需自行执行）",
+                "en": "Perimeter plan: 50% Core Hedge (execute manually)"
               }
             }
           ]
@@ -104,8 +104,8 @@
             },
             {
               "toast": {
-                "zh_CN": "宏观防线：拒绝避险，裸露全部多头头寸",
-                "en": "Perimeter: Zero hedge, full unhedged exposure"
+                "zh_CN": "宏观防线：选择零对冲，保留全部敞口",
+                "en": "Perimeter decision: Zero hedge, full exposure"
               }
             }
           ]
@@ -119,8 +119,8 @@
         "en": "Lin Lan · Lead Mentor"
       },
       "text": {
-        "zh_CN": "净值可能走得慢一些，但真到风暴来时，这艘船不会因为一次巨浪就散架。你给委托人留了最实在的一层保护。",
-        "en": "The NAV may grind forward under friction, but when the storm hits, this vessel won't break apart on a single wave. You've given your investors a real layer of protection."
+        "zh_CN": "净值可能走得慢一些，但真到风暴来时，这艘船不会因为一次巨浪就散架。你选择为委托人留下最实在的一层保护。",
+        "en": "NAV may move slower, but when the storm arrives, this ship will not break apart on the first wave. You chose to give clients the most concrete layer of protection."
       },
       "next": "wrap"
     },
@@ -131,8 +131,8 @@
         "en": "Zhou Heng · Macroeconomics Professor"
       },
       "text": {
-        "zh_CN": "经典的机构妥协艺术。在不确定性的迷雾中，不把筹码押在任何一个极端。你为组合保留了反弹的生机，也留出了防守的余地。",
-        "en": "Classic institutional pragmatism. In the fog of uncertainty, refusing to bet your life on any single extreme. You preserve upside elasticity while reserving shelter."
+        "zh_CN": "经典的机构妥协艺术。在不确定性的迷雾中，不把筹码押在任何一个极端。你选择为组合保留反弹的生机，也留出防守的余地。",
+        "en": "The classic art of institutional compromise. In the fog of uncertainty, you refuse to bet everything on either extreme. You chose to keep some upside for the portfolio while preserving room to defend."
       },
       "next": "wrap"
     },
@@ -143,8 +143,8 @@
         "en": "Gu Yan · Star Trainee"
       },
       "text": {
-        "zh_CN": "痛快！这才是真正交易员的气魄！把油门踩到底，那些懦夫瞻前顾后的成本，都将变成我们登顶领奖台的踏脚石！",
-        "en": "Exhilarating! That is the steel of a true trader! Floor the gas pedal; every penny those cowards bleed on insurance becomes fuel for our ascent to the podium!"
+        "zh_CN": "痛快！这才是真正交易员的气魄！把油门踩到底，那些懦夫瞻前顾后的成本，都将变成你登顶领奖台的踏脚石！",
+        "en": "Exhilarating! That is the steel of a true trader! Floor the gas pedal; every penny those cowards bleed on insurance becomes a stepping stone on your ascent to the podium!"
       },
       "next": "wrap"
     },
@@ -158,7 +158,39 @@
         "zh_CN": "去期货交易台核对你的空头持仓与保证金占用。风暴前夜的空气总是令人窒息，但明天开盘后，一切狂妄与审慎都会见分晓。",
         "en": "Audit your futures contracts and collateral usage on the Futures screen. The air on the eve of a hurricane is always stifling. Tomorrow morning, every swagger and every prudence will meet its reckoning."
       },
-      "next": "end"
+      "next": "end",
+      "text_by_flag": [
+        {
+          "condition": {
+            "flag": "hedge",
+            "value": "full"
+          },
+          "text": {
+            "zh_CN": "方案已定：100% 股指期货空头。去期货交易台按方案建立对冲，核对保证金占用，然后执行。风暴前夜的空气总是令人窒息，但明天开盘后，一切狂妄与审慎都会见分晓。",
+            "en": "Plan set: 100% short index futures. Go to the futures desk, establish the hedge, verify collateral usage, and execute. The air on the eve of a hurricane is always stifling, but tomorrow every swagger and every prudence will meet its reckoning."
+          }
+        },
+        {
+          "condition": {
+            "flag": "hedge",
+            "value": "partial"
+          },
+          "text": {
+            "zh_CN": "方案已定：50% 股指期货空头。去期货交易台按比例建立对冲，保留一半敞口，核对保证金。风暴前夜的空气总是令人窒息，但明天开盘后，一切狂妄与审慎都会见分晓。",
+            "en": "Plan set: 50% short index futures. Go to the futures desk, establish the partial hedge, keep half the exposure, and verify collateral. The air on the eve of a hurricane is always stifling, but tomorrow every swagger and every prudence will meet its reckoning."
+          }
+        },
+        {
+          "condition": {
+            "flag": "hedge",
+            "value": "none"
+          },
+          "text": {
+            "zh_CN": "你选择不做空头对冲。去期货交易台确认你的净敞口与保证金缓冲。风暴前夜的空气总是令人窒息，但明天开盘后，一切狂妄与审慎都会见分晓。",
+            "en": "You chose no short hedge. Go to the futures desk and confirm your net exposure and collateral buffer. The air on the eve of a hurricane is always stifling, but tomorrow every swagger and every prudence will meet its reckoning."
+          }
+        }
+      ]
     },
     "end": {
       "type": "end"

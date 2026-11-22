@@ -211,6 +211,11 @@
           },
           {
             "story_seen": "client_trust"
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
           }
         ]
       }
@@ -230,6 +235,11 @@
           },
           {
             "story_seen": "client_trust"
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
           }
         ]
       }
@@ -249,6 +259,11 @@
           },
           {
             "story_seen": "client_trust"
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
           }
         ]
       }
@@ -271,6 +286,11 @@
           },
           {
             "story_seen": "crisis_eve"
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
           }
         ]
       }
@@ -293,6 +313,11 @@
           },
           {
             "story_seen": "crisis_eve"
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
           }
         ]
       }
@@ -315,6 +340,11 @@
           },
           {
             "story_seen": "crisis_eve"
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
           }
         ]
       }

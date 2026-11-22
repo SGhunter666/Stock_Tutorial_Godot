@@ -28,6 +28,7 @@ var _ticker_label: Label
 var _meta_label: Label
 var _profile_label: Label
 var _sensitivity_label: Label
+var _watch_button: Button
 var _indicators_card: PanelContainer
 var _indicator_labels: Dictionary = {}
 var _last_label: Label
@@ -84,6 +85,14 @@ func _build() -> void:
 	identity.add_child(_sensitivity_label)
 	quote_head.add_child(identity)
 	quote_head.add_child(SmaKit.hspacer())
+	_watch_button = SmaKit.button(I18n.t("trade.watchAdd"), _toggle_watch)
+	_watch_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_watch_button.custom_minimum_size.x = 100
+	quote_head.add_child(_watch_button)
+	var alert_button := SmaKit.button(I18n.t("trade.alertButton"), _open_alerts)
+	alert_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	alert_button.custom_minimum_size.x = 100
+	quote_head.add_child(alert_button)
 	var financials_button := SmaKit.button(I18n.t("financials.open"), _open_financials)
 	financials_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	financials_button.custom_minimum_size.x = 100
@@ -389,6 +398,25 @@ func _open_financials() -> void:
 	dialog.setup(game, game.selected_ticker)
 
 
+func _toggle_watch() -> void:
+	if game == null or not game.started:
+		return
+	game.toggle_watch(game.selected_ticker)
+	refresh("watch")
+
+
+func _open_alerts() -> void:
+	if game == null or not game.started or game.selected_ticker == "":
+		return
+	var main := get_tree().get_first_node_in_group("main")
+	if main == null:
+		return
+	var dialog := SmaPriceAlertDialog.new()
+	main.add_child(dialog)
+	dialog.closed.connect(func(): refresh("alerts"))
+	dialog.setup(game, game.selected_ticker)
+
+
 func _book_cell(text: String, color: Color) -> Label:
 	var node := SmaKit.label(text, 11, color)
 	node.custom_minimum_size.x = 92
@@ -434,6 +462,14 @@ func refresh(reason: String = "") -> void:
 	var last := float(quote.get("last", 0.0))
 	_ticker_label.text = ticker
 	_name_label.text = String(company.get("name", ticker))
+	if _watch_button != null:
+		var watched: bool = game.is_watched(ticker)
+		var watch_label := I18n.t(
+			"trade.watchRemove" if watched else "trade.watchAdd")
+		if _watch_button.text != watch_label:
+			_watch_button.text = watch_label
+			_watch_button.add_theme_color_override("font_color",
+				SmaUiTheme.ACCENT if watched else SmaUiTheme.TEXT)
 	_meta_label.text = "%s · %s · %s" % [
 		SmaKit.sector_label(String(company.get("sector", ""))),
 		SmaKit.liquidity_label(String(company.get("liquidity", ""))),
