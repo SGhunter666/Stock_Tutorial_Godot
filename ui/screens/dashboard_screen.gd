@@ -27,6 +27,8 @@ func refresh(_reason: String = "") -> void:
 	_render_header()
 	if game.has_intro_task():
 		_body.add_child(_render_intro())
+	elif game.opening_gap_unlocked():
+		_body.add_child(_render_opening_gap())
 	var columns := SmaKit.hbox(12)
 	var learning := _render_learning()
 	learning.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -73,6 +75,34 @@ func _render_header() -> void:
 	header.add_child(SmaKit.button(I18n.t("dashboard.openAcademy"),
 		_go_academy, true))
 	_body.add_child(header)
+
+
+func _render_opening_gap() -> Control:
+	var card := SmaKit.card(14)
+	var content := SmaKit.vbox(8)
+	card.add_child(content)
+	content.add_child(SmaKit.title(I18n.t("gap.title"), 19))
+	_add_intro_text(content, I18n.t("gap.dashboardHint"))
+	var state: Dictionary = game.opening_gap
+	var label := "gap.start"
+	if not state.is_empty():
+		var attempts: Array = state["attempts"]
+		var last: Dictionary = attempts.back()
+		label = "gap.resume"
+		if last["stage"] == SmaOpeningGap.Stage.REVIEWED or (attempts.size() == 2 \
+				and last["stage"] == SmaOpeningGap.Stage.CLOSED):
+			label = "gap.viewResults"
+	var actions := SmaKit.flow(8)
+	var button := SmaKit.button(I18n.t(label), func():
+		var main := get_tree().get_first_node_in_group("main") as SmaMain
+		if main != null:
+			main.navigate("opening_gap"), true)
+	button.name = "OpeningGapEntry"
+	button.focus_mode = Control.FOCUS_ALL
+	button.disabled = game.is_story_paused() or game.is_fast_forwarding()
+	actions.add_child(button)
+	content.add_child(actions)
+	return card
 
 
 func _render_intro() -> Control:

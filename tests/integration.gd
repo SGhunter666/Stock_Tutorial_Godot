@@ -1,5 +1,7 @@
 extends Node
 
+const GapStage := SmaOpeningGap.Stage
+
 ## Headless integration smoke test. Runs the real main scene with autoloads,
 ## starts a game, trades, navigates every screen, saves, loads and quits.
 
@@ -40,6 +42,9 @@ func _ready() -> void:
 		failures.append("story choice did not set the path flag")
 	if main._current_screen != "dashboard" or not Game.has_intro_task():
 		failures.append("opening did not lead to today's task")
+	main.navigate("opening_gap")
+	if main._current_screen == "opening_gap" or Game.opening_gap_active:
+		failures.append("opening-gap chapter unlocked before the first review")
 	main._screens["dashboard"]._open_intro_trade()
 	if main._current_screen != "trade" or Game.selected_ticker != "APLA":
 		failures.append("first task did not open the APLA ticket")
@@ -843,6 +848,7 @@ func _ready() -> void:
 		failures.append("close review did not complete the task")
 	if Game.intro["review"].get("exitOutcome") != "notTriggered":
 		failures.append("close review did not keep the player's exit assessment")
+	await _check_opening_gap(main, failures)
 	main.navigate("portfolio")
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -1057,3 +1063,122 @@ func _ready() -> void:
 		SmaSaveService.clear(Game.save_path)
 		Game.save_path = SmaSaveService.SAVE_PATH
 		get_tree().quit(1)
+
+
+func _check_opening_gap(main: SmaMain, failures: Array[String]) -> void:
+	# Earlier checks can leave several queued story scenes after the close.
+	for line in 128:
+		if not Game.narrative.is_active():
+			break
+		if Game.narrative.current_view().get("type") == "choice":
+			Game.narrative.choose(0)
+		else:
+			Game.narrative.advance()
+	var legacy := SmaSaveService.read(Game.save_path)
+	legacy.erase("openingGap")
+	if Game._decode_save(legacy).is_empty():
+		failures.append("a completed beta-02.1 save could not unlock the new chapter")
+	main.navigate("dashboard")
+	var entry := main.find_child("OpeningGapEntry", true, false) as Button
+	if entry == null or entry.disabled or entry.focus_mode != Control.FOCUS_ALL:
+		failures.append("dashboard did not offer a keyboard-accessible assessment entry")
+		return
+	Game.set_paused(false)
+	var career: Dictionary = JSON.parse_string(JSON.stringify(Game.exchange.to_dict()))
+	entry = main.find_child("OpeningGapEntry", true, false) as Button
+	entry.pressed.emit()
+	if not Game.opening_gap_active or main._current_screen != "opening_gap":
+		failures.append("opening-gap entry did not navigate to the chapter")
+		return
+	Game._process(3.0)
+	Game.step_minute()
+	if JSON.parse_string(JSON.stringify(Game.exchange.to_dict())) != career or main._topbar.visible:
+		failures.append("the chapter did not suspend the career clock and controls")
+	main.navigate("dashboard")
+	if Game.paused or Game.opening_gap_active:
+		failures.append("leaving the chapter did not preserve the running clock")
+	Game.set_paused(true)
+	main.navigate("opening_gap")
+	if not Game.apply_opening_gap(0, GapStage.BRIEFING, "advance") \
+			or not _resume_gap(main, GapStage.OPEN):
+		failures.append("opening quotes could not be resumed")
+		return
+
+	var saved_path := Game.save_path
+	Game.save_path = saved_path.path_join("invalid-slot.json")
+	var failed_order := Game.apply_opening_gap(0, GapStage.OPEN, "confirm", "buy")
+	Game.save_path = saved_path
+	if failed_order or Game.opening_gap["attempts"][0]["stage"] != GapStage.OPEN:
+		failures.append("a failed write consumed the opening decision")
+	var screen: SmaOpeningGapScreen = main._screens["opening_gap"]
+	var buy := screen.find_child("Choice_buy", true, false) as Button
+	var confirm := screen.find_child("ConfirmDecision", true, false) as Button
+	if buy == null or confirm == null or confirm.visible or buy.focus_mode != Control.FOCUS_ALL:
+		failures.append("opening decision controls did not render correctly")
+		return
+	buy.button_pressed = true
+	buy.pressed.emit()
+	if not confirm.visible or confirm.focus_mode != Control.FOCUS_ALL:
+		failures.append("the preview did not enable keyboard confirmation")
+	confirm.pressed.emit()
+	if Game.apply_opening_gap(0, GapStage.OPEN, "confirm", "sell") \
+			or not _resume_gap(main, GapStage.DECIDED):
+		failures.append("confirmed decision was not persisted exactly once")
+		return
+	if not Game.apply_opening_gap(0, GapStage.DECIDED, "advance") \
+			or not _resume_gap(main, GapStage.INTRADAY) \
+			or not Game.apply_opening_gap(0, GapStage.INTRADAY, "advance") \
+			or not _resume_gap(main, GapStage.CLOSED):
+		failures.append("the intraday or close reveal could not be resumed")
+		return
+	var review := main.find_child("Reflection", true, false) as LineEdit
+	var outcome := main.find_child("ExitOutcome", true, false) as OptionButton
+	if review == null or outcome == null:
+		failures.append("the closing reflection or exit-condition assessment was not displayed")
+		return
+	outcome.select(1)
+	review.text = "Adding at the open used more cash and crossed my risk budget."
+	review.text_submitted.emit(review.text)
+	if not SmaOpeningGap.is_complete(Game.opening_gap) \
+			or not Game.apply_opening_gap(0, GapStage.REVIEWED, "compare") \
+			or not Game.apply_opening_gap(1, GapStage.BRIEFING, "advance") \
+			or not Game.apply_opening_gap(1, GapStage.OPEN, "confirm", "hold") \
+			or not Game.apply_opening_gap(1, GapStage.DECIDED, "advance") \
+			or not Game.apply_opening_gap(1, GapStage.INTRADAY, "advance") \
+			or not _resume_gap(main, GapStage.CLOSED):
+		failures.append("the comparison was not playable or persisted")
+		return
+	if Game.opening_gap["attempts"][0]["action"] != "buy" \
+			or Game.opening_gap["attempts"][0]["exitOutcome"] != "triggered" \
+			or Game.opening_gap["attempts"][1]["action"] != "hold" \
+			or JSON.parse_string(JSON.stringify(Game.exchange.to_dict())) != career:
+		failures.append("the comparison changed the first result or the career account")
+	await _check_gap_layout(main, failures)
+	main.navigate("dashboard")
+
+
+func _resume_gap(main: SmaMain, expected: int) -> bool:
+	if not Game.load_game() or Game.opening_gap.is_empty():
+		return false
+	main.navigate("opening_gap")
+	return Game.opening_gap_active and Game.opening_gap["attempts"].back()["stage"] == expected
+
+
+func _check_gap_layout(main: SmaMain, failures: Array[String]) -> void:
+	var window := get_window()
+	var original_size := window.size
+	var original_scale := window.content_scale_factor
+	var original_locale: String = I18n.locale
+	for locale in ["zh_CN", "en"]:
+		I18n.set_locale(locale)
+		for resolution in [Vector2i(1280, 800), Vector2i(1920, 1200), Vector2i(2560, 1600)]:
+			window.size = resolution
+			window.content_scale_factor = SmaDisplay.resolve_ui_scale("1.25", resolution)
+			for frame in 3:
+				await get_tree().process_frame
+			var screen: SmaOpeningGapScreen = main._screens["opening_gap"]
+			if screen._splits.size() != 2 or screen._body.get_global_rect().end.x > screen.get_global_rect().end.x + 1.0:
+				failures.append("comparison layout clips at %s (%s)" % [resolution, locale])
+	window.size = original_size
+	window.content_scale_factor = original_scale
+	I18n.set_locale(original_locale)

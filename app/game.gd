@@ -43,6 +43,8 @@ var quant: Dictionary = SmaQuant.default_config()
 var fund: Dictionary = SmaFund.create_state()
 var alerts: Dictionary = SmaAlerts.create_state()
 var intro: Dictionary = {}
+var opening_gap: Dictionary = {}
+var opening_gap_active := false
 var started := false
 var paused := true
 var speed := 1
@@ -81,7 +83,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if not started or exchange == null:
+	if not started or exchange == null or opening_gap_active:
 		return
 	if _fast_forward_active:
 		_process_fast_forward()
@@ -122,6 +124,8 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	fund = SmaFund.create_state()
 	alerts = SmaAlerts.create_state()
 	intro = {"plan": {}, "receipt": {}, "review": {}, "complete": false}
+	opening_gap = {}
+	opening_gap_active = false
 	narrative = SmaStoryService.new()
 	narrative.setup(self)
 	narrative.load_content()
@@ -288,6 +292,50 @@ func finish_intro_review() -> void:
 	state_changed.emit("intro")
 
 
+func opening_gap_unlocked() -> bool:
+	return started and not sandbox_mode and bool(intro.get("complete", false))
+
+
+func enter_opening_gap() -> bool:
+	if not opening_gap_unlocked() or _story_pause or _fast_forward_active:
+		return false
+	if opening_gap.is_empty():
+		var plan: Dictionary = intro["plan"]
+		var next := SmaOpeningGap.start(str(plan.get("exitRule", "")))
+		if next.is_empty():
+			toast_requested.emit(I18n.t("gap.unavailable"))
+			return false
+		if not _save_opening_gap(next):
+			return false
+	opening_gap_active = true
+	return true
+
+
+func leave_opening_gap() -> void:
+	opening_gap_active = false
+
+
+func apply_opening_gap(index: int, stage: int, event: String, value: String = "",
+		outcome: String = "unrecorded") -> bool:
+	if not opening_gap_active:
+		return false
+	var next := SmaOpeningGap.transition(opening_gap, index, stage, event, value, outcome)
+	if next.is_empty() or not _save_opening_gap(next):
+		return false
+	state_changed.emit("opening_gap")
+	return true
+
+
+func _save_opening_gap(next: Dictionary) -> bool:
+	var previous := opening_gap
+	opening_gap = next
+	if save_game(false):
+		return true
+	opening_gap = previous
+	toast_requested.emit(I18n.t("toast.saveFailed"))
+	return false
+
+
 func set_intro_exit_outcome(value: String) -> void:
 	if not has_intro_task() or intro["review"].is_empty() or intro["plan"].is_empty():
 		return
@@ -408,7 +456,7 @@ func _check_price_alerts() -> void:
 
 
 func set_speed(next_speed: int) -> void:
-	if not SPEEDS.has(next_speed):
+	if opening_gap_active or not SPEEDS.has(next_speed):
 		return
 	speed = next_speed
 	settings["speed"] = next_speed
@@ -515,21 +563,21 @@ func _apply_ui_scale(window: Window, window_size: Vector2i) -> void:
 
 
 func toggle_pause() -> void:
-	if not started or _story_pause or _fast_forward_active:
+	if not started or opening_gap_active or _story_pause or _fast_forward_active:
 		return
 	paused = not paused
 	state_changed.emit("clock")
 
 
 func set_paused(value: bool) -> void:
-	if not started:
+	if not started or opening_gap_active:
 		return
 	paused = value
 	state_changed.emit("clock")
 
 
 func step_minute() -> void:
-	if not started or _story_pause or exchange == null or _fast_forward_active:
+	if not started or opening_gap_active or _story_pause or exchange == null or _fast_forward_active:
 		return
 	paused = true
 	_advance_steps(60)
@@ -538,7 +586,7 @@ func step_minute() -> void:
 
 
 func step_day() -> void:
-	if not started or _story_pause or exchange == null or _fast_forward_active:
+	if not started or opening_gap_active or _story_pause or exchange == null or _fast_forward_active:
 		return
 	paused = true
 	_fast_forward_total = maxi(1, SmaExchange.SESSION_SECONDS - int(exchange.state["second"]))
@@ -2157,6 +2205,8 @@ func start_sandbox(cash: float, seed_value: String, difficulty: String) -> Dicti
 		"difficulty": safe_difficulty, "commission": commission}
 	sandbox_mode = true
 	intro = {}
+	opening_gap = {}
+	opening_gap_active = false
 	exchange = SmaExchange.new(safe_seed, safe_cash, commission)
 	academy = SmaAcademy.create_state()
 	history = SmaHistoryService.new()
@@ -2272,6 +2322,7 @@ func save_game(manual: bool = true) -> bool:
 		"fund": fund,
 		"alerts": alerts,
 		"intro": intro,
+		"openingGap": opening_gap,
 	}
 	var ok := _write_save(payload)
 	if ok:
@@ -2309,7 +2360,7 @@ func _decode_save(payload: Dictionary) -> Dictionary:
 			or typeof(payload.get("exchange")) != TYPE_DICTIONARY:
 		return {}
 	for key in ["settings", "academy", "challenges", "career", "quant", "fund",
-			"alerts", "history", "narrative", "intro"]:
+			"alerts", "history", "narrative", "intro", "openingGap"]:
 		if typeof(payload.get(key, {})) != TYPE_DICTIONARY:
 			return {}
 	var saved_story: Dictionary = payload.get("narrative", {})
@@ -2328,6 +2379,10 @@ func _decode_save(payload: Dictionary) -> Dictionary:
 		for key in ["plan", "receipt", "review"]:
 			if typeof(saved_intro.get(key)) != TYPE_DICTIONARY:
 				return {}
+	var saved_gap: Dictionary = payload.get("openingGap", {})
+	if not SmaOpeningGap.is_valid(saved_gap) \
+			or (not saved_gap.is_empty() and not bool(saved_intro.get("complete", false))):
+		return {}
 	for key in ["flags", "seen"]:
 		if typeof(saved_story.get(key, {})) != TYPE_DICTIONARY:
 			return {}
@@ -2371,6 +2426,7 @@ func _decode_save(payload: Dictionary) -> Dictionary:
 		"fund": SmaFund.normalize_state(payload.get("fund", {}), saved_day, String(engine.state["seed"])),
 		"alerts": SmaAlerts.normalize_state(payload.get("alerts", {})),
 		"intro": saved_intro,
+		"openingGap": saved_gap,
 		"settings": saved_settings, "selectedTicker": payload.get("selectedTicker", INTRO_TICKER),
 	}
 
@@ -2384,6 +2440,8 @@ func _apply_loaded_save(loaded: Dictionary) -> void:
 	fund = loaded["fund"]
 	alerts = loaded["alerts"]
 	intro = loaded["intro"]
+	opening_gap = loaded["openingGap"]
+	opening_gap_active = false
 	history = loaded["history"]
 	narrative = loaded["narrative"]
 	_connect_narrative()

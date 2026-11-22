@@ -2,7 +2,7 @@
 
 一个使用 **Godot 4** 开发的单机金融教学与交易模拟游戏。玩家从个人投资者起步，在确定性的模拟市场中学习交易、风控、期权、期货、多资产、量化、基金管理和职业决策，并在一段完整的职场剧情中从学徒成长为基金掌舵人。
 
-- 当前版本：`beta-02.1`
+- 当前版本：`beta-03`
 - 引擎：Godot `4.7+`（已在 `4.7.2` 测试）
 - 渲染：GL Compatibility
 - 语言：简体中文 / English
@@ -11,6 +11,8 @@
 - 原始项目：<https://github.com/SGhunter666/STOCK_Tutorial>
 
 在 [GitHub Releases](https://github.com/SGhunter666/Stock_Tutorial_Godot/releases) 查看公开发布的 Windows 版本。下载 ZIP 后解压，再双击游戏程序。
+
+完成首笔交易的收盘复盘后，在仪表盘进入《跳空开盘》。使用独立训练账户完成开盘决策和收盘复盘，再用相同的行情试一次不同的行动。
 
 > **免责声明**
 >
@@ -159,7 +161,7 @@ macOS 如果使用官方应用包：
 已导出的版本位于：
 
 ```text
-build/windows/StockMarketAcademy_beta-02.1.exe
+build/windows/StockMarketAcademy_beta-03.exe
 ```
 
 该目录在 `.gitignore` 中，不会提交到 Git。
@@ -610,21 +612,21 @@ macOS 官方应用包示例：
 导出预设名称：`Windows Desktop`
 
 ```bash
-godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-02.1.exe
+godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-03.exe
 ```
 
 macOS 官方应用包：
 
 ```bash
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . \
-  --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-02.1.exe
+  --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-03.exe
 ```
 
 注意事项：
 
 - 需要先在 Godot 中安装 Windows 导出模板。
 - `build/` 已加入 `.gitignore`，不会提交到仓库。
-- 当前版本号来自 `project.godot` 的 `config/version = "beta-02.1"`。
+- 当前版本号来自 `project.godot` 的 `config/version = "beta-03"`。
 - 导出文件约 122 MB。
 
 ---
@@ -768,6 +770,6 @@ macOS 官方应用包：
 
 ---
 
-- **版本**：`beta-02.1`
+- **版本**：`beta-03`
 - **引擎**：Godot 4.7+
 - **语言**：简体中文 / English

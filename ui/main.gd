@@ -45,6 +45,7 @@ var _more_nav_button: Button
 var _more_nav_open := false
 var _current_screen := "market"
 var _screen_host: Control
+var _topbar: Control
 var _sidebar: Control
 var _nav_menu: MenuButton
 var _speed_box: HBoxContainer
@@ -140,7 +141,8 @@ func _build_ui() -> void:
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_theme_constant_override("separation", 0)
 	add_child(root)
-	root.add_child(_build_topbar())
+	_topbar = _build_topbar()
+	root.add_child(_topbar)
 
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -280,7 +282,8 @@ func _sync_compact_layout() -> void:
 	if _sidebar == null:
 		return
 	var compact := size.x < COMPACT_WIDTH
-	_sidebar.visible = not compact
+	_topbar.visible = not Game.opening_gap_active
+	_sidebar.visible = not compact and not Game.opening_gap_active
 	_nav_menu.visible = compact
 	_speed_box.visible = not compact
 	_speed_picker.visible = compact
@@ -352,6 +355,7 @@ func _vertical_divider() -> Control:
 func _build_screens() -> void:
 	_screens.clear()
 	_screens["dashboard"] = SmaDashboardScreen.new()
+	_screens["opening_gap"] = SmaOpeningGapScreen.new()
 	_screens["market"] = SmaMarketScreen.new()
 	_screens["watchlist"] = SmaWatchlistScreen.new()
 	_screens["screener"] = SmaScreenerScreen.new()
@@ -416,6 +420,11 @@ func _build_toast() -> void:
 func navigate(screen_id: String, force: bool = false) -> void:
 	if not _screens.has(screen_id):
 		return
+	if screen_id == "opening_gap":
+		if not Game.enter_opening_gap():
+			return
+	elif Game.opening_gap_active:
+		Game.leave_opening_gap()
 	_current_screen = screen_id
 	var navigation := _nav_menu.get_popup()
 	for index in NAV_ITEMS.size():
@@ -431,6 +440,7 @@ func navigate(screen_id: String, force: bool = false) -> void:
 		screen.setup(Game)
 	else:
 		screen.refresh("nav")
+	_sync_compact_layout()
 
 
 func open_ticker(ticker: String, screen_id: String = "trade") -> void:
@@ -485,7 +495,7 @@ func _on_game_loaded() -> void:
 		_start_overlay.visible = false
 	# A save carries its own theme and layout, so rebuild before showing it.
 	_build_ui()
-	navigate("dashboard" if Game.has_intro_task() else "market")
+	navigate("dashboard" if Game.has_intro_task() or Game.opening_gap_unlocked() else "market")
 
 
 func _build_fast_forward_overlay() -> void:
@@ -763,7 +773,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _shortcuts_blocked() -> bool:
-	if not Game.started:
+	if not Game.started or Game.opening_gap_active:
 		return true
 	if _start_overlay != null and _start_overlay.visible:
 		return true
