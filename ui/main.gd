@@ -637,9 +637,15 @@ func _toggle_language() -> void:
 
 func _on_locale_changed(_locale: String) -> void:
 	var start_visible := _start_overlay != null and _start_overlay.visible
+	var previous := _screens.get(_current_screen) as SmaScreen
+	var draft := previous.capture_draft() if previous != null and not start_visible else {}
 	_build_ui()
 	if not Game.started or start_visible:
 		_show_start_overlay()
+	elif not draft.is_empty():
+		var current := _screens.get(_current_screen) as SmaScreen
+		if current != null:
+			current.restore_draft(draft)
 
 
 func _on_layout_changed() -> void:

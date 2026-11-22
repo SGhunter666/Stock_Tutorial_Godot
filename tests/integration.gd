@@ -156,6 +156,7 @@ func _ready() -> void:
 		failures.append("market star did not remove from watchlist")
 	main.navigate("trade")
 	await get_tree().process_frame
+	_check_trade_language_draft(main, failures)
 
 	main.navigate("academy")
 	await get_tree().process_frame
@@ -1065,6 +1066,29 @@ func _ready() -> void:
 		get_tree().quit(1)
 
 
+func _check_trade_language_draft(main: SmaMain, failures: Array[String]) -> void:
+	var ticket: SmaTradeScreen = main._screens["trade"]
+	var original := ticket.capture_draft()
+	var locale: String = I18n.locale
+	ticket._on_side("sell")
+	ticket._on_type("stop")
+	# Leave the edits in the LineEdits, as when the player switches without pressing Enter.
+	ticket._qty.get_line_edit().text = "27"
+	ticket._stop_price.get_line_edit().text = "41.25"
+	I18n.toggle()
+	ticket = main._screens["trade"]
+	var side := ticket._side_group.get_pressed_button()
+	var order_type := ticket._type_group.get_pressed_button()
+	if ticket._qty.value != 27 or ticket._stop_price.value != 41.25 \
+			or side == null or side.text != I18n.t("trade.sell") \
+			or order_type == null or order_type.text != I18n.t("trade.stop") \
+			or not ticket._stop_row.visible:
+		failures.append("language switch discarded the trade order draft")
+	I18n.set_locale(locale)
+	ticket = main._screens["trade"]
+	ticket.restore_draft(original)
+
+
 func _check_opening_gap(main: SmaMain, failures: Array[String]) -> void:
 	# Earlier checks can leave several queued story scenes after the close.
 	for line in 128:
@@ -1120,6 +1144,14 @@ func _check_opening_gap(main: SmaMain, failures: Array[String]) -> void:
 	buy.pressed.emit()
 	if not confirm.visible or confirm.focus_mode != Control.FOCUS_ALL:
 		failures.append("the preview did not enable keyboard confirmation")
+	I18n.toggle()
+	screen = main._screens["opening_gap"]
+	buy = screen.find_child("Choice_buy", true, false) as Button
+	confirm = screen.find_child("ConfirmDecision", true, false) as Button
+	if buy == null or not buy.button_pressed or confirm == null or not confirm.visible \
+			or Game.opening_gap["attempts"][0]["stage"] != GapStage.OPEN:
+		failures.append("language switch discarded or submitted the opening decision draft")
+		return
 	confirm.pressed.emit()
 	if Game.apply_opening_gap(0, GapStage.OPEN, "confirm", "sell") \
 			or not _resume_gap(main, GapStage.DECIDED):
@@ -1137,7 +1169,16 @@ func _check_opening_gap(main: SmaMain, failures: Array[String]) -> void:
 		failures.append("the closing reflection or exit-condition assessment was not displayed")
 		return
 	outcome.select(1)
-	review.text = "Adding at the open used more cash and crossed my risk budget."
+	var draft_text := "Adding at the open used more cash and crossed my risk budget."
+	review.text = draft_text
+	I18n.toggle()
+	review = main.find_child("Reflection", true, false) as LineEdit
+	outcome = main.find_child("ExitOutcome", true, false) as OptionButton
+	var submit_review := main.find_child("SaveReflection", true, false) as Button
+	if review == null or review.text != draft_text or outcome == null or outcome.selected != 1 \
+			or submit_review == null or submit_review.disabled:
+		failures.append("language switch discarded the opening-gap review draft")
+		return
 	review.text_submitted.emit(review.text)
 	if not SmaOpeningGap.is_complete(Game.opening_gap) \
 			or not Game.apply_opening_gap(0, GapStage.REVIEWED, "compare") \

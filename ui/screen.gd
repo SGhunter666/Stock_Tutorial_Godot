@@ -27,3 +27,12 @@ func refresh(_reason: String = "") -> void:
 
 func on_tick() -> void:
 	pass
+
+
+## Optional transient form state for a language-driven rebuild of the screen.
+func capture_draft() -> Dictionary:
+	return {}
+
+
+func restore_draft(_draft: Dictionary) -> void:
+	pass

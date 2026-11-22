@@ -12,6 +12,9 @@ var _body: VBoxContainer
 var _scroll: ScrollContainer
 var _splits: Array[BoxContainer] = []
 var _focus: Control
+var _choice_group: ButtonGroup
+var _reflection: LineEdit
+var _exit_outcome: OptionButton
 var _index := 0
 var _stage := Stage.BRIEFING
 
@@ -27,27 +30,52 @@ func _build() -> void:
 
 
 func refresh(_reason: String = "") -> void:
+	_render(capture_draft())
+
+
+func capture_draft() -> Dictionary:
+	if _choice_group != null:
+		var chosen := _choice_group.get_pressed_button()
+		if chosen != null:
+			return {"index": _index, "stage": _stage, "action": chosen.get_meta("action")}
+	if is_instance_valid(_reflection):
+		return {"index": _index, "stage": _stage, "text": _reflection.text,
+			"caret": _reflection.caret_column,
+			"outcome": _exit_outcome.selected if is_instance_valid(_exit_outcome) else 0}
+	return {}
+
+
+func restore_draft(draft: Dictionary) -> void:
+	_render(draft)
+
+
+func _render(draft: Dictionary) -> void:
 	if not built or not visible or not game.opening_gap_active:
 		return
 	_splits.clear()
 	_focus = null
+	_choice_group = null
+	_reflection = null
+	_exit_outcome = null
 	SmaKit.clear_children(_body)
 	var state: Dictionary = game.opening_gap
 	var attempts: Array = state["attempts"]
 	_index = attempts.size() - 1
 	var attempt: Dictionary = attempts[_index]
 	_stage = int(attempt["stage"])
+	if draft.get("index") != _index or draft.get("stage") != _stage:
+		draft = {}
 	var account := SmaOpeningGap.snapshot(attempt)
 	_add_header(account)
 	var split := _columns(_body)
 	_add_market(split, account)
 	var card := _card(split)
 	if _stage == Stage.OPEN:
-		_add_decisions(card, state, attempt, account)
+		_add_decisions(card, state, attempt, account, draft.get("action", ""))
 	elif _stage < Stage.CLOSED:
 		_add_advance(card, state, account)
 	elif _index == 0 and _stage == Stage.CLOSED:
-		_add_review(card, state)
+		_add_review(card, state, draft)
 	elif _index == 0:
 		card.add_child(SmaKit.title(I18n.t("gap.compare"), 16))
 		_add_text(card, I18n.t("gap.compareHint"))
@@ -138,7 +166,8 @@ func _add_advance(parent: VBoxContainer, state: Dictionary, account: Dictionary)
 		_focus = _action(parent, "gap.advanceIntraday" if _stage == Stage.DECIDED else "gap.advanceClose", "advance")
 
 
-func _add_decisions(parent: VBoxContainer, state: Dictionary, attempt: Dictionary, account: Dictionary) -> void:
+func _add_decisions(parent: VBoxContainer, state: Dictionary, attempt: Dictionary,
+		account: Dictionary, selected: String) -> void:
 	parent.add_child(SmaKit.title(I18n.t("gap.decide"), 16))
 	_add_text(parent, I18n.t("gap.decideHint"))
 	_add_exit_rule(parent, state["exitRule"])
@@ -147,29 +176,36 @@ func _add_decisions(parent: VBoxContainer, state: Dictionary, attempt: Dictionar
 	var details := SmaKit.vbox(4)
 	parent.add_child(details)
 	var group := ButtonGroup.new()
+	_choice_group = group
 	var index := _index
 	var confirm := _button(parent, I18n.t("gap.confirm"), func():
 		var chosen := group.get_pressed_button()
 		if chosen != null:
 			game.apply_opening_gap(index, Stage.OPEN, "confirm", chosen.get_meta("action")), true)
 	confirm.hide()
+	var preview := func(action: String):
+		SmaKit.clear_children(details)
+		var order := SmaOpeningGap.preview(attempt, action)
+		_add_execution(details, order, action)
+		_add_text(details, I18n.t("gap.afterOrder", {"cash": _money(order["cash"]), "shares": order["shares"]}))
+		confirm.show()
 	for action in SmaOpeningGap.available_actions(state):
 		var quantity: int = account["startingShares"] if action == "hold" else account["orderShares"]
-		var button := _button(choices, I18n.t("gap.action.%s" % action, {"qty": quantity}), func():
-			SmaKit.clear_children(details)
-			var order := SmaOpeningGap.preview(attempt, action)
-			_add_execution(details, order, action)
-			_add_text(details, I18n.t("gap.afterOrder", {"cash": _money(order["cash"]), "shares": order["shares"]}))
-			confirm.show())
+		var button := _button(choices, I18n.t("gap.action.%s" % action, {"qty": quantity}), preview.bind(action))
 		button.name = "Choice_%s" % action
 		button.toggle_mode = true
 		button.button_group = group
 		button.set_meta("action", action)
+		if action == selected:
+			button.set_pressed_no_signal(true)
+			preview.call(action)
+			_focus = button
 	confirm.name = "ConfirmDecision"
-	_focus = choices.get_child(0) as Control
+	if _focus == null:
+		_focus = choices.get_child(0) as Control
 
 
-func _add_review(parent: VBoxContainer, state: Dictionary) -> void:
+func _add_review(parent: VBoxContainer, state: Dictionary, draft: Dictionary) -> void:
 	parent.add_child(SmaKit.title(I18n.t("gap.review"), 16))
 	_add_text(parent, I18n.t("gap.reviewHint"))
 	_add_exit_rule(parent, state["exitRule"])
@@ -177,7 +213,10 @@ func _add_review(parent: VBoxContainer, state: Dictionary) -> void:
 	reflection.name = "Reflection"
 	reflection.placeholder_text = I18n.t("gap.reflection")
 	reflection.max_length = SmaOpeningGap.REVIEW_LIMIT
+	reflection.text = draft.get("text", "")
+	reflection.caret_column = draft.get("caret", 0)
 	parent.add_child(reflection)
+	_reflection = reflection
 	var outcomes: OptionButton
 	if state["exitRule"] != "":
 		parent.add_child(SmaKit.caption(I18n.t("intro.exitCheck")))
@@ -185,13 +224,15 @@ func _add_review(parent: VBoxContainer, state: Dictionary) -> void:
 		outcomes.name = "ExitOutcome"
 		for outcome in SmaOpeningGap.EXIT_OUTCOMES:
 			outcomes.add_item(I18n.t(EXIT_LABELS[outcome]))
+		outcomes.select(draft.get("outcome", 0))
 		parent.add_child(outcomes)
+		_exit_outcome = outcomes
 	var submit := func():
 		var outcome := "unrecorded" if outcomes == null else String(SmaOpeningGap.EXIT_OUTCOMES[outcomes.selected])
 		game.apply_opening_gap(0, Stage.CLOSED, "review", reflection.text, outcome)
 	var save := _button(parent, I18n.t("gap.saveReview"), submit, true)
 	save.name = "SaveReflection"
-	save.disabled = true
+	save.disabled = reflection.text.strip_edges().is_empty()
 	reflection.text_changed.connect(func(value): save.disabled = value.strip_edges().is_empty())
 	reflection.text_submitted.connect(func(value):
 		if not value.strip_edges().is_empty():

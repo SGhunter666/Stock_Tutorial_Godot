@@ -545,6 +545,46 @@ func on_tick() -> void:
 	refresh()
 
 
+func capture_draft() -> Dictionary:
+	if not game.started or _ticket_ticker.is_empty():
+		return {}
+	var values: Array = []
+	for field in _draft_fields(not _oco_key.is_empty()):
+		values.append([field.value, field.get_line_edit().text])
+	return {"ticker": _ticket_ticker, "side": _side, "type": _order_type,
+		"ocoKey": _oco_key, "values": values}
+
+
+func restore_draft(draft: Dictionary) -> void:
+	if draft.get("ticker") != _ticket_ticker or not draft.has("values"):
+		return
+	var side: String = draft["side"]
+	var order_type: String = draft["type"]
+	if order_type == "limit" and _limit_type_button.disabled:
+		order_type = "market"
+	for button in _side_group.get_buttons():
+		button.set_pressed_no_signal(button.text == I18n.t("trade.%s" % side))
+	for button in _type_group.get_buttons():
+		button.set_pressed_no_signal(button.text == I18n.t("trade.%s" % order_type))
+	_on_side(side)
+	_on_type(order_type)
+	var fields := _draft_fields(not _oco_key.is_empty() and draft["ocoKey"] == _oco_key)
+	var values: Array = draft["values"]
+	for index in fields.size():
+		var field := fields[index]
+		field.set_value_no_signal(values[index][0])
+		field.get_line_edit().text = values[index][1]
+		field.apply()
+	_update_estimate()
+
+
+func _draft_fields(include_oco: bool) -> Array[SpinBox]:
+	var fields: Array[SpinBox] = [_qty, _limit, _stop_price, _trail_pct]
+	if include_oco:
+		fields.append_array([_oco_qty, _oco_tp, _oco_stop])
+	return fields
+
+
 func _set_empty(empty: bool) -> void:
 	var hint: Control = get_node_or_null("EmptyHint")
 	for child in get_children():
