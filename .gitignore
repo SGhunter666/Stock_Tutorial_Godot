@@ -1,5 +1,6 @@
 .godot/
 build/
 .trae/
+.trae-html-share-packages/
 .DS_Store
 *.tmp
