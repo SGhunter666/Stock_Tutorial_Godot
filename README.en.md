@@ -2,7 +2,7 @@
 
 A single-player financial education and trading simulation built with **Godot 4**. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-03`
+- Version: `beta-03.1`
 - Engine: Godot `4.7+` (tested on `4.7.2`)
 - Renderer: GL Compatibility
 - Languages: Simplified Chinese / English
@@ -140,7 +140,7 @@ New careers begin with Today’s Task on the dashboard. Write an optional trade 
 ### Windows build
 
 ```text
-build/windows/StockMarketAcademy_beta-03.exe
+build/windows/StockMarketAcademy_beta-03.1.exe
 ```
 
 `build/` is ignored by Git.
@@ -502,12 +502,12 @@ macOS app bundle:
 Preset name: `Windows Desktop`
 
 ```bash
-godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-03.exe
+godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-03.1.exe
 ```
 
 - Windows export templates must be installed.
 - `build/` is ignored by Git.
-- Version comes from `project.godot` (`beta-03`).
+- Version comes from `project.godot` (`beta-03.1`).
 - The exported executable is about 122 MB.
 
 ---
@@ -608,6 +608,6 @@ This project is released under the [MIT License](LICENSE).
 
 ---
 
-- **Version:** `beta-03`
+- **Version:** `beta-03.1`
 - **Engine:** Godot 4.7+
 - **Languages:** Simplified Chinese / English
