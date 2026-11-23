@@ -128,9 +128,12 @@ func _draw() -> void:
 	for value in vma:
 		if not is_nan(float(value)):
 			max_volume = maxf(max_volume, float(value))
+	var body_width := maxf(1.5, _slot * 0.62)
+	if timeframe == "1m":
+		body_width = minf(body_width, 24.0)
 	_draw_grid()
-	_draw_volume(max_volume)
-	_draw_candles()
+	_draw_volume(max_volume, body_width)
+	_draw_candles(body_width)
 	_draw_ma_lines(ma_series, start)
 	_draw_vma(vma, start, max_volume)
 	_draw_cost_lines()
@@ -170,8 +173,7 @@ func _draw_grid() -> void:
 			Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.32), 1.0)
 
 
-func _draw_volume(max_volume: float) -> void:
-	var body_width := maxf(1.5, _slot * 0.62)
+func _draw_volume(max_volume: float, body_width: float) -> void:
 	for index in _visible.size():
 		var bar: Dictionary = _visible[index]
 		var color := SmaUiTheme.POSITIVE if float(bar["c"]) >= float(bar["o"]) \
@@ -185,8 +187,7 @@ func _draw_volume(max_volume: float) -> void:
 		Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.45), 1.0)
 
 
-func _draw_candles() -> void:
-	var body_width := maxf(1.5, _slot * 0.62)
+func _draw_candles(body_width: float) -> void:
 	for index in _visible.size():
 		var bar: Dictionary = _visible[index]
 		var open_price := float(bar["o"])
@@ -380,8 +381,9 @@ func _draw_metric(x: float, y: float, label: String, value: String, color: Color
 
 
 func _draw_time_axis() -> void:
-	for step in 4:
-		var ratio := float(step) / 3.0
+	var labels := mini(4, _visible.size())
+	for step in labels:
+		var ratio := float(step) / float(maxi(1, labels - 1))
 		var index := int(round(ratio * float(_visible.size() - 1)))
 		var bar: Dictionary = _visible[index]
 		var label := _label_for(bar)
@@ -389,7 +391,7 @@ func _draw_time_axis() -> void:
 		if step == 0:
 			draw_string(_font, Vector2(_left, size.y - 6), label,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 10, SmaUiTheme.DIM)
-		elif step == 3:
+		elif step == labels - 1:
 			draw_string(_font, Vector2(_left, size.y - 6), label,
 				HORIZONTAL_ALIGNMENT_RIGHT, _right - _left, 10, SmaUiTheme.DIM)
 		else:

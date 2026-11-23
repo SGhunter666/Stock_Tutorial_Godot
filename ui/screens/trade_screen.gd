@@ -638,6 +638,9 @@ func _update_chart(ticker: String) -> void:
 	var candles: Array = game.exchange.get_candles(ticker, _timeframe)
 	_start_chart.visible = candles.is_empty()
 	var title := "%s · %s" % [ticker, _timeframe]
+	if _timeframe == "1m":
+		var second := int(game.exchange.state["second"]) % 60
+		title += " · " + I18n.t("chart.nextMinute", {"seconds": 60 - second})
 	_chart.set_candles(candles, _timeframe, title)
 	var account: Dictionary = game.exchange.state["account"]
 	var markers: Array = []

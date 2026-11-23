@@ -328,6 +328,7 @@
   "challenges.yes": "是",
   "chart.candles": "K 线",
   "chart.no_data": "暂无行情数据",
+  "chart.nextMinute": "距下一根 {seconds} 秒",
   "clock.day": "第 {day} 个交易日",
   "clock.nextDay": "快进到下一交易日",
   "clock.pause": "暂停",

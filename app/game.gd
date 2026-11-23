@@ -91,17 +91,17 @@ func _process(delta: float) -> void:
 	if paused or _story_pause:
 		return
 	_accum += delta * float(speed)
+	_ui_accum += delta
+	_autosave_accum += delta
 	var steps := int(_accum)
 	if steps <= 0:
 		return
 	_accum -= float(steps)
 	_accum = minf(_accum, float(MAX_STEPS_PER_FRAME))
 	_advance_steps(mini(steps, MAX_STEPS_PER_FRAME))
-	_ui_accum += delta
 	if _ui_accum >= 0.08:
 		_ui_accum = 0.0
 		tick.emit()
-	_autosave_accum += delta
 	if _autosave_accum >= AUTOSAVE_SECONDS:
 		_autosave_accum = 0.0
 		save_game(false)
@@ -135,7 +135,7 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	speed = 1
 	settings["speed"] = 1
 	settings["locale"] = I18n.locale
-	settings["chartTimeframe"] = "1D"
+	settings["chartTimeframe"] = "1m"
 	selected_ticker = INTRO_TICKER
 	_last_day = 0
 	_last_call_id = ""

@@ -1324,7 +1324,8 @@ func get_candles(ticker: String, timeframe: String = "1m") -> Array:
 	var cs: Dictionary = state["companies"].get(ticker.to_upper(), {})
 	if cs.is_empty():
 		return []
-	return SmaMinuteSeries.candles(cs["series"], timeframe, SmaCalendar.iso_date(int(state["dayIndex"])))
+	return SmaMinuteSeries.candles(cs["series"], timeframe, _date_text(),
+		int(state["second"]), float(cs["open"]))
 
 
 func get_book(ticker: String, level_count: int = 6) -> Dictionary:

@@ -1,5 +1,5 @@
-## One-minute OHLCV aggregation. Bars only contain real simulated trades; missing
-## minutes are never filled with invented volume, and no future bar is exposed.
+## Trade-based OHLCV aggregation. The 1m display carries the last traded price
+## through quiet minutes with zero volume and exposes only elapsed minutes.
 class_name SmaMinuteSeries
 extends RefCounted
 
@@ -188,14 +188,36 @@ static func _aggregate_daily(daily: Array, key_of: Callable) -> Array:
 	return result
 
 
-static func candles(series: Dictionary, timeframe: String, date: String) -> Array:
+static func _live_minutes(bars: Array, date: String, second: int, opening_price: float) -> Array:
+	var active_minute := minute_index_for_second(second)
+	var result: Array = []
+	var trade_index := 0
+	var reference := opening_price
+	for minute in range(active_minute + 1):
+		var partial := minute == active_minute
+		if trade_index < bars.size() and int(bars[trade_index]["minute"]) == minute:
+			var bar := _base_candle(bars[trade_index], {"partial": partial})
+			reference = float(bar["c"])
+			result.append(bar)
+			trade_index += 1
+		else:
+			result.append({
+				"d": date, "end": date, "time": _clock_text(9 * 60 + 30 + minute),
+				"o": reference, "h": reference, "l": reference, "c": reference,
+				"v": 0, "trades": 0, "partial": partial,
+			})
+	return result
+
+
+static func candles(series: Dictionary, timeframe: String, date: String,
+		second: int, opening_price: float) -> Array:
 	var bars: Array = []
 	bars.append_array(series.get("intraday", []))
 	var current: Variant = series.get("current", null)
 	if current != null:
 		bars.append(current)
 	if timeframe == "1m":
-		return bars.map(func(bar): return _base_candle(bar))
+		return _live_minutes(bars, date, second, opening_price)
 	if INTRADAY_TIMEFRAMES.has(timeframe):
 		return _aggregate_intraday(bars, int(_TIMEFRAME_MINUTES[timeframe]))
 	var daily: Array = series.get("daily", []).duplicate(true)

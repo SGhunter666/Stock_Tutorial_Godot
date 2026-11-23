@@ -328,6 +328,7 @@
   "challenges.yes": "Yes",
   "chart.candles": "Candles",
   "chart.no_data": "No market data yet",
+  "chart.nextMinute": "Next candle in {seconds}s",
   "clock.day": "Trading day {day}",
   "clock.nextDay": "Fast-forward to next session",
   "clock.pause": "Pause",

@@ -48,6 +48,9 @@ func _ready() -> void:
 	main._screens["dashboard"]._open_intro_trade()
 	if main._current_screen != "trade" or Game.selected_ticker != "APLA":
 		failures.append("first task did not open the APLA ticket")
+	var first_chart: SmaCandleChart = main._screens["trade"]._chart
+	if first_chart.timeframe != "1m" or first_chart.candles.size() != 1:
+		failures.append("new careers do not open with a live 1m candle")
 	if not Game.set_intro_plan("Check the spread", "Exit below the morning range", 100.0):
 		failures.append("trade plan did not save before the fill")
 
@@ -1052,6 +1055,8 @@ func _ready() -> void:
 		window.content_scale_factor = original_scale
 		I18n.set_locale(original_locale)
 
+	_check_live_trade_clock(main, failures)
+
 	if failures.is_empty():
 		print("INTEGRATION OK equity=%.2f day=%d stories=%d" % [
 			Game.get_equity(), Game.get_day(), Game.narrative.stories.size()])
@@ -1064,6 +1069,35 @@ func _ready() -> void:
 		SmaSaveService.clear(Game.save_path)
 		Game.save_path = SmaSaveService.SAVE_PATH
 		get_tree().quit(1)
+
+
+func _check_live_trade_clock(main: SmaMain, failures: Array[String]) -> void:
+	main.navigate("trade")
+	Game.set_chart_timeframe("1m")
+	Game.set_speed(1)
+	Game.set_paused(false)
+	Game._accum = 0.0
+	var original_second := int(Game.exchange.state["second"])
+	var remaining := mini(62, SmaExchange.SESSION_SECONDS - 1 - original_second)
+	var chart: SmaCandleChart = main._screens["trade"]._chart
+	for elapsed in range(1, remaining + 1):
+		for frame in 16:
+			Game._process(1.0 / 16.0)
+		var second := original_second + elapsed
+		if int(Game.exchange.state["second"]) != second \
+				or main._clock_label.text != SmaCalendar.session_clock(second):
+			failures.append("1× clock did not display simulated second %d" % second)
+			break
+		var expected_bars := SmaMinuteSeries.minute_index_for_second(second) + 1
+		if chart.candles.size() != expected_bars \
+				or not chart.title_text.ends_with(I18n.t("chart.nextMinute", {"seconds": 60 - second % 60})):
+			failures.append("1m chart went out of sync at simulated second %d" % second)
+			break
+	Game.set_paused(true)
+	var paused_time := main._clock_label.text
+	Game._process(2.0)
+	if main._clock_label.text != paused_time:
+		failures.append("pausing did not freeze the live clock")
 
 
 func _check_trade_language_draft(main: SmaMain, failures: Array[String]) -> void:

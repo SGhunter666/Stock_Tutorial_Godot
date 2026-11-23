@@ -129,6 +129,10 @@ func run() -> void:
 	approx(float(clock_exchange.state["companies"]["APLA"]["prevClose"]),
 		float(clock_exchange.state["companies"]["APLA"]["last"]), 0.0001,
 		"previous close resets to the last price")
+	var next_session := clock_exchange.get_candles("APLA", "1m")
+	eq(next_session.size(), 1, "new session starts with one candle")
+	eq(next_session[0]["time"], "09:30", "next session restarts the minute chart")
+	_check_live_minutes()
 
 	describe("exchange-margin")
 	var snapshot := SmaMargin.margin_snapshot(clock_exchange.state)
@@ -150,3 +154,31 @@ func run() -> void:
 	if not dividend_rows.is_empty():
 		check(float(dividend_rows[0]["amount"]) > 0.0, "dividend amount is positive")
 		eq(String(dividend_rows[0]["ticker"]), "APLA", "dividend attributed to the holding")
+
+
+func _check_live_minutes() -> void:
+	describe("live-one-minute-chart")
+	var series := SmaMinuteSeries.create()
+	var date := SmaCalendar.iso_date(0)
+	var bars := SmaMinuteSeries.candles(series, "1m", date, 0, 100.0)
+	eq(bars.size(), 1, "opening price is available before the first trade")
+	check(bars[0]["partial"] and bars[0]["c"] == 100.0 and bars[0]["v"] == 0,
+		"first candle starts flat with zero volume")
+	SmaMinuteSeries.apply_trade(series, {"date": date, "second": 4, "price": 104.0, "qty": 5})
+	SmaMinuteSeries.apply_trade(series, {"date": date, "second": 59, "price": 98.0, "qty": 2})
+	bars = SmaMinuteSeries.candles(series, "1m", date, 59, 100.0)
+	eq(bars.size(), 1, "elapsed seconds update the same candle")
+	check(bars[0]["o"] == 104.0 and bars[0]["h"] == 104.0 and bars[0]["l"] == 98.0
+		and bars[0]["c"] == 98.0 and bars[0]["v"] == 7, "minute OHLCV derives from real simulated fills")
+	bars = SmaMinuteSeries.candles(series, "1m", date, 60, 100.0)
+	eq(bars.size(), 2, "minute boundary creates exactly one new candle without a fill")
+	check(not bars[0]["partial"] and bars[1]["partial"] and bars[1]["time"] == "09:31"
+		and bars[1]["c"] == 98.0 and bars[1]["v"] == 0, "only the newest candle remains open")
+	var previous: Dictionary = bars[0]
+	SmaMinuteSeries.apply_trade(series, {"date": date, "second": 65, "price": 101.0, "qty": 3})
+	bars = SmaMinuteSeries.candles(series, "1m", date, 65, 100.0)
+	eq(bars[0], previous, "a new-minute trade leaves the previous candle intact")
+	check(bars[1]["c"] == 101.0 and bars[1]["v"] == 3, "trade updates only its own minute")
+	bars = SmaMinuteSeries.candles(series, "1m", date, 180, 100.0)
+	check(bars.size() == 4 and bars[2]["time"] == "09:32" and bars[2]["v"] == 0
+		and not bars[2]["partial"] and bars[3]["partial"], "quiet minutes follow the clock without fake volume")
