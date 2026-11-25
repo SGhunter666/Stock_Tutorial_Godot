@@ -1,12 +1,12 @@
 # Stock Market Academy / 远望交易学院
 
-一个使用 **Godot 4** 开发的单机金融教学与交易模拟游戏。玩家从个人投资者起步，在确定性的模拟市场中学习交易、风控、期权、期货、多资产、量化、基金管理和职业决策，并在一段完整的职场剧情中从学徒成长为基金掌舵人。
+一个使用 **Godot 4** 开发的 **16-Bit 经典像素风**单机金融教学与交易模拟游戏。融合「开罗式动态像素交易室」与「PC-98 复古 CRT 交易终端」，内置 16-bit FM 芯片音乐合成器、可点击互动像素大厅与阶梯像素 K 线图。玩家从个人投资者起步，在确定性的模拟市场中学习交易、风控、期权、期货、多资产、量化、基金管理和职业决策，并在一段完整的职场剧情中从学徒成长为基金掌舵人。
 
-- 当前版本：`beta-07`
+- 当前版本：`beta-11`（100% Full 16-Bit Pixel Edition）
 - 引擎：Godot `4.7+`（已在 `4.7.2` 测试）
-- 渲染：GL Compatibility
+- 渲染：GL Compatibility（全局整数像素倍率与 `NEAREST` 采样）
 - 语言：简体中文 / English
-- 平台：Windows（已导出）、macOS / Linux 可从源码运行
+- 平台：Windows / macOS（内置双平台导出预设）、Linux 可从源码运行
 - 仓库：<https://github.com/SGhunter666/Stock_Tutorial_Godot>
 - 原始项目：<https://github.com/SGhunter666/STOCK_Tutorial>
 
@@ -63,13 +63,25 @@
 
 ## 界面预览
 
-### 行情与行业热力图
+### 交易台（开罗橡木桌 × CRT 阶梯像素均线 · 默认 A+B 融合）
+
+![交易台](docs/screenshots/trade.png)
+
+### 开罗暖阳羊皮纸像素配色（纯 B 风）
+
+![开罗暖阳羊皮纸像素配色](docs/screenshots/kairosoft_light.png)
+
+### 仪表盘与可点击互动像素交易室
+
+![仪表盘](docs/screenshots/dashboard.png)
+
+### 行情大厅与行业热力图
 
 ![行情与行业热力图](docs/screenshots/market.png)
 
-### 交易台
+### 投资组合与 Bayer 抖动 CRT 净值曲线
 
-![交易台](docs/screenshots/trade.png)
+![投资组合](docs/screenshots/portfolio.png)
 
 ### 自选与提醒
 
@@ -528,13 +540,14 @@ build/windows/StockMarketAcademy_beta-03.1.exe
 ### 20. 设置
 
 - 语言：简体中文 / English。
-- 主题：深色 / 浅色。
-- 布局：新手 / 高级（高级布局显示更多指标）。
+- 像素主题配色：开罗木桌 × 终端像素（默认 A+B 融合）/ 开罗暖阳羊皮纸像素（纯 B 风）/ PC-98 暗夜像素终端（纯 A 风）。
+- 涨跌色板：国际（绿涨红跌）/ 中文 A 股（红涨绿跌）/ 色盲友好（蓝涨橙跌）。
+- 布局：新手 / 高级（高级布局采用紧凑间距并默认展开全部分组）。
 - 显示模式：窗口 / 全屏。
 - 窗口预设：`1280x720`、`1280x800`、`1366x768`、`1440x900`、`1600x900`、`1680x1050`、`1920x1080`、`1920x1200`、`2560x1440`、`2560x1600`、自动。
 - UI 缩放：自动 / `1.0` / `1.1` / `1.25`。
-- 音频：主音量、音乐音量、音效音量、静音。
-- 存档导出 / 导入（JSON 文件）。
+- 音频：主音量、16-bit FM 芯片音乐音量、音效音量、静音。
+- 多职业存档槽（1–4 槽独立切换）与 JSON 导出 / 导入。
 
 ---
 
@@ -571,7 +584,7 @@ godot --headless --path . --script res://tests/run_tests.gd
 期望输出类似：
 
 ```text
-ALL TESTS PASSED (30169 checks)
+ALL TESTS PASSED (31788 checks)
 ```
 
 ### 集成测试
@@ -607,27 +620,25 @@ macOS 官方应用包示例：
 
 ---
 
-## 导出 Windows 版本
+## 导出 Windows 与 macOS 版本
 
-导出预设名称：`Windows Desktop`
-
-```bash
-godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-03.1.exe
-```
-
-macOS 官方应用包：
+仓库已在 `export_presets.cfg` 中内置 **`Windows Desktop`** 与 **`macOS`** 双平台导出预设（像素图标均已锁定无损最近邻插值 `icon_interpolation = 0`）：
 
 ```bash
+# 导出 Windows 独立单文件 EXE
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . \
-  --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-03.1.exe
+  --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-11.exe
+
+# 导出 macOS Universal (.app 压缩包)
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . \
+  --export-release "macOS" build/macos/StockMarketAcademy_beta-11.zip
 ```
 
 注意事项：
 
-- 需要先在 Godot 中安装 Windows 导出模板。
+- 需要先在 Godot 中安装对应版本的导出模板（`4.7.2.stable`）。
 - `build/` 已加入 `.gitignore`，不会提交到仓库。
-- 当前版本号来自 `project.godot` 的 `config/version = "beta-03.1"`。
-- 导出文件约 122 MB。
+- 当前版本号来自 `project.godot` 的 `config/version = "beta-11"`。
 
 ---
 
@@ -660,7 +671,7 @@ macOS 官方应用包：
 │   ├── order_book.gd / margin.gd / indicators.gd
 │   └── ...
 ├── data/
-│   ├── companies.json      # 50 家公司
+│   ├── companies.json      # 57 家公司
 │   ├── academy/curriculum.json
 │   ├── stories/            # manifest、triggers、characters、16 段剧情
 │   └── history/            # catalog 与 4 个真实日线场景
@@ -752,13 +763,14 @@ macOS 官方应用包：
 - ETF 净值在交易日收盘时更新，盘中不做逐秒重估；ETF 价格提醒会在日切触发。
 - 价格提醒每 10 个模拟秒检查一次，不是逐 tick 检查。
 - 税务实验室仅覆盖英国 2026/27 教学估算，不构成税务建议。
-- 存档为本地单槽 JSON；切换设备需要手动导出/导入。
+- 存档为本地 4 槽位 JSON；切换设备可手动导出/导入。
 
 ---
 
-## 许可证
+## 许可证与第三方致谢
 
-本项目使用 [MIT License](LICENSE)。
+- **项目源码与原创像素资产**：采用 [MIT License](LICENSE)。
+- **内置点阵字体**：采用 TakWolf 开源的 [Fusion Pixel Font（缝合像素字体）](https://github.com/TakWolf/fusion-pixel-font)（`10px` 与 `12px` 比例简体中文版），遵循 [SIL Open Font License 1.1](assets/fonts/OFL.txt)。
 
 ---
 
@@ -770,6 +782,6 @@ macOS 官方应用包：
 
 ---
 
-- **版本**：`beta-03.1`
+- **版本**：`beta-11`
 - **引擎**：Godot 4.7+
 - **语言**：简体中文 / English

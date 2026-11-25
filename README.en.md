@@ -1,12 +1,12 @@
 # Stock Market Academy
 
-A single-player financial education and trading simulation built with **Godot 4**. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
+A single-player **16-bit pixel-art** financial education and trading simulation built with **Godot 4** — fusing an interactive Kairosoft-inspired pixel trading floor with a crisp PC-98 CRT terminal, procedural 16-bit FM chiptune music, stepped pixel indicator curves, and segmented LED order-book depth. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-07`
+- Version: `beta-11` (100% Full 16-Bit Pixel Edition)
 - Engine: Godot `4.7+` (tested on `4.7.2`)
-- Renderer: GL Compatibility
+- Renderer: GL Compatibility (integer bitmap font scaling & `NEAREST` filtering)
 - Languages: Simplified Chinese / English
-- Platforms: Windows (exported), macOS / Linux from source
+- Platforms: Windows & macOS (export presets included), Linux from source
 - Repository: <https://github.com/SGhunter666/Stock_Tutorial_Godot>
 - Original project: <https://github.com/SGhunter666/STOCK_Tutorial>
 
@@ -44,23 +44,35 @@ The default seed is `academy-2026` and the default starting cash is **USD 100,00
 
 ## Screenshots
 
-### Market and sector heatmap
-
-![Market and sector heatmap](docs/screenshots/market.png)
-
-### Trading desk
+### Trading Desk (Kairosoft Oak Desk × CRT Pixel Hybrid — Default Style A+B)
 
 ![Trading desk](docs/screenshots/trade.png)
 
-### Watchlist and alerts
+### Kairosoft Warm Cream Parchment Pixel Palette (Style B)
+
+![Kairosoft Warm Cream Pixel Palette](docs/screenshots/kairosoft_light.png)
+
+### Dashboard & Interactive Pixel Trading Floor
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Market Board & Sector Heatmap
+
+![Market and sector heatmap](docs/screenshots/market.png)
+
+### Portfolio & Bayer-Dithered CRT Equity Curve
+
+![Portfolio](docs/screenshots/portfolio.png)
+
+### Watchlist & Price Alerts
 
 ![Watchlist and alerts](docs/screenshots/watchlist.png)
 
-### Stock screener
+### Stock Screener
 
 ![Stock screener](docs/screenshots/screener.png)
 
-### Earnings center
+### Earnings Center
 
 ![Earnings center](docs/screenshots/earnings.png)
 
@@ -424,13 +436,14 @@ Features: backtest, parameter optimization, factor research, regression and mach
 ### Settings
 
 - Language: Simplified Chinese / English.
-- Theme: dark / light.
+- Pixel Palette: Kairosoft Desk × CRT Pixel (A+B default) / Kairosoft Warm Cream Pixel (Style B) / PC-98 Midnight Pixel (Style A).
+- Color scheme: International (green up / red down), China A-share (red up / green down), or Colorblind-friendly (blue / orange).
 - Layout: beginner / advanced.
 - Display mode: windowed / fullscreen.
 - Window presets: `1280x720`, `1280x800`, `1366x768`, `1440x900`, `1600x900`, `1680x1050`, `1920x1080`, `1920x1200`, `2560x1440`, `2560x1600`, automatic.
 - UI scale: auto / `1.0` / `1.1` / `1.25`.
-- Audio: master, music, SFX and mute.
-- Save export/import as JSON.
+- Audio: master, 16-bit FM music, SFX and mute.
+- 4 independent career save slots & JSON export/import.
 
 ---
 
@@ -465,7 +478,7 @@ godot --headless --path . --script res://tests/run_tests.gd
 Expected output:
 
 ```text
-ALL TESTS PASSED (30169 checks)
+ALL TESTS PASSED (31788 checks)
 ```
 
 ### Integration test
@@ -497,18 +510,18 @@ macOS app bundle:
 
 ---
 
-## Export Windows Build
+## Export Windows & macOS Builds
 
-Preset name: `Windows Desktop`
+Presets `Windows Desktop` and `macOS` are configured in `export_presets.cfg` with nearest-neighbor pixel icon scaling (`icon_interpolation = 0`):
 
 ```bash
-godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-03.1.exe
+godot --headless --path . --export-release "Windows Desktop" build/windows/StockMarketAcademy_beta-11.exe
+godot --headless --path . --export-release "macOS" build/macos/StockMarketAcademy_beta-11.zip
 ```
 
-- Windows export templates must be installed.
+- Godot `4.7.2.stable` export templates must be installed.
 - `build/` is ignored by Git.
-- Version comes from `project.godot` (`beta-03.1`).
-- The exported executable is about 122 MB.
+- Version comes from `project.godot` (`beta-11`).
 
 ---
 
@@ -590,13 +603,14 @@ Code layers:
 - ETF NAV updates at session close; ETF alerts fire at the close.
 - Price alerts are checked every 10 simulated seconds, not every tick.
 - The tax lab covers UK 2026/27 estimates only.
-- Saves are local single-slot JSON; use export/import to move them.
+- Saves are local 4-slot JSON files; use export/import to move them between machines.
 
 ---
 
-## License
+## License & Credits
 
-This project is released under the [MIT License](LICENSE).
+- **Source code & original pixel assets:** [MIT License](LICENSE).
+- **Bundled bitmap fonts:** [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font) (`10px` & `12px` proportional Simplified Chinese) by TakWolf, licensed under the [SIL Open Font License 1.1](assets/fonts/OFL.txt).
 
 ---
 
@@ -608,6 +622,6 @@ This project is released under the [MIT License](LICENSE).
 
 ---
 
-- **Version:** `beta-03.1`
+- **Version:** `beta-11`
 - **Engine:** Godot 4.7+
 - **Languages:** Simplified Chinese / English

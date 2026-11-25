@@ -666,6 +666,20 @@ func _capture_beta10_showcase() -> void:
 	await _settle(5)
 	await _shot("beta11_dashboard_desk")
 
+	Game.toggle_watch("APLA")
+	Game.toggle_watch("NVDO")
+	var alert_px := float(Game.exchange.quote("APLA").get("last", 180.0))
+	Game.add_price_alert("APLA", "above", SmaFormat.round_to(alert_px * 1.03, 2))
+	main.navigate("watchlist")
+	await _settle(5)
+	await _shot("beta11_watchlist_desk")
+	main.navigate("screener")
+	await _settle(5)
+	await _shot("beta11_screener_desk")
+	main.navigate("earnings")
+	await _settle(5)
+	await _shot("beta11_earnings_desk")
+
 	Game.exchange.state["account"]["equityHistory"] = [
 		{"day": 0, "equity": 100000.0},
 		{"day": 1, "equity": 100640.0},
