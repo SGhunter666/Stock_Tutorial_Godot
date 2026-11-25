@@ -90,8 +90,29 @@ func run() -> void:
 	var account := {"cash": 1000.0, "careerIncome": 0.0}
 	var salary := SmaCareer.apply_salary(account, career, 63)
 	eq(bool(salary.get("paid", false)), true, "salary due after the interval")
-	approx(float(account["cash"]), 1200.0, 0.01, "salary credited")
+	approx(float(account["cash"]), 1500.0, 0.01, "recalibrated salary credited")
 	eq(int(career["salaryPaidDay"]), 21, "salary day advances")
+
+	describe("career-equity-recalibration")
+	var rank2 := SmaCareer.create_state(0)
+	rank2["rank"] = 2
+	var flat_progress := SmaCareer.progress(rank2, _make_context(_academy(["u8"]), 100000.0))
+	eq(bool(flat_progress["ready"]), false, "starting 100k equity does not satisfy rank 2 equity target")
+	var pass_progress := SmaCareer.progress(rank2, _make_context(_academy(["u8"]), 103000.0))
+	eq(bool(pass_progress["ready"]), true, "103k equity satisfies rank 2 equity target")
+	var rank6 := SmaCareer.create_state(0)
+	rank6["rank"] = 6
+	var r6_low := SmaCareer.progress(rank6, _make_context(_academy(["u32"]), 110000.0))
+	var r6_eq_done := false
+	for req in r6_low["requirements"]:
+		if String(req.get("kind", "")) == "equity":
+			r6_eq_done = bool(req.get("done", false))
+	eq(r6_eq_done, false, "110k equity does not satisfy rank 6 125k equity target")
+	var r6_high := SmaCareer.progress(rank6, _make_context(_academy(["u32"]), 125000.0))
+	for req in r6_high["requirements"]:
+		if String(req.get("kind", "")) == "equity":
+			r6_eq_done = bool(req.get("done", false))
+	eq(r6_eq_done, true, "125k equity satisfies rank 6 equity target")
 
 	describe("career-certificates")
 	var cert_academy := _academy(["u1", "u2", "u3", "u4"])

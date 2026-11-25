@@ -34,15 +34,61 @@ const NAV_ITEMS := [
 	["settings", "nav.settings"],
 	["story", "nav.story"],
 ]
+const NAV_GROUPS := [
+	{"id": "overview", "titleKey": "nav.group.overview", "items": [
+		["dashboard", "nav.dashboard"],
+		["portfolio", "nav.portfolio"],
+		["watchlist", "nav.watchlist"],
+	]},
+	{"id": "research", "titleKey": "nav.group.research", "items": [
+		["market", "nav.market"],
+		["screener", "nav.screener"],
+		["earnings", "nav.earnings"],
+		["statements", "statements.title"],
+		["news", "nav.news"],
+		["macro", "nav.macro"],
+	]},
+	{"id": "execution", "titleKey": "nav.group.execution", "items": [
+		["trade", "nav.trade"],
+		["etf", "nav.etf"],
+		["options", "nav.options"],
+		["futures", "nav.futures"],
+		["multiasset", "nav.multiasset"],
+	]},
+	{"id": "growth", "titleKey": "nav.group.growth", "items": [
+		["academy", "nav.academy"],
+		["story", "nav.story"],
+		["challenges", "nav.challenges"],
+		["career", "nav.career"],
+	]},
+	{"id": "fund_lab", "titleKey": "nav.group.fundLab", "items": [
+		["fund", "nav.fund"],
+		["quant", "nav.quant"],
+		["history", "nav.history"],
+		["replay", "nav.replay"],
+		["tax", "nav.tax"],
+		["sandbox", "nav.sandbox"],
+	]},
+	{"id": "system", "titleKey": "nav.group.system", "items": [
+		["glossary", "nav.glossary"],
+		["settings", "nav.settings"],
+		["boundaries", "boundaries.title"],
+		["roadmap", "roadmap.title"],
+	]},
+]
 const CORE_NAV := ["dashboard", "market", "watchlist", "trade", "portfolio", "academy",
 	"story", "settings"]
 const COMPACT_WIDTH := 1360.0
 
 var _screens: Dictionary = {}
 var _nav_buttons: Dictionary = {}
-var _more_nav: VBoxContainer
-var _more_nav_button: Button
-var _more_nav_open := false
+var _group_open: Dictionary = {
+	"overview": true, "research": true, "execution": true,
+	"growth": true, "fund_lab": false, "system": false,
+}
+var _group_boxes: Dictionary = {}
+var _group_headers: Dictionary = {}
+var _screen_group: Dictionary = {}
 var _current_screen := "market"
 var _screen_host: Control
 var _topbar: Control
@@ -96,6 +142,7 @@ func _ready() -> void:
 	Game.career_promoted.connect(func(_rank): _play_sound("promotion"))
 	Game.challenge_finished.connect(func(status, _id):
 		_play_sound("achievement" if status == "completed" else "reject"))
+	Game.price_alert_triggered.connect(func(_count): _play_sound("alert"))
 	Game.game_started.connect(func(): _play_sound("story"))
 	Game.game_loaded.connect(func(): _play_sound("story"))
 	resized.connect(_sync_compact_layout)
@@ -127,6 +174,9 @@ func _build_ui() -> void:
 	_toast_tween = null
 	_help_dialog = null
 	_nav_buttons.clear()
+	_group_boxes.clear()
+	_group_headers.clear()
+	_screen_group.clear()
 	_speed_buttons.clear()
 	_step_buttons.clear()
 	_top_metrics.clear()
@@ -282,8 +332,9 @@ func _sync_compact_layout() -> void:
 	if _sidebar == null:
 		return
 	var compact := size.x < COMPACT_WIDTH
-	_topbar.visible = not Game.opening_gap_active
-	_sidebar.visible = not compact and not Game.opening_gap_active
+	var in_scenario: bool = Game.opening_gap_active or Game.black_friday_active
+	_topbar.visible = not in_scenario
+	_sidebar.visible = not compact and not in_scenario
 	_nav_menu.visible = compact
 	_speed_box.visible = not compact
 	_speed_picker.visible = compact
@@ -297,7 +348,7 @@ func _build_sidebar() -> Control:
 	style.border_width_right = 1
 	style.set_content_margin_all(12)
 	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size.x = 196
+	panel.custom_minimum_size.x = 204
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -310,32 +361,38 @@ func _build_sidebar() -> Control:
 	nav_box.add_theme_constant_override("separation", 4)
 	nav_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nav_scroll.add_child(nav_box)
-	var more_nav := SmaKit.vbox(4)
 	var group := ButtonGroup.new()
-	var beginner_nav: bool = Game.settings.get("layout", "beginner") == "beginner"
-	for entry in NAV_ITEMS:
-		var button := SmaKit.toggle(I18n.t(String(entry[1])), group)
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.custom_minimum_size.y = 32
-		button.pressed.connect(func(): navigate(String(entry[0])))
-		_nav_buttons[String(entry[0])] = button
-		if beginner_nav and not CORE_NAV.has(entry[0]):
-			more_nav.add_child(button)
-		else:
-			nav_box.add_child(button)
-	_more_nav = more_nav
-	_more_nav_button = null
-	if beginner_nav:
-		_more_nav_button = SmaKit.toggle(I18n.t("nav.moreTools"))
-		_more_nav_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		_more_nav_button.custom_minimum_size.y = 32
-		_more_nav_button.button_pressed = _more_nav_open
-		_more_nav_button.toggled.connect(func(expanded: bool):
-			_more_nav_open = expanded
-			_more_nav.visible = expanded)
-		nav_box.add_child(_more_nav_button)
-		more_nav.visible = _more_nav_open
-	nav_box.add_child(more_nav)
+	var advanced_nav: bool = String(Game.settings.get("layout", "beginner")) == "advanced"
+	for section in NAV_GROUPS:
+		var gid := String(section["id"])
+		var expanded := true if advanced_nav else bool(_group_open.get(gid, true))
+		_group_open[gid] = expanded
+		var header := Button.new()
+		header.flat = true
+		header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		header.add_theme_font_size_override("font_size", 11)
+		header.add_theme_color_override("font_color", SmaUiTheme.DIM)
+		header.text = "%s %s" % ["▾" if expanded else "▸", I18n.t(String(section["titleKey"]))]
+		var items_box := SmaKit.vbox(3)
+		items_box.visible = expanded
+		header.pressed.connect(func():
+			var next := not bool(_group_open.get(gid, true))
+			_group_open[gid] = next
+			items_box.visible = next
+			header.text = "%s %s" % ["▾" if next else "▸", I18n.t(String(section["titleKey"]))])
+		nav_box.add_child(header)
+		nav_box.add_child(items_box)
+		_group_headers[gid] = header
+		_group_boxes[gid] = items_box
+		for entry in section["items"]:
+			var screen_id := String(entry[0])
+			_screen_group[screen_id] = gid
+			var button := SmaKit.toggle(I18n.t(String(entry[1])), group)
+			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			button.custom_minimum_size.y = 30
+			button.pressed.connect(func(): navigate(screen_id))
+			_nav_buttons[screen_id] = button
+			items_box.add_child(button)
 	_story_badge = SmaKit.caption("")
 	nav_box.add_child(_story_badge)
 	var disclaimer := SmaKit.caption(I18n.t("app.disclaimer"))
@@ -356,6 +413,7 @@ func _build_screens() -> void:
 	_screens.clear()
 	_screens["dashboard"] = SmaDashboardScreen.new()
 	_screens["opening_gap"] = SmaOpeningGapScreen.new()
+	_screens["black_friday"] = SmaBlackFridayScreen.new()
 	_screens["market"] = SmaMarketScreen.new()
 	_screens["watchlist"] = SmaWatchlistScreen.new()
 	_screens["screener"] = SmaScreenerScreen.new()
@@ -425,12 +483,25 @@ func navigate(screen_id: String, force: bool = false) -> void:
 			return
 	elif Game.opening_gap_active:
 		Game.leave_opening_gap()
+	if screen_id == "black_friday":
+		if not Game.enter_black_friday():
+			return
+		_play_sound("crisis_alarm")
+	elif Game.black_friday_active:
+		Game.leave_black_friday()
 	_current_screen = screen_id
 	var navigation := _nav_menu.get_popup()
 	for index in NAV_ITEMS.size():
 		navigation.set_item_checked(index, NAV_ITEMS[index][0] == screen_id)
-	if _more_nav_button != null and not CORE_NAV.has(screen_id):
-		_more_nav_button.button_pressed = true
+	var gid := String(_screen_group.get(screen_id, ""))
+	if gid != "" and _group_boxes.has(gid) and not bool(_group_open.get(gid, false)):
+		_group_open[gid] = true
+		_group_boxes[gid].visible = true
+		if _group_headers.has(gid):
+			for section in NAV_GROUPS:
+				if String(section["id"]) == gid:
+					_group_headers[gid].text = "▾ %s" % I18n.t(String(section["titleKey"]))
+					break
 	for id in _screens.keys():
 		_screens[id].visible = id == screen_id
 	for id in _nav_buttons.keys():
@@ -691,6 +762,51 @@ func _show_start_overlay() -> void:
 	box.add_child(SmaKit.muted(I18n.t("start.subtitle"), 14))
 	box.add_child(SmaKit.caption(I18n.t("app.tagline")))
 	box.add_child(SmaKit.separator())
+	var name_row := SmaKit.hbox(8)
+	name_row.add_child(SmaKit.label(I18n.t("start.playerNameLabel"), 12, SmaUiTheme.MUTED))
+	var name_edit := LineEdit.new()
+	name_edit.name = "StartPlayerName"
+	name_edit.placeholder_text = I18n.t("start.playerNamePlaceholder")
+	name_edit.text = String(Game.settings.get("playerName", ""))
+	name_edit.max_length = 24
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_edit.text_changed.connect(func(v: String): Game.settings["playerName"] = v.strip_edges().substr(0, 24))
+	name_row.add_child(name_edit)
+	box.add_child(name_row)
+	var slot_box := SmaKit.vbox(4)
+	slot_box.add_child(SmaKit.caption(I18n.t("start.saveSlotTitle")))
+	var slot_row := SmaKit.hbox(6)
+	var slot_group := ButtonGroup.new()
+	var slot_info := SmaKit.caption("")
+	var refresh_slot_ui := func():
+		var summary := SmaSaveService.slot_summary(Game.active_slot)
+		if bool(summary.get("exists", false)):
+			var pname := String(summary.get("playerName", ""))
+			if pname == "":
+				pname = I18n.t("player.defaultName")
+			slot_info.text = I18n.t("start.slotSummary", {
+				"slot": Game.active_slot, "name": pname,
+				"day": int(summary["day"]) + 1,
+				"equity": SmaFormat.money(float(summary["equity"])),
+				"rank": int(summary["rank"]),
+			})
+		else:
+			slot_info.text = I18n.t("start.slotEmpty", {"slot": Game.active_slot})
+		if _start_continue != null:
+			_start_continue.disabled = not Game.has_save()
+	for slot in range(1, SmaSaveService.SLOT_COUNT + 1):
+		var s_summary := SmaSaveService.slot_summary(slot)
+		var badge := "●" if bool(s_summary.get("exists", false)) else "○"
+		var btn := SmaKit.toggle("%s %s" % [badge, I18n.t("settings.slotLabel", {"slot": slot})], slot_group)
+		btn.button_pressed = slot == Game.active_slot
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.pressed.connect(func():
+			Game.select_save_slot(slot)
+			refresh_slot_ui.call())
+		slot_row.add_child(btn)
+	slot_box.add_child(slot_row)
+	slot_box.add_child(slot_info)
+	box.add_child(slot_box)
 	var new_game := SmaKit.button(I18n.t("start.new_game"), _start_new_game, true)
 	new_game.custom_minimum_size.y = 46
 	box.add_child(new_game)
@@ -698,6 +814,7 @@ func _show_start_overlay() -> void:
 	_start_continue.custom_minimum_size.y = 42
 	_start_continue.disabled = not Game.has_save()
 	box.add_child(_start_continue)
+	refresh_slot_ui.call()
 	if not Game.has_save():
 		box.add_child(SmaKit.caption(I18n.t("start.no_save")))
 	box.add_child(SmaKit.separator())
@@ -705,7 +822,7 @@ func _show_start_overlay() -> void:
 	footer.add_child(SmaKit.caption(I18n.t("start.footer")))
 	footer.add_child(SmaKit.hspacer())
 	footer.add_child(SmaKit.caption(I18n.t("app.version", {
-		"version": String(ProjectSettings.get_setting("application/config/version", "beta-02.1")),
+		"version": String(ProjectSettings.get_setting("application/config/version", "beta-04")),
 	})))
 	footer.add_child(SmaKit.button(I18n.t("start.language"), _toggle_language))
 	box.add_child(footer)
@@ -779,7 +896,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _shortcuts_blocked() -> bool:
-	if not Game.started or Game.opening_gap_active:
+	if not Game.started or Game.opening_gap_active or Game.black_friday_active:
 		return true
 	if _start_overlay != null and _start_overlay.visible:
 		return true

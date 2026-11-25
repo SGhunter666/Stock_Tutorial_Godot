@@ -15,12 +15,15 @@ var _feedback: Label
 var _answers: Dictionary = {}
 var _controls: Dictionary = {}
 var _submitted := false
+var test_out_mode := false
 
 
-func setup(game_ref: Node, target_unit: String, quiz_session: Dictionary) -> void:
+func setup(game_ref: Node, target_unit: String, quiz_session: Dictionary,
+		is_test_out: bool = false) -> void:
 	game = game_ref
 	unit_id = target_unit
 	session = quiz_session
+	test_out_mode = is_test_out
 	_build()
 	render_questions()
 
@@ -42,13 +45,15 @@ func _build() -> void:
 	var root := SmaKit.vbox(12)
 	panel.add_child(root)
 	var header := SmaKit.hbox(12)
-	header.add_child(SmaKit.label(I18n.t("quiz.title"), 20))
+	header.add_child(SmaKit.label(I18n.t("quiz.testOutTitle" if test_out_mode else "quiz.title"), 20))
 	var unit_title := I18n.t(String(SmaAcademy.unit(unit_id).get("titleKey", unit_id)))
 	header.add_child(SmaKit.muted(unit_title, 13))
 	header.add_child(SmaKit.hspacer())
 	header.add_child(SmaKit.button(I18n.t("common.close"), _close))
 	root.add_child(header)
-	root.add_child(SmaKit.muted(I18n.t("quiz.subtitle", {"pass": session.get("passScore", 80)})))
+	var pass_target := SmaAcademy.TEST_OUT_SCORE if test_out_mode else int(session.get("passScore", 80))
+	root.add_child(SmaKit.muted(I18n.t("quiz.testOutSubtitle" if test_out_mode else "quiz.subtitle",
+		{"pass": pass_target})))
 	root.add_child(SmaKit.separator())
 	var scroll := SmaKit.scroll(470)
 	_content = SmaKit.vbox(14)
@@ -173,7 +178,8 @@ func _submit() -> void:
 				return
 			answers[question_id] = _answers[question_id]
 	_submitted = true
-	var outcome: Dictionary = game.academy_submit_quiz(unit_id, session, answers)
+	var outcome: Dictionary = game.academy_submit_test_out(unit_id, session, answers) if test_out_mode \
+		else game.academy_submit_quiz(unit_id, session, answers)
 	_feedback.text = ""
 	_render_result(outcome)
 
@@ -182,12 +188,16 @@ func _render_result(outcome: Dictionary) -> void:
 	SmaKit.clear_children(_content)
 	var grade: Dictionary = outcome.get("grade", {})
 	var passed := bool(grade.get("passed", false))
+	var audio := get_node_or_null("/root/Sfx")
+	if audio != null and audio.has_method("play"):
+		audio.play("quiz_pass" if passed else "quiz_fail")
 	var head := SmaKit.card(14)
 	var head_box := SmaKit.vbox(6)
 	head.add_child(head_box)
 	head_box.add_child(SmaKit.label(I18n.t("quiz.resultsTitle"), 18))
+	var pass_target := SmaAcademy.TEST_OUT_SCORE if test_out_mode else int(session.get("passScore", 80))
 	var params := {"score": grade.get("score", 0), "correct": grade.get("correctCount", 0),
-		"total": grade.get("total", 0), "pass": session.get("passScore", 80)}
+		"total": grade.get("total", 0), "pass": pass_target}
 	head_box.add_child(SmaKit.label(I18n.t("quiz.passedText" if passed else "quiz.failedText", params),
 		13, SmaUiTheme.POSITIVE if passed else SmaUiTheme.WARNING))
 	_content.add_child(head)

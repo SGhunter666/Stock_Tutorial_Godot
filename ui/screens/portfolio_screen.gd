@@ -1,5 +1,5 @@
-## Portfolio: account summary, long/short books and the fill ledger. Rebuilds the
-## tables on state changes and at a low frequency on ticks to avoid layout churn.
+## Portfolio: account summary, equity curve, risk metrics, clickable long/short
+## books, derivatives/multi-asset holdings and fill ledger.
 class_name SmaPortfolioScreen
 extends SmaScreen
 
@@ -8,8 +8,11 @@ const REFRESH_INTERVAL_MS := 350
 var _stat_values: Dictionary = {}
 var _risk_values: Dictionary = {}
 var _risk_level_label: Label
+var _equity_chart: SmaLineChart
+var _equity_meta: Label
 var _long_box: VBoxContainer
 var _short_box: VBoxContainer
+var _other_box: VBoxContainer
 var _fills_box: VBoxContainer
 var _status_label: Label
 var _last_rebuild := 0
@@ -49,6 +52,20 @@ func _build() -> void:
 		grid.add_child(box)
 	content.add_child(stats_card)
 
+	var chart_card := SmaKit.card(12)
+	var chart_box := SmaKit.vbox(6)
+	chart_card.add_child(chart_box)
+	var chart_head := SmaKit.hbox(8)
+	chart_head.add_child(SmaKit.label(I18n.t("portfolio.equityCurve"), 13))
+	chart_head.add_child(SmaKit.hspacer())
+	_equity_meta = SmaKit.caption("")
+	chart_head.add_child(_equity_meta)
+	chart_box.add_child(chart_head)
+	_equity_chart = SmaLineChart.new()
+	_equity_chart.custom_minimum_size = Vector2(320, 140)
+	chart_box.add_child(_equity_chart)
+	content.add_child(chart_card)
+
 	var risk_card := SmaKit.card(12)
 	var risk_box := SmaKit.vbox(5)
 	risk_card.add_child(risk_box)
@@ -85,6 +102,19 @@ func _build() -> void:
 		"portfolio.unrealized"], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], false)
 	content.add_child(short_section["card"])
 	_short_box = short_section["body"]
+
+	var other_card := SmaKit.card(10)
+	var other_wrap := SmaKit.vbox(6)
+	other_card.add_child(other_wrap)
+	var other_head := SmaKit.hbox(8)
+	other_head.add_child(SmaKit.label(I18n.t("portfolio.otherAssets"), 13))
+	other_head.add_child(SmaKit.hspacer())
+	other_head.add_child(SmaKit.caption(I18n.t("portfolio.otherAssetsHint")))
+	other_wrap.add_child(other_head)
+	_other_box = SmaKit.vbox(4)
+	other_wrap.add_child(_other_box)
+	content.add_child(other_card)
+
 	var fills_section := _table_section("portfolio.trades", ["common.day", "market.ticker", "common.side",
 		"common.qty", "common.price", "portfolio.realized"], [0.9, 0.8, 0.9, 0.9, 0.9, 1.2], true)
 	content.add_child(fills_section["card"])
@@ -92,8 +122,8 @@ func _build() -> void:
 
 
 func _table_section(title_key: String, columns: Array, ratios: Array, expand: bool) -> Dictionary:
-	var card := SmaKit.card(0)
-	var box := SmaKit.vbox(0)
+	var card := SmaKit.card(10)
+	var box := SmaKit.vbox(4)
 	card.add_child(box)
 	var head := SmaKit.hbox(8)
 	var title := SmaKit.label(I18n.t(title_key), 13)
@@ -102,7 +132,7 @@ func _table_section(title_key: String, columns: Array, ratios: Array, expand: bo
 	head.add_child(SmaKit.hspacer())
 	box.add_child(head)
 	var header := SmaKit.header_row(columns, ratios)
-	header.custom_minimum_size.y = 26
+	header.custom_minimum_size.y = 24
 	box.add_child(header)
 	var scroll := SmaKit.scroll(140 if expand else 110)
 	var body := SmaKit.vbox(2)
@@ -119,9 +149,11 @@ func refresh(reason: String = "") -> void:
 		return
 	_last_rebuild = Time.get_ticks_msec()
 	_update_stats()
+	_update_equity_curve()
 	_update_risk()
 	_update_long()
 	_update_short()
+	_update_other_assets()
 	_update_fills()
 
 
@@ -133,12 +165,12 @@ func _update_stats() -> void:
 	var exchange: SmaExchange = game.exchange
 	var account: Dictionary = exchange.state["account"]
 	var snapshot := SmaMargin.margin_snapshot(exchange.state)
-	var equity := float(snapshot["equity"])
+	var equity := exchange.equity()
 	var day_start := _day_start_equity()
 	var day_pnl := equity - day_start
 	_stat_values["equity"].text = SmaFormat.money(equity)
 	_stat_values["cash"].text = SmaFormat.money(float(account["cash"]))
-	_stat_values["buying_power"].text = SmaFormat.money(float(snapshot["buyingPower"]))
+	_stat_values["buying_power"].text = SmaFormat.money(game.effective_buying_power())
 	_stat_values["maintenance"].text = SmaFormat.money(float(snapshot["maintenanceExcess"]))
 	_stat_values["realized"].text = SmaFormat.signed_money(float(account["realizedPnl"]))
 	_stat_values["realized"].add_theme_color_override("font_color",
@@ -154,6 +186,32 @@ func _update_stats() -> void:
 		_status_label.add_theme_color_override("font_color", SmaUiTheme.WARNING)
 	else:
 		_status_label.add_theme_color_override("font_color", SmaUiTheme.NEGATIVE)
+
+
+func _update_equity_curve() -> void:
+	if _equity_chart == null:
+		return
+	var account: Dictionary = game.exchange.state["account"]
+	var history: Array = account.get("equityHistory", [])
+	var values: Array = []
+	var start_day := 0
+	for point in history:
+		if values.is_empty():
+			start_day = int(point.get("day", 0))
+		values.append(float(point.get("equity", 0.0)))
+	var current_equity: float = game.get_equity()
+	if values.is_empty():
+		values.append(float(account.get("initialCash", current_equity)))
+	values.append(current_equity)
+	var initial := float(account.get("initialCash", 100000.0))
+	var total_ret := (current_equity / initial - 1.0) * 100.0 if initial > 0.0 else 0.0
+	var line_color := SmaKit.value_color(total_ret) if absf(total_ret) > 0.001 else SmaUiTheme.ACCENT
+	_equity_chart.set_series(values, line_color, "money",
+		SmaCalendar.iso_date(start_day), SmaCalendar.iso_date(game.get_day()))
+	_equity_meta.text = "%s %s · %s %s" % [
+		I18n.t("dashboard.sinceStart"), SmaFormat.pct(total_ret, 2),
+		I18n.t("market.index"), SmaFormat.pct(game.market_index_change(), 2),
+	]
 
 
 func _update_risk() -> void:
@@ -187,6 +245,44 @@ func _day_start_equity() -> float:
 	return value
 
 
+func _clickable_row(inner: Control, callback: Callable) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0)
+	style.set_content_margin_all(4)
+	panel.add_theme_stylebox_override("panel", style)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	panel.mouse_entered.connect(func(): style.bg_color = SmaUiTheme.PANEL_ALT)
+	panel.mouse_exited.connect(func(): style.bg_color = Color(0, 0, 0, 0))
+	panel.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			callback.call())
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(inner)
+	return panel
+
+
+func _open_ticker(ticker: String) -> void:
+	var main := get_tree().get_first_node_in_group("main")
+	if main == null or not main.has_method("navigate"):
+		return
+	if SmaEtfs.is_etf(ticker):
+		game.select_ticker(ticker)
+		main.navigate("etf")
+		if main._screens.has("etf"):
+			main._screens["etf"]._selected = ticker
+			main._screens["etf"].refresh()
+	else:
+		main.open_ticker(ticker)
+
+
+func _open_screen(screen_id: String) -> void:
+	var main := get_tree().get_first_node_in_group("main")
+	if main != null and main.has_method("navigate"):
+		main.navigate(screen_id)
+
+
 func _update_long() -> void:
 	SmaKit.clear_children(_long_box)
 	var rows: Array = game.exchange.position_rows()
@@ -194,8 +290,9 @@ func _update_long() -> void:
 		_long_box.add_child(SmaKit.muted(I18n.t("portfolio.no_positions")))
 		return
 	for row in rows:
-		_long_box.add_child(SmaKit.data_row([
-			String(row["ticker"]), String(row["name"]), SmaFormat.quantity(float(row["qty"])),
+		var ticker := String(row["ticker"])
+		var line := SmaKit.data_row([
+			ticker, String(row["name"]), SmaFormat.quantity(float(row["qty"])),
 			SmaFormat.num(float(row["avgCost"]), 2), SmaFormat.num(float(row["last"]), 2),
 			SmaFormat.money(float(row["marketValue"])), SmaFormat.signed_money(float(row["unrealized"])),
 		], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], [
@@ -203,7 +300,8 @@ func _update_long() -> void:
 			SmaUiTheme.TEXT, SmaUiTheme.TEXT, SmaKit.value_color(float(row["unrealized"])),
 		], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
 			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
-			HORIZONTAL_ALIGNMENT_RIGHT]))
+			HORIZONTAL_ALIGNMENT_RIGHT])
+		_long_box.add_child(_clickable_row(line, _open_ticker.bind(ticker)))
 
 
 func _update_short() -> void:
@@ -213,8 +311,9 @@ func _update_short() -> void:
 		_short_box.add_child(SmaKit.muted(I18n.t("portfolio.no_shorts")))
 		return
 	for row in rows:
-		_short_box.add_child(SmaKit.data_row([
-			String(row["ticker"]), String(row["name"]), SmaFormat.quantity(float(row["qty"])),
+		var ticker := String(row["ticker"])
+		var line := SmaKit.data_row([
+			ticker, String(row["name"]), SmaFormat.quantity(float(row["qty"])),
 			SmaFormat.num(float(row["avgPrice"]), 2), SmaFormat.num(float(row["last"]), 2),
 			SmaFormat.money(float(row["marketValue"])), SmaFormat.signed_money(float(row["unrealized"])),
 		], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], [
@@ -222,7 +321,67 @@ func _update_short() -> void:
 			SmaUiTheme.TEXT, SmaUiTheme.TEXT, SmaKit.value_color(float(row["unrealized"])),
 		], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
 			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
-			HORIZONTAL_ALIGNMENT_RIGHT]))
+			HORIZONTAL_ALIGNMENT_RIGHT])
+		_short_box.add_child(_clickable_row(line, _open_ticker.bind(ticker)))
+
+
+func _update_other_assets() -> void:
+	SmaKit.clear_children(_other_box)
+	var entries: Array = []
+	for opt in game.option_rows():
+		var qty := int(opt.get("qty", 0))
+		var label := "%s %s %s (D%d)" % [
+			String(opt.get("ticker", "")),
+			String(opt.get("type", "")).to_upper(),
+			SmaFormat.num(float(opt.get("strike", 0.0)), 2),
+			int(opt.get("expiryDay", 0)),
+		]
+		entries.append({"cat": I18n.t("nav.options"), "label": label, "qty": "%d" % qty,
+			"value": float(opt.get("marketValue", 0.0)), "pnl": float(opt.get("unrealized", 0.0)),
+			"screen": "options"})
+	for fut in game.futures_rows():
+		var label := "%s %s (D%d)" % [
+			String(fut.get("ticker", "")),
+			String(fut.get("side", "")).to_upper(),
+			int(fut.get("expiryDay", 0)),
+		]
+		entries.append({"cat": I18n.t("nav.futures"), "label": label,
+			"qty": SmaFormat.quantity(float(fut.get("qty", 0))),
+			"value": float(fut.get("notional", fut.get("margin", 0.0))),
+			"pnl": float(fut.get("unrealized", 0.0)), "screen": "futures"})
+	for pair in [
+		[game.bond_rows(), "multiasset.bondValue"],
+		[game.fx_rows(), "multiasset.fxValue"],
+		[game.commodity_rows(), "multiasset.commodityValue"],
+		[game.crypto_rows(), "multiasset.cryptoValue"],
+	]:
+		var cat := I18n.t(String(pair[1]))
+		for row in pair[0]:
+			entries.append({"cat": cat,
+				"label": String(row.get("name", row.get("id", row.get("pair", "")))),
+				"qty": SmaFormat.num(float(row.get("qty", row.get("units", 0.0))), 2),
+				"value": float(row.get("value", 0.0)),
+				"pnl": float(row.get("pnl", 0.0)), "screen": "multiasset"})
+	if entries.is_empty():
+		_other_box.add_child(SmaKit.muted(I18n.t("portfolio.noOtherAssets"), 11))
+		return
+	_other_box.add_child(SmaKit.header_row(
+		["portfolio.assetClass", "portfolio.instrument", "common.qty",
+			"portfolio.market_value", "portfolio.unrealized"],
+		[0.9, 1.8, 0.7, 1.0, 1.0],
+		[HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
+			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT]))
+	for item in entries:
+		var pnl := float(item["pnl"])
+		var line := SmaKit.data_row([
+			String(item["cat"]), String(item["label"]), String(item["qty"]),
+			SmaFormat.money(float(item["value"])), SmaFormat.signed_money(pnl),
+		], [0.9, 1.8, 0.7, 1.0, 1.0], [
+			SmaUiTheme.ACCENT, SmaUiTheme.TEXT, SmaUiTheme.MUTED,
+			SmaUiTheme.TEXT, SmaKit.value_color(pnl),
+		], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
+			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT])
+		_other_box.add_child(_clickable_row(line, _open_screen.bind(String(item["screen"]))))
 
 
 func _update_fills() -> void:

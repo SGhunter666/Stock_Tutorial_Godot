@@ -3,7 +3,9 @@
 class_name SmaFundScreen
 extends SmaScreen
 
+var _scroll: ScrollContainer
 var _body: VBoxContainer
+var _active_tab := "overview"
 var _selected_ticker := ""
 var _trade_qty := 10
 var _research: Dictionary = {}
@@ -20,15 +22,16 @@ func _build() -> void:
 	var root := SmaKit.vbox(10)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
-	var scroll := SmaKit.scroll()
-	root.add_child(scroll)
+	_scroll = SmaKit.scroll()
+	root.add_child(_scroll)
 	_body = SmaKit.vbox(12)
-	scroll.add_child(_body)
+	_scroll.add_child(_body)
 
 
 func refresh(_reason: String = "") -> void:
 	if not built:
 		return
+	var saved_scroll := _scroll.scroll_vertical if _scroll != null else 0
 	SmaKit.clear_children(_body)
 	if game == null or not game.started:
 		return
@@ -41,19 +44,57 @@ func refresh(_reason: String = "") -> void:
 		_render_setup(status == "closed")
 		return
 	_render_metrics()
-	_render_trading()
-	_render_plan()
-	_render_research()
-	_render_optimizer()
-	_render_clients()
-	_render_team()
-	_render_operations()
-	_render_risk_model()
-	_render_attribution()
-	_render_leaderboard()
-	_render_insights()
-	_render_events()
+	_render_tabs()
+	match _active_tab:
+		"quant":
+			_render_plan()
+			_render_research()
+			_render_optimizer()
+		"clients":
+			_render_clients()
+			_render_team()
+			_render_operations()
+		"risk":
+			_render_risk_model()
+			_render_attribution()
+			_render_leaderboard()
+			_render_insights()
+		_:
+			_render_trading()
+			_render_events()
 	_body.add_child(SmaKit.muted(I18n.t("fund.note"), 10))
+	_restore_scroll.call_deferred(saved_scroll)
+
+
+func _restore_scroll(pos: int) -> void:
+	if is_instance_valid(_scroll):
+		_scroll.scroll_vertical = pos
+
+
+func _render_tabs() -> void:
+	var row := SmaKit.flow(6)
+	var group := ButtonGroup.new()
+	for spec in [
+		["overview", "fund.tab.overview"],
+		["quant", "fund.tab.quant"],
+		["clients", "fund.tab.clients"],
+		["risk", "fund.tab.risk"],
+	]:
+		var tab_id := String(spec[0])
+		var btn := SmaKit.toggle(I18n.t(String(spec[1])), group)
+		btn.button_pressed = _active_tab == tab_id
+		btn.pressed.connect(func():
+			_active_tab = tab_id
+			if is_instance_valid(_scroll):
+				_scroll.scroll_vertical = 0
+			refresh("tab"))
+		row.add_child(btn)
+	if game.black_friday_unlocked():
+		row.add_child(SmaKit.button(I18n.t("bf.start" if game.black_friday.is_empty() else "bf.resume"), func():
+			var main := get_tree().get_first_node_in_group("main") as SmaMain
+			if main != null:
+				main.navigate("black_friday"), true))
+	_body.add_child(row)
 
 
 func _render_header() -> void:
@@ -114,7 +155,7 @@ func _render_setup(reopening: bool) -> void:
 	box.add_child(grid)
 
 	var name_input := LineEdit.new()
-	name_input.text = "Atlas Capital"
+	name_input.text = I18n.t("fund.defaultName")
 	name_input.max_length = 36
 	name_input.custom_minimum_size.x = 200
 	grid.add_child(_field("fund.nameLabel", name_input))

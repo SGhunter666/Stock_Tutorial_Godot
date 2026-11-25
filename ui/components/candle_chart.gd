@@ -1,13 +1,16 @@
-## Canvas candle + volume chart with moving averages, a crosshair OHLC readout,
-## volume MA, position cost lines and trade markers. Reads only the candles it
-## is given; it never asks the engine for future data.
+## Canvas candle + volume chart with cached moving averages, optional Bollinger
+## bands, horizontal history pan, price-alert / order lines, crosshair OHLC
+## readout, volume MA, position cost lines and trade markers. Reads only the
+## candles it is given; it never asks the engine for future data.
 class_name SmaCandleChart
 extends Control
 
 signal visible_count_changed(count: int)
+signal pan_changed(panned: bool)
 
 const MA_PERIODS := [5, 10, 20, 60]
 const VMA_PERIOD := 5
+const BOLL_PERIOD := 20
 const MIN_VISIBLE := 20
 const MAX_VISIBLE := 250
 const DEFAULT_VISIBLE := 60
@@ -16,7 +19,11 @@ var candles: Array = []
 var title_text: String = ""
 var timeframe: String = "1m"
 var visible_count := DEFAULT_VISIBLE
+var pan_offset := 0
+var show_ma := true
+var show_boll := false
 var trade_markers: Array = []
+var price_lines: Array = []
 var long_cost := 0.0
 var short_cost := 0.0
 
@@ -24,6 +31,9 @@ var _font: Font
 var _font_size := 10
 var _hover_index := -1
 var _hover_pos := Vector2(-1, -1)
+var _dragging := false
+var _drag_start_x := 0.0
+var _drag_start_pan := 0
 var _plot := Rect2()
 var _left := 0.0
 var _right := 0.0
@@ -35,6 +45,12 @@ var _slot := 0.0
 var _visible: Array = []
 var _low := 0.0
 var _high := 0.0
+
+var _cache_key := ""
+var _ma_cache: Dictionary = {}
+var _vma_cache: Array = []
+var _boll_upper: Array = []
+var _boll_lower: Array = []
 
 
 func _init() -> void:
@@ -49,9 +65,15 @@ func _init() -> void:
 
 func set_candles(next_candles: Array, next_timeframe: String = "1m",
 		next_title: String = "") -> void:
+	var tf_changed := timeframe != next_timeframe
 	candles = next_candles
 	timeframe = next_timeframe
 	title_text = next_title
+	if tf_changed:
+		_set_pan(0)
+	else:
+		_clamp_pan()
+	_ensure_series_cache()
 	queue_redraw()
 
 
@@ -60,8 +82,26 @@ func set_visible_count(count: int) -> void:
 	if next_count == visible_count:
 		return
 	visible_count = next_count
+	_clamp_pan()
 	visible_count_changed.emit(visible_count)
 	queue_redraw()
+
+
+func set_indicators(ma_enabled: bool, boll_enabled: bool) -> void:
+	if show_ma == ma_enabled and show_boll == boll_enabled:
+		return
+	show_ma = ma_enabled
+	show_boll = boll_enabled
+	queue_redraw()
+
+
+func reset_pan() -> void:
+	_set_pan(0)
+	queue_redraw()
+
+
+func is_panned() -> bool:
+	return pan_offset > 0
 
 
 func set_trade_markers(next_markers: Array) -> void:
@@ -69,10 +109,83 @@ func set_trade_markers(next_markers: Array) -> void:
 	queue_redraw()
 
 
+func set_price_lines(next_lines: Array) -> void:
+	price_lines = next_lines
+	queue_redraw()
+
+
 func set_position_cost(next_long_cost: float, next_short_cost: float) -> void:
 	long_cost = maxf(0.0, next_long_cost)
 	short_cost = maxf(0.0, next_short_cost)
 	queue_redraw()
+
+
+func _max_pan() -> int:
+	return maxi(0, candles.size() - mini(visible_count, candles.size()))
+
+
+func _clamp_pan() -> void:
+	_set_pan(clampi(pan_offset, 0, _max_pan()))
+
+
+func _set_pan(next_pan: int) -> void:
+	var clamped := clampi(next_pan, 0, _max_pan())
+	if clamped == pan_offset:
+		return
+	var was_panned := pan_offset > 0
+	pan_offset = clamped
+	var now_panned := pan_offset > 0
+	if was_panned != now_panned:
+		pan_changed.emit(now_panned)
+
+
+func _series_signature() -> String:
+	if candles.is_empty():
+		return "empty"
+	var first: Dictionary = candles[0]
+	var last: Dictionary = candles[-1]
+	return "%s|%d|%s|%s|%.4f|%.4f|%.4f|%s" % [
+		timeframe, candles.size(), String(first.get("d", "")), String(last.get("d", "")),
+		float(last.get("c", 0.0)), float(last.get("h", 0.0)), float(last.get("l", 0.0)),
+		str(last.get("v", 0)),
+	]
+
+
+func _ensure_series_cache() -> void:
+	var sig := _series_signature()
+	if sig == _cache_key:
+		return
+	_cache_key = sig
+	_ma_cache.clear()
+	_vma_cache.clear()
+	_boll_upper.clear()
+	_boll_lower.clear()
+	if candles.is_empty():
+		return
+	for period in MA_PERIODS:
+		_ma_cache[period] = _moving_average(period, "c")
+	_vma_cache = _moving_average(VMA_PERIOD, "v")
+	_compute_bollinger()
+
+
+func _compute_bollinger() -> void:
+	var n := candles.size()
+	_boll_upper.resize(n)
+	_boll_lower.resize(n)
+	var mid_series: Array = _ma_cache.get(BOLL_PERIOD, [])
+	for index in n:
+		if index < BOLL_PERIOD - 1 or mid_series.size() != n:
+			_boll_upper[index] = NAN
+			_boll_lower[index] = NAN
+			continue
+		var mean := float(mid_series[index])
+		var sum_sq := 0.0
+		for offset in range(index - BOLL_PERIOD + 1, index + 1):
+			var diff := float(candles[offset].get("c", 0.0)) - mean
+			sum_sq += diff * diff
+		var std := sqrt(sum_sq / float(BOLL_PERIOD))
+		_boll_upper[index] = mean + 2.0 * std
+		_boll_lower[index] = mean - 2.0 * std
 
 
 func _draw() -> void:
@@ -86,11 +199,13 @@ func _draw() -> void:
 		draw_string(_font, Vector2(12, size.y * 0.5), I18n.t("chart.no_data"),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, SmaUiTheme.DIM)
 		return
+	_ensure_series_cache()
 	var count := mini(visible_count, candles.size())
 	if count <= 0:
 		return
-	var start := candles.size() - count
-	_visible = candles.slice(start)
+	var max_start := maxi(0, candles.size() - count)
+	var start := clampi(max_start - pan_offset, 0, max_start)
+	_visible = candles.slice(start, start + count)
 	_left = 12.0
 	_right = size.x - 74.0
 	_top = 62.0
@@ -102,10 +217,24 @@ func _draw() -> void:
 	_low = INF
 	_high = -INF
 	var max_volume := 1.0
-	for bar in _visible:
+	for index in _visible.size():
+		var bar: Dictionary = _visible[index]
 		_low = minf(_low, float(bar["l"]))
 		_high = maxf(_high, float(bar["h"]))
 		max_volume = maxf(max_volume, float(bar.get("v", 0)))
+		if show_boll and start + index < _boll_upper.size():
+			var u := float(_boll_upper[start + index])
+			var l := float(_boll_lower[start + index])
+			if not is_nan(u):
+				_high = maxf(_high, u)
+			if not is_nan(l):
+				_low = minf(_low, l)
+	if timeframe == "1m":
+		# Hold the initial scale steady while the first few quotes move the body.
+		var opening_price := float(_visible[0]["o"])
+		var half_range := maxf(0.06, opening_price * 0.003)
+		_low = minf(_low, maxf(0.0, opening_price - half_range))
+		_high = maxf(_high, opening_price + half_range)
 	if _high - _low < 0.0001:
 		_high += 0.5
 		_low -= 0.5
@@ -121,22 +250,24 @@ func _draw() -> void:
 		_hover_index = clampi(int(floor((_hover_pos.x - _left) / _slot)),
 			0, _visible.size() - 1)
 
-	var ma_series: Dictionary = {}
-	for period in MA_PERIODS:
-		ma_series[period] = _moving_average(period, "c")
-	var vma := _moving_average(VMA_PERIOD, "v")
-	for value in vma:
-		if not is_nan(float(value)):
-			max_volume = maxf(max_volume, float(value))
+	for index in _visible.size():
+		if start + index < _vma_cache.size():
+			var vval := float(_vma_cache[start + index])
+			if not is_nan(vval):
+				max_volume = maxf(max_volume, vval)
 	var body_width := maxf(1.5, _slot * 0.62)
 	if timeframe == "1m":
 		body_width = minf(body_width, 24.0)
 	_draw_grid()
 	_draw_volume(max_volume, body_width)
+	if show_boll:
+		_draw_bollinger(start)
 	_draw_candles(body_width)
-	_draw_ma_lines(ma_series, start)
-	_draw_vma(vma, start, max_volume)
+	if show_ma:
+		_draw_ma_lines(start)
+	_draw_vma(start, max_volume)
 	_draw_cost_lines()
+	_draw_price_lines()
 	_draw_trade_markers(start)
 	_draw_last_price()
 	_draw_legend(start)
@@ -206,11 +337,31 @@ func _draw_candles(body_width: float) -> void:
 		draw_rect(Rect2(x - body_width * 0.5, body_top, body_width, body_height), color)
 
 
-func _draw_ma_lines(ma_series: Dictionary, start: int) -> void:
+func _draw_bollinger(start: int) -> void:
+	var band_color := Color(SmaUiTheme.INFO.r, SmaUiTheme.INFO.g, SmaUiTheme.INFO.b, 0.65)
+	for series in [_boll_upper, _boll_lower]:
+		var points := PackedVector2Array()
+		for index in _visible.size():
+			if start + index >= series.size():
+				continue
+			var value := float(series[start + index])
+			if is_nan(value):
+				if points.size() > 1:
+					draw_polyline(points, band_color, 1.0, true)
+				points = PackedVector2Array()
+				continue
+			points.append(Vector2(_left + _slot * (float(index) + 0.5), _price_y(value)))
+		if points.size() > 1:
+			draw_polyline(points, band_color, 1.0, true)
+
+
+func _draw_ma_lines(start: int) -> void:
 	var colors := [SmaUiTheme.ACCENT, SmaUiTheme.WARNING, SmaUiTheme.INFO, Color("#a78bfa")]
 	for period_index in MA_PERIODS.size():
 		var period: int = MA_PERIODS[period_index]
-		var series: Array = ma_series[period]
+		var series: Array = _ma_cache.get(period, [])
+		if series.is_empty():
+			continue
 		var points := PackedVector2Array()
 		for index in _visible.size():
 			var value := float(series[start + index])
@@ -224,10 +375,12 @@ func _draw_ma_lines(ma_series: Dictionary, start: int) -> void:
 			draw_polyline(points, colors[period_index], 1.2, true)
 
 
-func _draw_vma(vma: Array, start: int, max_volume: float) -> void:
+func _draw_vma(start: int, max_volume: float) -> void:
+	if _vma_cache.is_empty():
+		return
 	var points := PackedVector2Array()
 	for index in _visible.size():
-		var value := float(vma[start + index])
+		var value := float(_vma_cache[start + index])
 		if is_nan(value):
 			if points.size() > 1:
 				draw_polyline(points, Color(SmaUiTheme.INFO.r, SmaUiTheme.INFO.g,
@@ -243,22 +396,38 @@ func _draw_vma(vma: Array, start: int, max_volume: float) -> void:
 
 
 func _draw_cost_lines() -> void:
-	_draw_dashed_cost(long_cost, SmaUiTheme.WARNING, I18n.t("chart.costLong"))
-	_draw_dashed_cost(short_cost, SmaUiTheme.NEGATIVE, I18n.t("chart.costShort"))
+	_draw_dashed_line(long_cost, SmaUiTheme.WARNING, I18n.t("chart.costLong"), true)
+	_draw_dashed_line(short_cost, SmaUiTheme.NEGATIVE, I18n.t("chart.costShort"), true)
 
 
-func _draw_dashed_cost(cost: float, color: Color, label: String) -> void:
-	if cost <= 0.0:
+func _draw_price_lines() -> void:
+	for entry in price_lines:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var price := float(entry.get("price", 0.0))
+		var label := String(entry.get("label", ""))
+		var color: Color = entry.get("color", SmaUiTheme.INFO)
+		_draw_dashed_line(price, color, label, false)
+
+
+func _draw_dashed_line(price: float, color: Color, label: String, left_label: bool) -> void:
+	if price <= 0.0:
 		return
-	var y := _price_y(cost)
+	var y := _price_y(price)
 	if y < _top or y > _price_bottom:
 		return
 	var x := _left
 	while x < _right:
 		draw_line(Vector2(x, y), Vector2(minf(x + 6.0, _right), y), color, 1.0)
 		x += 10.0
-	draw_string(_font, Vector2(_left + 6, y - 4), "%s %s" % [label, SmaFormat.num(cost, 2)],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, color)
+	var text := "%s %s" % [label, SmaFormat.num(price, 2)]
+	if left_label:
+		draw_string(_font, Vector2(_left + 6, y - 4), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, color)
+	else:
+		var text_w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+		draw_string(_font, Vector2(maxf(_left + 6.0, _right - text_w - 6.0), y - 4), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, color)
 
 
 func _draw_trade_markers(start: int) -> void:
@@ -290,7 +459,7 @@ func _draw_trade_markers(start: int) -> void:
 				Vector2(x, y + 7.0), Vector2(x - 4.0, y), Vector2(x + 4.0, y)]), color)
 
 
-func _bar_index_for_trade(trade: Dictionary, start: int) -> int:
+func _bar_index_for_trade(trade: Dictionary, _start: int) -> int:
 	var date := String(trade.get("date", ""))
 	if date == "":
 		var day_index := int(trade.get("day", -1))
@@ -325,16 +494,19 @@ func _bar_index_for_trade(trade: Dictionary, start: int) -> int:
 
 
 func _draw_last_price() -> void:
-	var last_price := float(_visible[-1]["c"])
+	var last_price := float(candles[-1]["c"])
 	var y := _price_y(last_price)
-	draw_line(Vector2(_left, y), Vector2(_right, y),
-		Color(SmaUiTheme.ACCENT.r, SmaUiTheme.ACCENT.g, SmaUiTheme.ACCENT.b, 0.6), 1.0)
-	_draw_axis_tag(Vector2(_right + 2, y), SmaFormat.num(last_price, 2), SmaUiTheme.ACCENT)
+	if y >= _top and y <= _price_bottom:
+		draw_line(Vector2(_left, y), Vector2(_right, y),
+			Color(SmaUiTheme.ACCENT.r, SmaUiTheme.ACCENT.g, SmaUiTheme.ACCENT.b, 0.6), 1.0)
+		_draw_axis_tag(Vector2(_right + 2, y), SmaFormat.num(last_price, 2), SmaUiTheme.ACCENT)
 
 
 func _draw_legend(start: int) -> void:
-	var bar: Dictionary = _visible[_hover_index] if _hover_index >= 0 \
-		and _hover_index < _visible.size() else _visible[-1]
+	var active_vis := _hover_index if _hover_index >= 0 and _hover_index < _visible.size() \
+		else _visible.size() - 1
+	var bar: Dictionary = _visible[active_vis]
+	var abs_index := start + active_vis
 	var x := _left
 	var y := 34.0
 	x = _draw_metric(x, y, "O ", SmaFormat.num(float(bar["o"]), 2), SmaUiTheme.TEXT)
@@ -345,38 +517,47 @@ func _draw_legend(start: int) -> void:
 	var open_price := float(bar["o"])
 	var change := (float(bar["c"]) / open_price - 1.0) * 100.0 if open_price > 0.0 else 0.0
 	x = _draw_metric(x, y, "", SmaFormat.pct(change, 2), SmaKit.value_color(change))
-	_draw_ma_legend(start, 48.0)
-	var vma := _moving_average(VMA_PERIOD, "v")
-	var vma_value := float(vma[start + _visible.size() - 1])
-	if not is_nan(vma_value):
-		draw_string(_font, Vector2(_left, _volume_top - 4),
-			"%s · VMA%d %s" % [I18n.t("trade.volume"), VMA_PERIOD,
-				SmaFormat.compact(vma_value)], HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
-			SmaUiTheme.INFO)
+	_draw_ma_legend(abs_index, 48.0)
+	if abs_index < _vma_cache.size():
+		var vma_value := float(_vma_cache[abs_index])
+		if not is_nan(vma_value):
+			draw_string(_font, Vector2(_left, _volume_top - 4),
+				"%s · VMA%d %s" % [I18n.t("trade.volume"), VMA_PERIOD,
+					SmaFormat.compact(vma_value)], HORIZONTAL_ALIGNMENT_LEFT, -1, 10,
+				SmaUiTheme.INFO)
 
 
-func _draw_ma_legend(start: int, y: float) -> void:
+func _draw_ma_legend(abs_index: int, y: float) -> void:
 	var colors := [SmaUiTheme.ACCENT, SmaUiTheme.WARNING, SmaUiTheme.INFO, Color("#a78bfa")]
 	var x := _left
-	for index in MA_PERIODS.size():
-		var period: int = MA_PERIODS[index]
-		var series := _moving_average(period, "c")
-		var value := float(series[start + _visible.size() - 1])
-		if is_nan(value):
-			continue
-		x = _draw_metric(x, y, "MA%d " % period, SmaFormat.num(value, 2),
-			colors[index], 10)
+	if show_ma:
+		for index in MA_PERIODS.size():
+			var period: int = MA_PERIODS[index]
+			var series: Array = _ma_cache.get(period, [])
+			if abs_index >= series.size():
+				continue
+			var value := float(series[abs_index])
+			if is_nan(value):
+				continue
+			x = _draw_metric(x, y, "MA%d " % period, SmaFormat.num(value, 2),
+				colors[index], 10)
+	if show_boll and abs_index < _boll_upper.size():
+		var upper := float(_boll_upper[abs_index])
+		var lower := float(_boll_lower[abs_index])
+		if not is_nan(upper) and not is_nan(lower):
+			x = _draw_metric(x, y, "BOLL ", "%s–%s" % [
+				SmaFormat.num(lower, 2), SmaFormat.num(upper, 2)], SmaUiTheme.INFO, 10)
 
 
 func _draw_metric(x: float, y: float, label: String, value: String, color: Color,
-		size: int = 11) -> float:
+		font_px: int = 11) -> float:
 	if label != "":
 		draw_string(_font, Vector2(x, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1,
-			size, SmaUiTheme.DIM)
-		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+			font_px, SmaUiTheme.DIM)
+		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_px).x
 	draw_string(_font, Vector2(x, y), value, HORIZONTAL_ALIGNMENT_LEFT, -1,
-		size, color)
-	x += _font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		font_px, color)
+	x += _font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_px).x
 	return x + 10.0
 
 
@@ -495,13 +676,30 @@ func _bar_title(bar: Dictionary) -> String:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		_update_hover(event.position)
+		if _dragging and _slot > 0.0:
+			var delta_bars := int(round((event.position.x - _drag_start_x) / _slot))
+			_set_pan(_drag_start_pan + delta_bars)
+			_hover_pos = event.position
+			queue_redraw()
+		else:
+			_update_hover(event.position)
 		accept_event()
-	elif event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+	elif event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				if event.double_click:
+					reset_pan()
+				else:
+					_dragging = true
+					_drag_start_x = event.position.x
+					_drag_start_pan = pan_offset
+			else:
+				_dragging = false
+			accept_event()
+		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			set_visible_count(visible_count - 10)
 			accept_event()
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			set_visible_count(visible_count + 10)
 			accept_event()
 
@@ -518,6 +716,7 @@ func _update_hover(position: Vector2) -> void:
 
 
 func _on_mouse_exited() -> void:
+	_dragging = false
 	_hover_index = -1
 	_hover_pos = Vector2(-1, -1)
 	queue_redraw()

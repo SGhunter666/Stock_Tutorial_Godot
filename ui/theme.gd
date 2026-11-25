@@ -24,6 +24,7 @@ static var NEGATIVE := Color("#f87171")
 static var WARNING := Color("#fbbf24")
 static var INFO := Color("#60a5fa")
 static var mode := "dark"
+static var color_scheme := "intl"
 
 ## Layout density: 1.0 for the beginner layout, a compact factor for advanced.
 static var density := 1.0
@@ -43,12 +44,10 @@ static func set_theme_mode(value: String) -> void:
 		PANEL_HOVER = Color("#e2eaf2")
 		BORDER = Color("#cfdae5")
 		TEXT = Color("#16202c")
-		MUTED = Color("#536475")
-		DIM = Color("#5d7083")
+		MUTED = Color("#4d6073")
+		DIM = Color("#5b7085")
 		ACCENT = Color("#0d9488")
 		ACCENT_DARK = Color("#0f766e")
-		POSITIVE = Color("#15803d")
-		NEGATIVE = Color("#dc2626")
 		WARNING = Color("#b45309")
 		INFO = Color("#1d4ed8")
 	else:
@@ -59,14 +58,32 @@ static func set_theme_mode(value: String) -> void:
 		PANEL_HOVER = Color("#1b3049")
 		BORDER = Color("#22384f")
 		TEXT = Color("#e7f1f8")
-		MUTED = Color("#89a3ba")
-		DIM = Color("#829aaf")
+		MUTED = Color("#9bb3c9")
+		DIM = Color("#8aa3b8")
 		ACCENT = Color("#5eead4")
 		ACCENT_DARK = Color("#0f766e")
-		POSITIVE = Color("#4ade80")
-		NEGATIVE = Color("#f87171")
 		WARNING = Color("#fbbf24")
 		INFO = Color("#60a5fa")
+	_apply_semantic_colors()
+
+
+static func set_color_scheme(value: String) -> void:
+	color_scheme = value if ["intl", "cn", "colorblind"].has(value) else "intl"
+	_apply_semantic_colors()
+
+
+static func _apply_semantic_colors() -> void:
+	var light := mode == "light"
+	match color_scheme:
+		"cn":
+			POSITIVE = Color("#dc2626") if light else Color("#f87171")
+			NEGATIVE = Color("#15803d") if light else Color("#4ade80")
+		"colorblind":
+			POSITIVE = Color("#1d4ed8") if light else Color("#60a5fa")
+			NEGATIVE = Color("#c2410c") if light else Color("#fb923c")
+		_:
+			POSITIVE = Color("#15803d") if light else Color("#4ade80")
+			NEGATIVE = Color("#dc2626") if light else Color("#f87171")
 
 
 static func _box(color: Color, border_color: Color = Color(0, 0, 0, 0),

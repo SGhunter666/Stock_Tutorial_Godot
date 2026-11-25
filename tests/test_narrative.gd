@@ -419,3 +419,52 @@ func run() -> void:
 			"low-trust manager ending reflects the lost trust")
 	else:
 		check(false, "manager ending available for the manager path")
+
+	describe("story-replay-readonly")
+	var replay_host := FakeHost.new()
+	var replay_service := _make_service(replay_host)
+	replay_service.stories["replay_grant"] = {
+		"id": "replay_grant",
+		"title": {"zh_CN": "回放隔离测试", "en": "Replay isolation test"},
+		"start": "choice",
+		"nodes": {
+			"choice": {
+				"type": "choice",
+				"text": {"zh_CN": "选择", "en": "Choose"},
+				"choices": [{
+					"text": {"zh_CN": "领奖励", "en": "Claim"},
+					"next": "end",
+					"effects": [
+						{"set_flag": "replayed_flag", "value": true},
+						{"add_cash": 500.0, "memo": "replay_grant"},
+						{"toast": {"zh_CN": "不应弹出", "en": "Should not toast"}},
+					],
+				}],
+			},
+			"end": {"type": "end"},
+		},
+	}
+	check(not replay_service.start_replay("replay_grant"), "unseen story cannot be replayed")
+	replay_service.seen["replay_grant"] = true
+	check(replay_service.start_replay("replay_grant"), "seen story opens in replay mode")
+	eq(bool(replay_service.current_view().get("replay", false)), true, "replay view marks read-only")
+	var replay_saved := replay_service.to_dict()
+	eq(replay_saved.get("active", null), null, "active replay is not serialized to save")
+	check(replay_service.choose(0), "replay choice advances cleanly")
+	eq(bool(replay_service.flags.get("replayed_flag", false)), false, "replay does not mutate flags")
+	approx(replay_host.cash, 100000.0, 0.001, "replay does not grant cash")
+	eq(replay_host.messages.size(), 0, "replay does not emit effect toasts")
+	eq(replay_service.history.size(), 0, "replay does not pollute story history")
+
+	describe("story-multi-flag-blocks")
+	var multi_host := FakeHost.new()
+	var multi_service := _make_service(multi_host)
+	multi_service.flags["option_style"] = "covered"
+	multi_service.flags["income_style"] = "reinvest"
+	multi_service.flags["risk_response"] = "cut"
+	multi_service.start_story("epilogue")
+	multi_service.advance()
+	var multi_text := String(multi_service.current_view().get("text", ""))
+	check(multi_text.contains("收租"), "multi-flag epilogue includes option_style block")
+	check(multi_text.contains("复利"), "multi-flag epilogue includes income_style block")
+	check(multi_text.contains("换成现金"), "multi-flag epilogue includes risk_response block")

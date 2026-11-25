@@ -14,6 +14,9 @@ var _index_label: Label
 var _index_change: Label
 var _heat_tiles: Dictionary = {}
 var _heat_buckets: Dictionary = {}
+var _sort_key := "ticker"
+var _sort_desc := false
+var _sort_buttons: Dictionary = {}
 
 
 func _build() -> void:
@@ -70,20 +73,40 @@ func _build() -> void:
 	table_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var table := SmaKit.vbox(0)
 	table_card.add_child(table)
-	var header := SmaKit.header_row(
-		["market.watch", "market.ticker", "market.company", "market.sector", "market.last",
-			"market.change", "market.bid", "market.ask", "market.volume"],
-		[0.35, 0.7, 2.1, 1.0, 0.9, 0.9, 0.8, 0.8, 1.0],
-		[HORIZONTAL_ALIGNMENT_CENTER, HORIZONTAL_ALIGNMENT_LEFT,
-			HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT,
-			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
-			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
-			HORIZONTAL_ALIGNMENT_RIGHT])
-	var header_texts: Array = header.get_children()
-	for index in header_texts.size():
-		var label: Label = header_texts[index]
-		label.text = I18n.t(label.text)
+	var header := SmaKit.hbox(8)
 	header.custom_minimum_size.y = 30
+	_sort_buttons.clear()
+	var col_specs := [
+		["market.watch", 0.35, HORIZONTAL_ALIGNMENT_CENTER, ""],
+		["market.ticker", 0.7, HORIZONTAL_ALIGNMENT_LEFT, "ticker"],
+		["market.company", 2.1, HORIZONTAL_ALIGNMENT_LEFT, "name"],
+		["market.sector", 1.0, HORIZONTAL_ALIGNMENT_LEFT, ""],
+		["market.last", 0.9, HORIZONTAL_ALIGNMENT_RIGHT, "last"],
+		["market.change", 0.9, HORIZONTAL_ALIGNMENT_RIGHT, "change"],
+		["market.bid", 0.8, HORIZONTAL_ALIGNMENT_RIGHT, ""],
+		["market.ask", 0.8, HORIZONTAL_ALIGNMENT_RIGHT, ""],
+		["market.volume", 1.0, HORIZONTAL_ALIGNMENT_RIGHT, "volume"],
+	]
+	for spec in col_specs:
+		var sort_id := String(spec[3])
+		if sort_id == "":
+			header.add_child(SmaKit.cell(I18n.t(String(spec[0])), float(spec[1]),
+				spec[2], SmaUiTheme.DIM, 11))
+		else:
+			var btn := Button.new()
+			btn.flat = true
+			btn.focus_mode = Control.FOCUS_NONE
+			btn.alignment = spec[2]
+			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			btn.size_flags_stretch_ratio = float(spec[1])
+			btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			btn.add_theme_font_size_override("font_size", 11)
+			btn.add_theme_color_override("font_color", SmaUiTheme.DIM)
+			btn.add_theme_color_override("font_hover_color", SmaUiTheme.ACCENT)
+			btn.pressed.connect(_toggle_sort.bind(sort_id))
+			_sort_buttons[sort_id] = {"button": btn, "labelKey": String(spec[0])}
+			header.add_child(btn)
+	_sync_sort_labels()
 	table.add_child(header)
 
 	var scroll := SmaKit.scroll()
@@ -146,7 +169,75 @@ func _create_row(ticker: String, company: Dictionary, sector: String,
 		row.add_child(cells[key])
 	_list.add_child(panel)
 	_rows[ticker] = {"panel": panel, "cells": cells, "sector": sector,
+		"name": String(company.get("name", ticker)),
 		"is_etf": is_etf, "locked": false, "watch": watch_button}
+
+
+func _toggle_sort(key: String) -> void:
+	if _sort_key == key:
+		_sort_desc = not _sort_desc
+	else:
+		_sort_key = key
+		_sort_desc = key in ["last", "change", "volume"]
+	_sync_sort_labels()
+	_apply_sort()
+
+
+func _sync_sort_labels() -> void:
+	for key in _sort_buttons.keys():
+		var info: Dictionary = _sort_buttons[key]
+		var btn: Button = info["button"]
+		var base := I18n.t(String(info["labelKey"]))
+		if key == _sort_key:
+			btn.text = "%s %s" % [base, "▼" if _sort_desc else "▲"]
+			btn.add_theme_color_override("font_color", SmaUiTheme.ACCENT)
+		else:
+			btn.text = base
+			btn.add_theme_color_override("font_color", SmaUiTheme.DIM)
+
+
+func _apply_sort() -> void:
+	if _list == null or game == null or game.exchange == null:
+		return
+	var tickers: Array = _rows.keys()
+	var quotes: Dictionary = {}
+	for t in tickers:
+		quotes[t] = game.exchange.quote(String(t))
+	tickers.sort_custom(func(a, b):
+		var a_locked := bool(_rows[a]["locked"])
+		var b_locked := bool(_rows[b]["locked"])
+		if a_locked != b_locked and _sort_key in ["last", "change", "volume"]:
+			return not a_locked
+		var qa: Dictionary = quotes[a]
+		var qb: Dictionary = quotes[b]
+		var cmp := 0
+		match _sort_key:
+			"name":
+				var na := String(_rows[a]["name"]).to_lower()
+				var nb := String(_rows[b]["name"]).to_lower()
+				cmp = -1 if na < nb else (1 if na > nb else 0)
+			"last":
+				var la := float(qa.get("last", 0.0))
+				var lb := float(qb.get("last", 0.0))
+				cmp = -1 if la < lb else (1 if la > lb else 0)
+			"change":
+				var ca := float(qa.get("changePct", 0.0))
+				var cb := float(qb.get("changePct", 0.0))
+				cmp = -1 if ca < cb else (1 if ca > cb else 0)
+			"volume":
+				var va := float(qa.get("volume", 0.0))
+				var vb := float(qb.get("volume", 0.0))
+				cmp = -1 if va < vb else (1 if va > vb else 0)
+			_:
+				var sa := String(a)
+				var sb := String(b)
+				cmp = -1 if sa < sb else (1 if sa > sb else 0)
+		if cmp == 0:
+			return String(a) < String(b)
+		return cmp > 0 if _sort_desc else cmp < 0)
+	for index in tickers.size():
+		var panel: PanelContainer = _rows[tickers[index]]["panel"]
+		_list.move_child(panel, index)
 
 
 func _build_heatmap() -> Control:
@@ -243,6 +334,7 @@ func _on_heatmap_sector(sector: String) -> void:
 func refresh(_reason: String = "") -> void:
 	_update_rows()
 	_apply_filter()
+	_apply_sort()
 
 
 func on_tick() -> void:
@@ -295,6 +387,7 @@ func _update_rows() -> void:
 		var change := float(quote.get("changePct", 0.0))
 		var last := float(quote.get("last", 0.0))
 		if locked:
+			cells["ticker"].text = "🔒 %s" % ticker
 			cells["last"].text = "—"
 			cells["change"].text = I18n.t("market.locked")
 			cells["change"].add_theme_color_override("font_color", SmaUiTheme.DIM)
@@ -302,6 +395,7 @@ func _update_rows() -> void:
 			cells["ask"].text = "—"
 			cells["volume"].text = "—"
 			continue
+		cells["ticker"].text = ticker
 		cells["last"].text = SmaFormat.num(last, 2)
 		cells["change"].text = SmaFormat.pct(change, 2)
 		cells["change"].add_theme_color_override("font_color", SmaKit.value_color(change))

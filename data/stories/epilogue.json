@@ -28,7 +28,7 @@
         "zh_CN": "档案只记录你走过的路，不替你下判断。",
         "en": "The archive records the road you took; it does not judge it for you."
       },
-      "text_by_flag": [
+      "text_blocks_by_flag": [
         {
           "condition": {
             "flag": "ethics",

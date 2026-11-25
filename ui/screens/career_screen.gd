@@ -3,7 +3,9 @@
 class_name SmaCareerScreen
 extends SmaScreen
 
+var _scroll: ScrollContainer
 var _body: VBoxContainer
+var _active_tab := "promotion"
 var _drafts: Dictionary = {}
 
 
@@ -13,28 +15,60 @@ func _build() -> void:
 	var root := SmaKit.vbox(10)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
-	var scroll := SmaKit.scroll()
-	root.add_child(scroll)
+	_scroll = SmaKit.scroll()
+	root.add_child(_scroll)
 	_body = SmaKit.vbox(12)
-	scroll.add_child(_body)
+	_scroll.add_child(_body)
 
 
 func refresh(_reason: String = "") -> void:
 	if not built:
 		return
+	var saved_scroll := _scroll.scroll_vertical if _scroll != null else 0
 	SmaKit.clear_children(_body)
 	if game == null or not game.started:
 		return
 	var data: Dictionary = game.career_progress()
 	_render_header(data)
 	_render_stats(data)
-	_render_current(data)
-	_render_tasks(data)
-	_render_reports(data)
-	_render_evaluations(data)
-	_render_certificates(data)
-	_render_ladder(data)
+	_render_tabs()
+	match _active_tab:
+		"tasks":
+			_render_tasks(data)
+			_render_reports(data)
+		"certs":
+			_render_certificates(data)
+			_render_ladder(data)
+		_:
+			_render_current(data)
+			_render_evaluations(data)
 	_body.add_child(SmaKit.muted(I18n.t("career.note"), 10))
+	_restore_scroll.call_deferred(saved_scroll)
+
+
+func _restore_scroll(pos: int) -> void:
+	if is_instance_valid(_scroll):
+		_scroll.scroll_vertical = pos
+
+
+func _render_tabs() -> void:
+	var row := SmaKit.flow(6)
+	var group := ButtonGroup.new()
+	for spec in [
+		["promotion", "career.tab.promotion"],
+		["tasks", "career.tab.tasks"],
+		["certs", "career.tab.certs"],
+	]:
+		var tab_id := String(spec[0])
+		var btn := SmaKit.toggle(I18n.t(String(spec[1])), group)
+		btn.button_pressed = _active_tab == tab_id
+		btn.pressed.connect(func():
+			_active_tab = tab_id
+			if is_instance_valid(_scroll):
+				_scroll.scroll_vertical = 0
+			refresh("tab"))
+		row.add_child(btn)
+	_body.add_child(row)
 
 
 func _render_header(data: Dictionary) -> void:

@@ -29,6 +29,7 @@ var active_id: String = ""
 var active_story: Dictionary = {}
 var node_id: String = ""
 var last_finished_id: String = ""
+var replay_mode := false
 
 
 func setup(target_host: Object) -> void:
@@ -106,11 +107,28 @@ func start_story(story_id: String) -> bool:
 		if active_id != story_id and not queue.has(story_id):
 			queue.append(story_id)
 		return false
+	replay_mode = false
 	active_id = story_id
 	active_story = stories[story_id]
 	seen[story_id] = true
 	node_id = String(active_story.get("start", ""))
 	_record("start")
+	story_started.emit(active_id)
+	view_changed.emit()
+	return true
+
+
+## Replays an already seen chapter in read-only mode so choices do not mutate
+## flags, grant cash, add fund clients or queue follow-up chapters.
+func start_replay(story_id: String) -> bool:
+	if not stories.has(story_id) or not bool(seen.get(story_id, false)):
+		return false
+	if is_active():
+		return false
+	replay_mode = true
+	active_id = story_id
+	active_story = stories[story_id]
+	node_id = String(active_story.get("start", ""))
 	story_started.emit(active_id)
 	view_changed.emit()
 	return true
@@ -150,7 +168,8 @@ func choose(index: int) -> bool:
 	var choice: Dictionary = choices[index]
 	if not evaluate(choice.get("condition", null)):
 		return false
-	_apply_effects(choice.get("effects", []))
+	if not replay_mode:
+		_apply_effects(choice.get("effects", []))
 	var next_id := String(choice.get("next", ""))
 	if next_id.is_empty():
 		_finish()
@@ -203,6 +222,7 @@ func current_view() -> Dictionary:
 		"character": character_id,
 		"can_continue": node_type == "line",
 		"node_id": node_id,
+		"replay": replay_mode,
 	}
 
 
@@ -349,9 +369,23 @@ func _apply_effects(effects: Array) -> void:
 					String(client.get("risk", "medium")))
 
 
-## A node may carry flag-specific variants of its narration. The first matching
-## entry wins; otherwise the default "text" is used.
+## A node may carry flag-specific variants of its narration.
+## - "text_blocks_by_flag" collects every matching block in order and joins them.
+## - "text_by_flag" uses the first matching entry.
+## Otherwise the default "text" is used.
 func _node_text(node: Dictionary) -> String:
+	var blocks: Variant = node.get("text_blocks_by_flag", [])
+	if typeof(blocks) == TYPE_ARRAY and not blocks.is_empty():
+		var matched: Array[String] = []
+		for entry in blocks:
+			if typeof(entry) != TYPE_DICTIONARY:
+				continue
+			if evaluate(entry.get("condition", null)):
+				var resolved := _resolve(entry.get("text", ""))
+				if resolved != "":
+					matched.append(resolved)
+		if not matched.is_empty():
+			return "\n\n".join(matched)
 	var value: Variant = node.get("text", "")
 	var variants: Variant = node.get("text_by_flag", [])
 	if typeof(variants) == TYPE_ARRAY:
@@ -385,22 +419,27 @@ func _goto(next_id: String) -> void:
 		_finish()
 		return
 	node_id = next_id
-	_record("node")
+	if not replay_mode:
+		_record("node")
 	view_changed.emit()
 
 
 func _finish() -> void:
 	var finished_id := active_id
+	var was_replay := replay_mode
+	replay_mode = false
 	active_id = ""
 	active_story = {}
 	node_id = ""
 	if not finished_id.is_empty():
-		_record("finish")
+		if not was_replay:
+			_record("finish")
 		story_finished.emit(finished_id)
-		last_finished_id = finished_id
-		handle_event("story_finished", {"story_id": finished_id})
+		if not was_replay:
+			last_finished_id = finished_id
+			handle_event("story_finished", {"story_id": finished_id})
 	view_changed.emit()
-	if not queue.is_empty():
+	if not was_replay and not queue.is_empty():
 		var next_story: String = queue.pop_front()
 		start_story(next_story)
 
@@ -417,13 +456,14 @@ func to_dict() -> Dictionary:
 		"flags": flags,
 		"seen": seen,
 		"history": history,
-		"activeId": active_id,
-		"nodeId": node_id,
+		"activeId": "" if replay_mode else active_id,
+		"nodeId": "" if replay_mode else node_id,
 		"queue": queue,
 	}
 
 
 func from_dict(data: Dictionary) -> void:
+	replay_mode = false
 	flags = data.get("flags", {})
 	seen = data.get("seen", {})
 	history = data.get("history", [])

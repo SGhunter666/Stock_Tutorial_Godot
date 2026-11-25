@@ -960,6 +960,29 @@ func _run_simulated_traders(rng: SmaRng) -> void:
 		})
 
 
+## A separate seeded stream makes the reference price move on quiet seconds
+## without changing the random sequence of orders, fills or news.
+func _sample_intraday_quotes() -> void:
+	var second := int(state["second"])
+	var date := _date_text()
+	var rng := SmaRng.new("%s|%d|%d|quotes" % [state["seed"], state["dayIndex"], second])
+	for ticker in state["companies"]:
+		if is_trading_halted(ticker):
+			continue
+		var cs: Dictionary = state["companies"][ticker]
+		var series: Dictionary = cs["series"]
+		var current: Variant = series.get("quotes", {}).get("current")
+		var anchor := float(cs["last"])
+		var initial_price := float(cs["open"]) if second == 1 else anchor
+		var previous := float(current["c"]) if current != null else initial_price
+		var amplitude := maxf(0.02, anchor * float(cs["company"]["vol"]) * 0.03)
+		var movement := (anchor - previous) * 0.15 + rng.range_float(-amplitude, amplitude)
+		var price := maxf(0.01, SmaFormat.round_to(previous + movement, 2))
+		if price == SmaFormat.round_to(previous, 2):
+			price += 0.01 if movement >= 0.0 or price <= 0.01 else -0.01
+		SmaMinuteSeries.apply_quote(series, date, second, SmaFormat.round_to(price, 2), previous)
+
+
 # ---------------------------------------------------------------------------
 # Risk
 # ---------------------------------------------------------------------------
@@ -1011,7 +1034,7 @@ func check_margin() -> Dictionary:
 # Clock
 # ---------------------------------------------------------------------------
 
-func advance_second() -> void:
+func advance_second(sample_quotes: bool = true) -> void:
 	last_player_fills = []
 	var rng := SmaRng.new(String(state["seed"]))
 	rng.set_state(state["rngState"])
@@ -1030,6 +1053,8 @@ func advance_second() -> void:
 	_flush_liquidity()
 	if int(state["second"]) % 10 == 0:
 		check_margin()
+	if sample_quotes:
+		_sample_intraday_quotes()
 	_prune_orders()
 	state["rngState"] = rng.get_state()
 

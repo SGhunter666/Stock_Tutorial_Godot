@@ -16,8 +16,8 @@
       "type": "line",
       "speaker": { "zh_CN": "林岚 · 首席导师", "en": "Lin Lan · Lead Mentor" },
       "text": {
-        "zh_CN": "先别急着下单。我带你走到工位：左边是行情，中间是交易台，右边是你的持仓。今天只有一个任务——弄明白你买入的到底是什么。",
-        "en": "Don't rush to trade. I'll walk you to your desk: quotes on the left, the ticket in the middle, your positions on the right. Today's only task is to understand what you are buying."
+        "zh_CN": "先别急着下单。左侧栏可以切换行情、交易台和持仓。今天只有一个任务——弄明白你买入的到底是什么。",
+        "en": "Don't rush to trade. Use the navigation bar on the left to switch between the market, the trading desk, and your portfolio. Today's only task is to understand what you are buying."
       },
       "next": "gu_yan_pass"
     },

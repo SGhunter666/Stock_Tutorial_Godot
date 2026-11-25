@@ -208,19 +208,22 @@ func _matching_rows(filters: Dictionary) -> Array:
 				and not String(company.get("name", "")).to_lower().contains(query):
 			continue
 		var financials: Dictionary = company.get("financials", {})
-		var pe := _number(financials.get("pe", 0.0))
-		if pe_max > 0.0 and (pe <= 0.0 or pe > pe_max):
-			continue
 		var quote: Dictionary = game.exchange.quote(symbol)
 		var last := float(quote.get("last", 0.0))
 		var change := float(quote.get("changePct", 0.0))
+		var eps := _number(financials.get("eps", 0.0))
+		var pe := (last / eps) if (eps > 0.0 and last > 0.0) else _number(financials.get("pe", 0.0))
+		if pe_max > 0.0 and (pe <= 0.0 or pe > pe_max):
+			continue
 		if change < change_min:
 			continue
 		var dividend := _number(financials.get("dividendPerShare", 0.0))
 		var yield_pct := dividend / last * 100.0 if last > 0.0 else 0.0
 		if yield_min > 0.0 and yield_pct < yield_min:
 			continue
-		var cap_b := _number(company.get("marketCap", 0.0)) / 1000000000.0
+		var shares := _number(company.get("sharesOutstanding", company.get("shares", 0.0)))
+		var cap_b := (shares * last / 1000000000.0) if (shares > 0.0 and last > 0.0) \
+			else (_number(company.get("marketCap", 0.0)) / 1000000000.0)
 		if cap_min > 0.0 and cap_b < cap_min:
 			continue
 		result.append({
@@ -279,13 +282,23 @@ func _result_row(entry: Dictionary) -> Control:
 	var watch_button := SmaKit.button("★" if game.is_watched(ticker) else "☆",
 		_toggle_watch.bind(ticker))
 	watch_button.custom_minimum_size.x = 34
-	row.add_child(watch_button)
+	row.add_child(_action_cell(watch_button, 0.5))
 	var trade_button := SmaKit.button(I18n.t("watchlist.trade"),
 		_open_ticker.bind(ticker))
 	trade_button.custom_minimum_size.x = 62
-	row.add_child(trade_button)
+	row.add_child(_action_cell(trade_button, 0.6))
 	_rows[ticker] = {"last": last_cell, "change": change_cell}
 	return row
+
+
+func _action_cell(button: Button, ratio: float) -> HBoxContainer:
+	var holder := SmaKit.hbox(0)
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	holder.size_flags_stretch_ratio = ratio
+	holder.alignment = BoxContainer.ALIGNMENT_CENTER
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	holder.add_child(button)
+	return holder
 
 
 func _stored_filters() -> Dictionary:

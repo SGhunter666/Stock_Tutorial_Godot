@@ -206,8 +206,9 @@ func _render_unit() -> void:
 	var meta_text := I18n.t("lesson.unitNumber", {"number": entry.get("number", 0)})
 	if bool(entry.get("optional", false)):
 		meta_text = "B%s" % String(entry["id"]).trim_prefix("b")
-	head_box.add_child(SmaKit.caption("%s · %s" % [
-		meta_text, I18n.t("academy.minutes", {"minutes": entry.get("minutes", 0)})]))
+	var track_label := I18n.t("academy.track.%s" % SmaAcademy.track_id(entry))
+	head_box.add_child(SmaKit.caption("%s · %s · %s" % [
+		meta_text, track_label, I18n.t("academy.minutes", {"minutes": entry.get("minutes", 0)})]))
 	head_box.add_child(SmaKit.title(I18n.t(String(entry["titleKey"])), 24))
 	head_box.add_child(SmaKit.muted(I18n.t(String(entry["summaryKey"])), 13))
 	head_box.add_child(_progress_bar(float(progress["pct"])))
@@ -511,17 +512,32 @@ func _render_quiz(entry: Dictionary, progress: Dictionary) -> void:
 	else:
 		box.add_child(SmaKit.label(I18n.t("quiz.bestScore", {"score": progress["quizBest"]}), 13,
 			SmaUiTheme.POSITIVE if bool(progress["quizPassed"]) else SmaUiTheme.WARNING))
+	var quiz_actions := SmaKit.flow(8)
 	var button := SmaKit.button(I18n.t("academy.quizStart"), _open_quiz_for_unit, true)
 	button.custom_minimum_size.x = 160
-	box.add_child(button)
+	quiz_actions.add_child(button)
+	if not bool(progress["completed"]):
+		var test_out := SmaKit.button(I18n.t("academy.testOutStart", {
+			"pass": SmaAcademy.TEST_OUT_SCORE}), _open_test_out_for_unit)
+		test_out.tooltip_text = I18n.t("academy.testOutHint", {"pass": SmaAcademy.TEST_OUT_SCORE})
+		quiz_actions.add_child(test_out)
+	box.add_child(quiz_actions)
+	if not bool(progress["completed"]):
+		var hint := SmaKit.caption(I18n.t("academy.testOutHint", {"pass": SmaAcademy.TEST_OUT_SCORE}))
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(hint)
 	_content.add_child(card)
 
 
 func _open_quiz_for_unit() -> void:
-	_open_quiz(_selected_unit)
+	_open_quiz(_selected_unit, false)
 
 
-func _open_quiz(unit_id: String) -> void:
+func _open_test_out_for_unit() -> void:
+	_open_quiz(_selected_unit, true)
+
+
+func _open_quiz(unit_id: String, test_out: bool = false) -> void:
 	var progress := SmaAcademy.ensure_unit(game.academy, unit_id)
 	var attempt := int(progress.get("quizAttempts", 0)) + 1
 	var session := SmaAcademy.build_quiz(unit_id, attempt)
@@ -535,7 +551,7 @@ func _open_quiz(unit_id: String) -> void:
 	main.add_child(dialog)
 	dialog.retry_requested.connect(func(target: String): _retry_unit = target)
 	dialog.closed.connect(_on_quiz_closed)
-	dialog.setup(game, unit_id, session)
+	dialog.setup(game, unit_id, session, test_out)
 
 
 func _on_quiz_closed() -> void:

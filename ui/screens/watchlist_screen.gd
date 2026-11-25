@@ -114,13 +114,23 @@ func _watch_row(ticker: String) -> Control:
 	var open_button := SmaKit.button(I18n.t("watchlist.trade"),
 		_open_ticker.bind(ticker))
 	open_button.custom_minimum_size.x = 64
-	row.add_child(open_button)
+	row.add_child(_action_cell(open_button, 0.7))
 	var remove_button := SmaKit.button("★", _remove_watch.bind(ticker))
 	remove_button.custom_minimum_size.x = 36
 	remove_button.tooltip_text = I18n.t("watchlist.removeWatch", {"ticker": ticker})
-	row.add_child(remove_button)
+	row.add_child(_action_cell(remove_button, 0.5))
 	_watch_rows[ticker] = {"last": last_cell, "change": change_cell}
 	return row
+
+
+func _action_cell(button: Button, ratio: float) -> HBoxContainer:
+	var holder := SmaKit.hbox(0)
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	holder.size_flags_stretch_ratio = ratio
+	holder.alignment = BoxContainer.ALIGNMENT_CENTER
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	holder.add_child(button)
+	return holder
 
 
 func _active_alerts(ticker: String) -> int:
@@ -207,12 +217,12 @@ func _alert_row(alert: Dictionary) -> Control:
 	var open_button := SmaKit.button(I18n.t("watchlist.trade"),
 		_open_ticker.bind(ticker))
 	open_button.custom_minimum_size.x = 64
-	row.add_child(open_button)
+	row.add_child(_action_cell(open_button, 0.7))
 	var delete_button := SmaKit.button("×",
 		_delete_alert.bind(String(alert.get("id", ""))))
 	delete_button.custom_minimum_size.x = 32
 	delete_button.tooltip_text = I18n.t("watchlist.deleteAlert")
-	row.add_child(delete_button)
+	row.add_child(_action_cell(delete_button, 0.5))
 	return row
 
 

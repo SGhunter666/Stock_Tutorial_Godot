@@ -74,6 +74,18 @@ func _render_simulation() -> void:
 	card.add_child(box)
 	box.add_child(SmaKit.label(I18n.t("settings.simulationTitle"), 14))
 	box.add_child(SmaKit.muted(I18n.t("settings.simulationSubtitle"), 11))
+	var name_row := SmaKit.hbox(6)
+	name_row.add_child(SmaKit.label(I18n.t("settings.playerName"), 11))
+	var name_edit := LineEdit.new()
+	name_edit.text = String(game.settings.get("playerName", ""))
+	name_edit.placeholder_text = I18n.t("start.playerNamePlaceholder")
+	name_edit.max_length = 24
+	name_edit.custom_minimum_size.x = 200
+	name_row.add_child(name_edit)
+	name_row.add_child(SmaKit.button(I18n.t("settings.playerNameSave"), func():
+		game.set_player_name(name_edit.text)
+		game.toast(I18n.t("toast.saved"))))
+	box.add_child(name_row)
 	var row := SmaKit.hbox(6)
 	row.add_child(SmaKit.label(I18n.t("settings.speed"), 11))
 	for speed in [1, 5, 10, 30, 60]:
@@ -110,6 +122,22 @@ func _render_simulation() -> void:
 	theme_row.add_child(theme_select)
 	box.add_child(theme_row)
 	box.add_child(SmaKit.muted(I18n.t("settings.themeHint"), 10))
+	var scheme_row := SmaKit.hbox(6)
+	scheme_row.add_child(SmaKit.label(I18n.t("settings.colorSchemeTitle"), 11))
+	var scheme_select := OptionButton.new()
+	var schemes := [["intl", "settings.colorSchemeIntl"], ["cn", "settings.colorSchemeCn"],
+		["colorblind", "settings.colorSchemeColorblind"]]
+	var current_scheme := String(game.settings.get("colorScheme", "intl"))
+	for index in schemes.size():
+		scheme_select.add_item(I18n.t(String(schemes[index][1])))
+		if String(schemes[index][0]) == current_scheme:
+			scheme_select.selected = index
+	scheme_select.custom_minimum_size.x = 220
+	scheme_select.item_selected.connect(func(index):
+		game.set_color_scheme(String(schemes[index][0])))
+	scheme_row.add_child(scheme_select)
+	box.add_child(scheme_row)
+	box.add_child(SmaKit.muted(I18n.t("settings.colorSchemeHint"), 10))
 	var motion := CheckBox.new()
 	motion.text = I18n.t("settings.reducedMotion")
 	motion.button_pressed = bool(game.settings.get("reducedMotion", false))
@@ -253,6 +281,41 @@ func _render_data() -> void:
 				int(stamp["second"])]})
 	box.add_child(SmaKit.muted(saved_text, 11))
 	box.add_child(SmaKit.muted(String(info.get("path", "")), 10))
+	box.add_child(SmaKit.label(I18n.t("settings.slotsTitle"), 12, SmaUiTheme.ACCENT))
+	var slots_box := SmaKit.vbox(4)
+	for s in game.save_slots():
+		var slot_num := int(s["slot"])
+		var s_row := SmaKit.hbox(8)
+		var is_active: bool = slot_num == int(game.active_slot)
+		var desc := I18n.t("start.slotEmpty", {"slot": slot_num})
+		if bool(s.get("exists", false)):
+			var pname := String(s.get("playerName", ""))
+			if pname == "":
+				pname = I18n.t("player.defaultName")
+			desc = I18n.t("start.slotSummary", {
+				"slot": slot_num, "name": pname,
+				"day": int(s["day"]) + 1,
+				"equity": SmaFormat.money(float(s["equity"])),
+				"rank": int(s["rank"]),
+			})
+		s_row.add_child(SmaKit.cell(("● " if is_active else "○ ") + desc, 1.5,
+			HORIZONTAL_ALIGNMENT_LEFT, SmaUiTheme.TEXT if is_active else SmaUiTheme.MUTED, 11))
+		var use_btn := SmaKit.button(I18n.t("settings.slotActive" if is_active else "settings.slotUse"),
+			func():
+				game.select_save_slot(slot_num)
+				refresh())
+		use_btn.disabled = is_active
+		use_btn.add_theme_font_size_override("font_size", 10)
+		s_row.add_child(use_btn)
+		if bool(s.get("exists", false)):
+			var load_btn := SmaKit.button(I18n.t("settings.slotLoad"), func():
+				game.select_save_slot(slot_num)
+				game.load_game()
+				refresh())
+			load_btn.add_theme_font_size_override("font_size", 10)
+			s_row.add_child(load_btn)
+		slots_box.add_child(s_row)
+	box.add_child(slots_box)
 	var actions := SmaKit.hbox(8)
 	actions.add_child(SmaKit.button(I18n.t("settings.saveNow"), _save_now, true))
 	actions.add_child(SmaKit.button(I18n.t("settings.exportSave"), _export))
@@ -297,7 +360,9 @@ func _reset() -> void:
 	dialog.title = I18n.t("settings.resetTitle")
 	dialog.dialog_text = I18n.t("settings.resetMessage")
 	dialog.ok_button_text = I18n.t("settings.resetConfirm")
+	dialog.canceled.connect(dialog.queue_free)
 	dialog.confirmed.connect(func():
+		dialog.queue_free()
 		game.reset_progress()
 		refresh())
 	add_child(dialog)

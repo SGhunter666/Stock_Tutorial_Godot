@@ -3,6 +3,63 @@ class_name SmaSaveService
 extends RefCounted
 
 const SAVE_PATH := "user://saves/career.json"
+const SLOT_COUNT := 4
+
+
+static func slot_path(slot: int) -> String:
+	var clamped := clampi(slot, 1, SLOT_COUNT)
+	if clamped == 1:
+		return SAVE_PATH
+	return "user://saves/career_slot_%d.json" % clamped
+
+
+static func slot_summary(slot: int) -> Dictionary:
+	var clamped := clampi(slot, 1, SLOT_COUNT)
+	var path := slot_path(clamped)
+	var summary := {
+		"slot": clamped, "path": path, "exists": false, "playerName": "",
+		"day": 0, "equity": 0.0, "rank": 1, "storiesSeen": 0,
+		"savedAt": 0, "graduated": false,
+	}
+	var data := read(path)
+	if data.is_empty():
+		data = read(path + ".bak")
+	if data.is_empty():
+		return summary
+	summary["exists"] = true
+	summary["savedAt"] = int(data.get("savedAt", 0))
+	var cfg: Variant = data.get("settings", {})
+	if cfg is Dictionary:
+		summary["playerName"] = String(cfg.get("playerName", ""))
+	var ex: Variant = data.get("exchange", {})
+	if ex is Dictionary:
+		summary["day"] = int(ex.get("dayIndex", 0))
+		var account: Variant = ex.get("account", {})
+		if account is Dictionary:
+			var history: Variant = account.get("equityHistory", [])
+			if history is Array and not history.is_empty() and history.back() is Dictionary:
+				summary["equity"] = float(history.back().get("equity", account.get("cash", 0.0)))
+			else:
+				summary["equity"] = float(account.get("cash", 0.0))
+	var cr: Variant = data.get("career", {})
+	if cr is Dictionary:
+		summary["rank"] = int(cr.get("rank", 1))
+	var story: Variant = data.get("narrative", {})
+	if story is Dictionary:
+		var seen: Variant = story.get("seen", {})
+		if seen is Dictionary:
+			summary["storiesSeen"] = seen.size()
+			summary["graduated"] = bool(seen.get("epilogue", false)) \
+				or bool(seen.get("graduation", false)) \
+				or bool(seen.get("graduation_unfunded", false))
+	return summary
+
+
+static func list_slots() -> Array:
+	var rows: Array = []
+	for slot in range(1, SLOT_COUNT + 1):
+		rows.append(slot_summary(slot))
+	return rows
 
 
 static func _ensure_dir(dir_path: String) -> bool:

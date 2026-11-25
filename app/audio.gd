@@ -79,6 +79,23 @@ func _build() -> void:
 		{"freq": 440.0, "start": 0.0, "duration": 0.12, "volume": 0.09},
 		{"freq": 554.37, "start": 0.10, "duration": 0.18, "volume": 0.09},
 	])
+	_streams["alert"] = _sequence([
+		{"freq": 880.0, "start": 0.0, "duration": 0.09, "volume": 0.14},
+		{"freq": 1174.66, "start": 0.10, "duration": 0.16, "volume": 0.14},
+	])
+	_streams["quiz_pass"] = _sequence([
+		{"freq": 587.33, "start": 0.0, "duration": 0.10, "volume": 0.13},
+		{"freq": 739.99, "start": 0.09, "duration": 0.10, "volume": 0.13},
+		{"freq": 880.00, "start": 0.18, "duration": 0.22, "volume": 0.14},
+	])
+	_streams["quiz_fail"] = _sequence([
+		{"freq": 329.63, "start": 0.0, "duration": 0.14, "volume": 0.13},
+		{"freq": 261.63, "start": 0.13, "duration": 0.22, "volume": 0.13},
+	])
+	_streams["crisis_alarm"] = _sequence([
+		{"freq": 196.00, "start": 0.0, "duration": 0.24, "volume": 0.16},
+		{"freq": 185.00, "start": 0.26, "duration": 0.28, "volume": 0.16},
+	])
 	for index in SFX_VOICES:
 		var player := AudioStreamPlayer.new()
 		player.bus = "SFX"
@@ -145,37 +162,48 @@ func _sequence(notes: Array) -> AudioStreamWAV:
 	return _wav(data, count, false)
 
 
-## Eight-second ambient loop: four soft chords with gaps, low enough to sit
-## under the interface without competing with it.
+## Twenty-four-second generative ambient loop: eight warm low-fatigue chords
+## with a subtle pentatonic shimmer layer so long study sessions stay calm.
 func _build_ambient_loop() -> AudioStreamWAV:
-	var duration := 8.0
+	var duration := 24.0
 	var count := int(SAMPLE_RATE * duration)
 	var buffer := PackedFloat32Array()
 	buffer.resize(count)
 	var chords := [
-		[220.00, 261.63, 329.63],
-		[174.61, 220.00, 261.63],
-		[261.63, 329.63, 392.00],
-		[196.00, 246.94, 293.66],
+		[220.00, 261.63, 329.63, 493.88],
+		[174.61, 220.00, 261.63, 329.63],
+		[261.63, 329.63, 392.00, 493.88],
+		[196.00, 246.94, 293.66, 329.63],
+		[146.83, 220.00, 261.63, 329.63],
+		[220.00, 261.63, 329.63, 392.00],
+		[174.61, 220.00, 261.63, 392.00],
+		[164.81, 246.94, 293.66, 392.00],
 	]
+	var shimmer := [523.25, 659.25, 587.33, 493.88, 523.25, 440.00, 659.25, 587.33]
 	for chord_index in chords.size():
 		var chord: Array = chords[chord_index]
-		var start := float(chord_index) * 2.0
-		var note_duration := 1.75
+		var start := float(chord_index) * 3.0
+		var note_duration := 2.95
 		var first := int(SAMPLE_RATE * start)
 		var note_count := int(SAMPLE_RATE * note_duration)
+		var bell_freq := float(shimmer[chord_index])
 		for offset in note_count:
 			var index := first + offset
 			if index < 0 or index >= count:
 				continue
 			var time := float(offset) / float(SAMPLE_RATE)
-			var envelope := clampf(time / 0.35, 0.0, 1.0) \
-				* clampf((note_duration - time) / 0.45, 0.0, 1.0)
+			var envelope := clampf(time / 0.65, 0.0, 1.0) \
+				* clampf((note_duration - time) / 0.75, 0.0, 1.0)
 			var sample := 0.0
 			for freq in chord:
 				sample += sin(TAU * float(freq) * time)
-				sample += sin(TAU * float(freq) * 2.0 * time) * 0.12
-			buffer[index] += sample * envelope * 0.018
+				sample += sin(TAU * float(freq) * 0.5 * time) * 0.18
+			var bell_t := time - 0.85
+			if bell_t > 0.0 and bell_t < 1.35:
+				var bell_env := clampf(bell_t / 0.08, 0.0, 1.0) \
+					* clampf((1.35 - bell_t) / 1.10, 0.0, 1.0)
+				sample += sin(TAU * bell_freq * bell_t) * bell_env * 0.28
+			buffer[index] += sample * envelope * 0.013
 	var data := PackedByteArray()
 	data.resize(count * 2)
 	for index in count:

@@ -12,6 +12,7 @@ const XP_QUIZ_PERFECT := 15
 const XP_UNIT_COMPLETE := 20
 const XP_PER_LEVEL := 150
 const PASS_SCORE := 80
+const TEST_OUT_SCORE := 85
 
 const TOOL_RULES := {
 	"order.limit": {"unitId": "u4", "sectionId": "s3"},
@@ -147,6 +148,7 @@ static func _new_unit_progress() -> Dictionary:
 		"practiceDone": false,
 		"completed": false,
 		"completedDay": null,
+		"testedOut": false,
 	}
 
 
@@ -177,6 +179,7 @@ static func normalize_state(saved: Variant) -> Dictionary:
 		progress["practiceDone"] = bool(raw.get("practiceDone", false))
 		progress["completed"] = bool(raw.get("completed", false))
 		progress["completedDay"] = raw.get("completedDay", null)
+		progress["testedOut"] = bool(raw.get("testedOut", false))
 		state["units"][unit_id] = progress
 	return state
 
@@ -200,10 +203,24 @@ static func is_unit_unlocked(state: Dictionary, unit_id: String) -> bool:
 	var entry := unit(unit_id)
 	if entry.is_empty():
 		return false
+	var primary_ok := true
 	for prerequisite in entry.get("prerequisites", []):
+		if not is_unit_complete(state, String(prerequisite)):
+			primary_ok = false
+			break
+	if primary_ok:
+		return true
+	var alt: Array = entry.get("altPrerequisites", [])
+	if alt.is_empty():
+		return false
+	for prerequisite in alt:
 		if not is_unit_complete(state, String(prerequisite)):
 			return false
 	return true
+
+
+static func track_id(entry: Dictionary) -> String:
+	return String(entry.get("track", "branch" if bool(entry.get("optional", false)) else "core"))
 
 
 static func progress_rows(state: Dictionary, entry: Dictionary) -> Dictionary:
@@ -312,6 +329,41 @@ static func record_quiz(state: Dictionary, unit_id: String, score: int,
 		xp_gained += award_xp(state, "quiz:%s:perfect" % unit_id, XP_QUIZ_PERFECT)
 	var completion := _evaluate_completion(state, entry, day)
 	return {"ok": true, "score": score, "passed": score >= PASS_SCORE,
+		"xpGained": xp_gained + int(completion.get("xpGained", 0)),
+		"completed": bool(completion.get("completed", false))}
+
+
+## Placement / test-out exam: scoring >= TEST_OUT_SCORE (85%) completes the
+## unit immediately, unlocking its tools and downstream tracks while leaving
+## lessons and demos open for review anytime.
+static func record_test_out(state: Dictionary, unit_id: String, score: int,
+		day: int) -> Dictionary:
+	var entry := unit(unit_id)
+	if entry.is_empty():
+		return {"ok": false}
+	var progress := ensure_unit(state, unit_id)
+	progress["quizAttempts"] = int(progress["quizAttempts"]) + 1
+	progress["lastScore"] = score
+	var previous_best := int(progress["quizBest"] if progress["quizBest"] != null else 0)
+	progress["quizBest"] = maxi(previous_best, score)
+	if score < TEST_OUT_SCORE:
+		return {"ok": true, "score": score, "passed": false, "testedOut": false,
+			"xpGained": 0, "completed": false}
+	var xp_gained := 0
+	for section_entry in entry.get("sections", []):
+		var section_id := String(section_entry["id"])
+		if not bool(progress["sectionsRead"].get(section_id, false)):
+			progress["sectionsRead"][section_id] = true
+			xp_gained += award_xp(state, "section:%s.%s" % [unit_id, section_id], XP_SECTION)
+	if not bool(progress["practiceDone"]):
+		progress["practiceDone"] = true
+		xp_gained += award_xp(state, "practice:%s" % unit_id, XP_PRACTICE)
+	xp_gained += award_xp(state, "quiz:%s:pass" % unit_id, XP_QUIZ_PASS)
+	if score == 100:
+		xp_gained += award_xp(state, "quiz:%s:perfect" % unit_id, XP_QUIZ_PERFECT)
+	progress["testedOut"] = true
+	var completion := _evaluate_completion(state, entry, day)
+	return {"ok": true, "score": score, "passed": true, "testedOut": true,
 		"xpGained": xp_gained + int(completion.get("xpGained", 0)),
 		"completed": bool(completion.get("completed", false))}
 

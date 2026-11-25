@@ -21,6 +21,10 @@ func _ready() -> void:
 		failures.append("game did not start")
 	if Game.narrative == null or not Game.narrative.is_active():
 		failures.append("opening story did not start")
+	var opening_second := int(Game.exchange.state["second"])
+	Game._process(2.0)
+	if int(Game.exchange.state["second"]) != opening_second:
+		failures.append("the market clock ran during the opening story")
 	if main._dialogue == null or not main._dialogue._portrait_frame.visible:
 		failures.append("opening dialogue portrait is not visible")
 	# Walk the opening story to the first choice and pick a path.
@@ -51,6 +55,15 @@ func _ready() -> void:
 	var first_chart: SmaCandleChart = main._screens["trade"]._chart
 	if first_chart.timeframe != "1m" or first_chart.candles.size() != 1:
 		failures.append("new careers do not open with a live 1m candle")
+	else:
+		var opening_price := float(first_chart.candles[0]["c"])
+		await get_tree().create_timer(1.5).timeout
+		var live_second := int(Game.exchange.state["second"])
+		if live_second <= opening_second \
+				or main._clock_label.text != SmaCalendar.session_clock(live_second) \
+				or float(first_chart.candles[0]["c"]) == opening_price:
+			failures.append("clock and 1m candle did not start automatically after the opening story")
+	Game.set_paused(true)
 	if not Game.set_intro_plan("Check the spread", "Exit below the morning range", 100.0):
 		failures.append("trade plan did not save before the fill")
 
@@ -78,9 +91,10 @@ func _ready() -> void:
 		else:
 			Game.narrative.advance()
 
+	var expected_minute_step := int(Game.exchange.state["second"]) + 60
 	Game.step_minute()
 	await get_tree().process_frame
-	if int(Game.exchange.state["second"]) != 60:
+	if int(Game.exchange.state["second"]) != expected_minute_step:
 		failures.append("minute step did not advance the clock")
 
 	var speed_key := InputEventKey.new()
@@ -349,8 +363,31 @@ func _ready() -> void:
 		if demo_id in ["shortPnl", "stopOrder"] and recorded:
 			failures.append("%s demo should not complete a practice" % demo_id)
 
+	# Verify tool locks are enforced before their lessons are read.
+	if String(Game.submit_order({"ticker": "APLA", "side": "buy", "type": "limit",
+			"qty": 1, "limitPrice": 10.0}).get("error", "")) != "order.limitLocked":
+		failures.append("limit order should stay locked before u4/s3")
+	if String(Game.submit_order({"ticker": "APLA", "side": "sell", "type": "stop",
+			"qty": 1, "stopPrice": 10.0}).get("error", "")) != "order.stopLocked":
+		failures.append("stop order should stay locked before u19/s1")
+	if String(Game.submit_order({"ticker": "NVDO", "side": "short", "type": "market",
+			"qty": 5}).get("error", "")) != "order.shortLocked":
+		failures.append("short selling should stay locked before u17/s1")
+	if String(Game.submit_order({"ticker": "APLA", "side": "buy", "type": "market",
+			"qty": 1000}).get("error", "")) != "order.marginLocked":
+		failures.append("margin leverage should stay locked before u18/s1")
+	if String(Game.buy_bond("gov2", 1).get("error", "")) != "order.multiassetLocked":
+		failures.append("multi-asset bond should stay locked before u13")
+
+	Game.academy_mark_section_read("u4", "s3")
+	Game.academy_mark_section_read("u17", "s1")
+	Game.academy_mark_section_read("u18", "s1")
+	Game.academy_mark_section_read("u19", "s1")
+	Game.academy_mark_section_read("u20", "s1")
+
 	main.navigate("trade")
 	await get_tree().process_frame
+	_check_trade_stop_language_draft(main, failures)
 	trade_screen = main._screens["trade"]
 	trade_screen._on_side("sell")
 	trade_screen._on_type("stop")
@@ -715,6 +752,13 @@ func _ready() -> void:
 	Game.set_theme("dark")
 	if SmaUiTheme.mode != "dark":
 		failures.append("dark theme not restored")
+	Game.set_color_scheme("cn")
+	if SmaUiTheme.color_scheme != "cn" or SmaUiTheme.POSITIVE.r <= SmaUiTheme.POSITIVE.g:
+		failures.append("CN color scheme not applied")
+	Game.set_color_scheme("colorblind")
+	if SmaUiTheme.color_scheme != "colorblind" or SmaUiTheme.POSITIVE.b <= SmaUiTheme.POSITIVE.r:
+		failures.append("colorblind color scheme not applied")
+	Game.set_color_scheme("cn")
 	var replay := Game.replay_snapshot(Game.replay_max_day())
 	if replay.is_empty() or not (replay.get("positions", []) is Array):
 		failures.append("replay snapshot missing")
@@ -741,6 +785,8 @@ func _ready() -> void:
 	var day_before := Game.get_day()
 	if not Game.load_game():
 		failures.append("load failed")
+	elif Game.paused:
+		failures.append("loading a career left the market clock paused")
 	var restored_receipt: Dictionary = Game.intro.get("receipt", {})
 	if restored_receipt.get("orderId") != first_receipt.get("orderId") \
 			or not is_equal_approx(float(restored_receipt.get("price", 0.0)), float(first_receipt["price"])) \
@@ -774,6 +820,9 @@ func _ready() -> void:
 		failures.append("financials views were not restored")
 	if not Game.is_watched("APLA"):
 		failures.append("watchlist was not restored")
+	if String(Game.settings.get("colorScheme", "")) != "cn" or SmaUiTheme.color_scheme != "cn":
+		failures.append("color scheme did not persist across save/load")
+	Game.set_color_scheme("intl")
 	if Game.price_alerts().size() != 1:
 		failures.append("price alert was not restored")
 	if not bool(Game.academy["demosCompleted"].get("greeks", false)):
@@ -853,6 +902,7 @@ func _ready() -> void:
 	if Game.intro["review"].get("exitOutcome") != "notTriggered":
 		failures.append("close review did not keep the player's exit assessment")
 	await _check_opening_gap(main, failures)
+	await _check_black_friday(main, failures)
 	main.navigate("portfolio")
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -1080,6 +1130,7 @@ func _check_live_trade_clock(main: SmaMain, failures: Array[String]) -> void:
 	var original_second := int(Game.exchange.state["second"])
 	var remaining := mini(62, SmaExchange.SESSION_SECONDS - 1 - original_second)
 	var chart: SmaCandleChart = main._screens["trade"]._chart
+	var previous_price := float(chart.candles.back()["c"])
 	for elapsed in range(1, remaining + 1):
 		for frame in 16:
 			Game._process(1.0 / 16.0)
@@ -1093,14 +1144,43 @@ func _check_live_trade_clock(main: SmaMain, failures: Array[String]) -> void:
 				or not chart.title_text.ends_with(I18n.t("chart.nextMinute", {"seconds": 60 - second % 60})):
 			failures.append("1m chart went out of sync at simulated second %d" % second)
 			break
+		var price := float(chart.candles.back()["c"])
+		if price == previous_price:
+			failures.append("1m candle price stayed flat at simulated second %d" % second)
+			break
+		previous_price = price
 	Game.set_paused(true)
 	var paused_time := main._clock_label.text
+	var paused_bar: Dictionary = chart.candles.back().duplicate()
 	Game._process(2.0)
-	if main._clock_label.text != paused_time:
-		failures.append("pausing did not freeze the live clock")
+	if main._clock_label.text != paused_time or chart.candles.back() != paused_bar:
+		failures.append("pausing did not freeze the live clock and candle")
 
 
 func _check_trade_language_draft(main: SmaMain, failures: Array[String]) -> void:
+	var ticket: SmaTradeScreen = main._screens["trade"]
+	var original := ticket.capture_draft()
+	var locale: String = I18n.locale
+	ticket._on_side("sell")
+	# Before u19/s1 is read, selecting stop should remain blocked at market.
+	ticket._on_type("stop")
+	if ticket._order_type != "market":
+		failures.append("locked stop order type should not activate before u19/s1")
+	ticket._qty.get_line_edit().text = "27"
+	I18n.toggle()
+	ticket = main._screens["trade"]
+	var side := ticket._side_group.get_pressed_button()
+	var order_type := ticket._type_group.get_pressed_button()
+	if ticket._qty.value != 27 \
+			or side == null or side.text != I18n.t("trade.sell") \
+			or order_type == null or order_type.text != I18n.t("trade.market"):
+		failures.append("language switch discarded the trade order draft")
+	I18n.set_locale(locale)
+	ticket = main._screens["trade"]
+	ticket.restore_draft(original)
+
+
+func _check_trade_stop_language_draft(main: SmaMain, failures: Array[String]) -> void:
 	var ticket: SmaTradeScreen = main._screens["trade"]
 	var original := ticket.capture_draft()
 	var locale: String = I18n.locale
@@ -1117,7 +1197,7 @@ func _check_trade_language_draft(main: SmaMain, failures: Array[String]) -> void
 			or side == null or side.text != I18n.t("trade.sell") \
 			or order_type == null or order_type.text != I18n.t("trade.stop") \
 			or not ticket._stop_row.visible:
-		failures.append("language switch discarded the trade order draft")
+		failures.append("language switch discarded the unlocked stop trade order draft")
 	I18n.set_locale(locale)
 	ticket = main._screens["trade"]
 	ticket.restore_draft(original)
@@ -1257,3 +1337,80 @@ func _check_gap_layout(main: SmaMain, failures: Array[String]) -> void:
 	window.size = original_size
 	window.content_scale_factor = original_scale
 	I18n.set_locale(original_locale)
+
+
+func _check_black_friday(main: SmaMain, failures: Array[String]) -> void:
+	Game.set_player_name("林小望")
+	if Game.display_player_name() != "林小望":
+		failures.append("custom trainee name did not apply")
+	var obj: Dictionary = Game.current_objective()
+	if String(obj.get("title", "")).is_empty() or String(obj.get("target", "")).is_empty():
+		failures.append("global objective tracker returned empty objective")
+	if Game.side_comments().is_empty():
+		failures.append("expected at least one non-blocking mentor side-comment")
+	if not Game.black_friday_unlocked():
+		failures.append("black friday campaign should unlock when fund is active")
+		return
+	main.navigate("black_friday")
+	await get_tree().process_frame
+	if not Game.black_friday_active or Game.black_friday.is_empty():
+		failures.append("black friday campaign did not enter cleanly")
+		return
+	var BfStage := SmaBlackFriday.Stage
+	if not Game.apply_black_friday(0, BfStage.BRIEFING, "advance") \
+			or not Game.apply_black_friday(0, BfStage.OPEN_0930, "confirm_open", "protect") \
+			or not Game.apply_black_friday(0, BfStage.AFTER_0930, "advance") \
+			or not Game.apply_black_friday(0, BfStage.CRUNCH_1100, "confirm_crunch", "protect") \
+			or not Game.apply_black_friday(0, BfStage.AFTER_1100, "advance") \
+			or not Game.apply_black_friday(0, BfStage.CLOSED, "review",
+				"Liquidity buffers must be planned before panic strikes."):
+		failures.append("black friday attempt 1 could not complete")
+		return
+	if String(Game.narrative.flags.get("crisis_choice", "")) != "protect":
+		failures.append("black friday attempt 1 did not write crisis_choice into narrative flags")
+	if not Game.apply_black_friday(0, BfStage.REVIEWED, "compare") \
+			or not Game.apply_black_friday(1, BfStage.BRIEFING, "advance") \
+			or not Game.apply_black_friday(1, BfStage.OPEN_0930, "confirm_open", "gate") \
+			or not Game.apply_black_friday(1, BfStage.AFTER_0930, "advance") \
+			or not Game.apply_black_friday(1, BfStage.CRUNCH_1100, "confirm_crunch", "gate") \
+			or not Game.apply_black_friday(1, BfStage.AFTER_1100, "advance"):
+		failures.append("black friday comparison attempt 2 failed")
+		return
+	if not Game.load_game() or not SmaBlackFriday.is_complete(Game.black_friday) \
+			or Game.display_player_name() != "林小望":
+		failures.append("black friday state or playerName did not survive save/load")
+	var report := Game.graduation_report()
+	if String(report.get("playerName", "")) != "林小望" or float(report.get("equity", 0.0)) <= 0.0:
+		failures.append("graduation report card did not compute expected fields")
+	var report_path := Game.save_path.get_basename() + "-report.json"
+	if not Game.export_graduation_report(report_path) \
+			or SmaSaveService.import_from(report_path).get("playerName", "") != "林小望":
+		failures.append("graduation report JSON export failed")
+	SmaSaveService.clear(report_path)
+	# Verify tabbed dense screens render cleanly across all tabs.
+	main.navigate("fund")
+	await get_tree().process_frame
+	var fund_screen: SmaFundScreen = main._screens["fund"]
+	for tab in ["overview", "quant", "clients", "risk"]:
+		fund_screen._active_tab = tab
+		fund_screen.refresh("tab")
+		if fund_screen._body.get_child_count() == 0:
+			failures.append("fund tab did not render: %s" % tab)
+	main.navigate("career")
+	await get_tree().process_frame
+	var career_screen: SmaCareerScreen = main._screens["career"]
+	for tab in ["promotion", "tasks", "certs"]:
+		career_screen._active_tab = tab
+		career_screen.refresh("tab")
+		if career_screen._body.get_child_count() == 0:
+			failures.append("career tab did not render: %s" % tab)
+	main.navigate("multiasset")
+	await get_tree().process_frame
+	var ma_screen: SmaMultiAssetScreen = main._screens["multiasset"]
+	for tab in ["bonds", "fx", "commodities", "crypto"]:
+		ma_screen._active_tab = tab
+		ma_screen.refresh("tab")
+		if ma_screen._body.get_child_count() == 0:
+			failures.append("multiasset tab did not render: %s" % tab)
+	main.navigate("dashboard")
+	await get_tree().process_frame

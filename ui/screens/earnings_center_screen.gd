@@ -107,8 +107,10 @@ func on_tick() -> void:
 	var quote: Dictionary = game.exchange.quote(_selected_ticker)
 	_research_quote.text = "%s · %s · %s" % [_selected_ticker, timeframe,
 		SmaFormat.money(float(quote.get("last", 0.0)))]
-	_research_chart.set_candles(game.exchange.get_candles(_selected_ticker, timeframe), timeframe,
-		"%s · %s" % [_selected_ticker, timeframe])
+	var title := "%s · %s" % [_selected_ticker, timeframe]
+	if timeframe == "1m":
+		title += " · " + I18n.t("chart.referenceQuote")
+	_research_chart.set_candles(game.exchange.get_candles(_selected_ticker, timeframe), timeframe, title)
 
 
 func _render_upcoming() -> void:

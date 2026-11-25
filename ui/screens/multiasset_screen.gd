@@ -4,7 +4,9 @@
 class_name SmaMultiAssetScreen
 extends SmaScreen
 
+var _scroll: ScrollContainer
 var _body: VBoxContainer
+var _active_tab := "bonds"
 var _bond_select: OptionButton
 var _fx_select: OptionButton
 var _commodity_select: OptionButton
@@ -21,15 +23,16 @@ func _build() -> void:
 	var root := SmaKit.vbox(10)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
-	var scroll := SmaKit.scroll()
-	root.add_child(scroll)
+	_scroll = SmaKit.scroll()
+	root.add_child(_scroll)
 	_body = SmaKit.vbox(12)
-	scroll.add_child(_body)
+	_scroll.add_child(_body)
 
 
 func refresh(_reason: String = "") -> void:
 	if not built:
 		return
+	var saved_scroll := _scroll.scroll_vertical if _scroll != null else 0
 	SmaKit.clear_children(_body)
 	_bond_select = null
 	_fx_select = null
@@ -37,16 +40,49 @@ func refresh(_reason: String = "") -> void:
 	_crypto_select = null
 	if game == null or not game.started:
 		return
-	if not SmaAcademy.is_unit_complete(game.academy, "u13"):
+	if not game.multiasset_unlocked():
 		_render_locked()
 		return
 	_render_header()
 	_render_summary()
-	_render_bonds()
-	_render_fx()
-	_render_commodities()
-	_render_crypto()
+	_render_tabs()
+	match _active_tab:
+		"fx":
+			_render_fx()
+		"commodities":
+			_render_commodities()
+		"crypto":
+			_render_crypto()
+		_:
+			_render_bonds()
 	_body.add_child(SmaKit.muted(I18n.t("multiasset.note"), 10))
+	_restore_scroll.call_deferred(saved_scroll)
+
+
+func _restore_scroll(pos: int) -> void:
+	if is_instance_valid(_scroll):
+		_scroll.scroll_vertical = pos
+
+
+func _render_tabs() -> void:
+	var row := SmaKit.flow(6)
+	var group := ButtonGroup.new()
+	for spec in [
+		["bonds", "multiasset.tab.bonds"],
+		["fx", "multiasset.tab.fx"],
+		["commodities", "multiasset.tab.commodities"],
+		["crypto", "multiasset.tab.crypto"],
+	]:
+		var tab_id := String(spec[0])
+		var btn := SmaKit.toggle(I18n.t(String(spec[1])), group)
+		btn.button_pressed = _active_tab == tab_id
+		btn.pressed.connect(func():
+			_active_tab = tab_id
+			if is_instance_valid(_scroll):
+				_scroll.scroll_vertical = 0
+			refresh("tab"))
+		row.add_child(btn)
+	_body.add_child(row)
 
 
 func _render_locked() -> void:

@@ -18,13 +18,13 @@ const MAX_CERTIFICATES := 12
 const TASK_DEFS := [
 	{"kind": "equity", "titleKey": "career.task.equity.title",
 		"descKey": "career.task.equity.desc", "deadlineDays": 12,
-		"rewardXp": 100, "rewardCash": 120.0},
+		"rewardXp": 100, "rewardCash": 400.0},
 	{"kind": "sector", "titleKey": "career.task.sector.title",
 		"descKey": "career.task.sector.desc", "deadlineDays": 15,
-		"rewardXp": 130, "rewardCash": 160.0},
+		"rewardXp": 130, "rewardCash": 550.0},
 	{"kind": "risk", "titleKey": "career.task.risk.title",
 		"descKey": "career.task.risk.desc", "deadlineDays": 10,
-		"rewardXp": 90, "rewardCash": 100.0},
+		"rewardXp": 90, "rewardCash": 350.0},
 ]
 
 const CERTIFICATES := [
@@ -53,14 +53,14 @@ const RANKS := [
 			{"kind": "inspected", "target": 3},
 		]},
 	{"number": 2, "id": "trader", "titleKey": "career.rank.trader.title",
-		"descKey": "career.rank.trader.desc", "salary": 200.0, "xp": 100,
+		"descKey": "career.rank.trader.desc", "salary": 500.0, "xp": 100,
 		"requirements": [
 			{"kind": "unit", "unitId": "u8", "target": 1},
 			{"kind": "trades", "target": 10},
-			{"kind": "equity", "target": 11000.0},
+			{"kind": "equity", "target": 103000.0},
 		]},
 	{"number": 3, "id": "research", "titleKey": "career.rank.research.title",
-		"descKey": "career.rank.research.desc", "salary": 400.0, "xp": 150,
+		"descKey": "career.rank.research.desc", "salary": 1000.0, "xp": 150,
 		"requirements": [
 			{"kind": "unit", "unitId": "u12", "target": 1},
 			{"kind": "demo", "demoId": "financials", "target": 1},
@@ -69,7 +69,7 @@ const RANKS := [
 			{"kind": "reports", "target": 1},
 		]},
 	{"number": 4, "id": "quant", "titleKey": "career.rank.quant.title",
-		"descKey": "career.rank.quant.desc", "salary": 700.0, "xp": 200,
+		"descKey": "career.rank.quant.desc", "salary": 1800.0, "xp": 200,
 		"requirements": [
 			{"kind": "unit", "unitId": "u16", "target": 1},
 			{"kind": "demo", "demoId": "risk", "target": 1},
@@ -78,7 +78,7 @@ const RANKS := [
 			{"kind": "reports", "target": 3},
 		]},
 	{"number": 5, "id": "pm", "titleKey": "career.rank.pm.title",
-		"descKey": "career.rank.pm.desc", "salary": 1200.0, "xp": 250,
+		"descKey": "career.rank.pm.desc", "salary": 3000.0, "xp": 250,
 		"requirements": [
 			{"kind": "unit", "unitId": "u30", "target": 1},
 			{"kind": "options", "target": 1},
@@ -87,24 +87,24 @@ const RANKS := [
 			{"kind": "evaluations", "target": 1},
 		]},
 	{"number": 6, "id": "hedge", "titleKey": "career.rank.hedge.title",
-		"descKey": "career.rank.hedge.desc", "salary": 2000.0, "xp": 300,
+		"descKey": "career.rank.hedge.desc", "salary": 5000.0, "xp": 300,
 		"requirements": [
 			{"kind": "unit", "unitId": "u32", "target": 1},
 			{"kind": "branches", "target": 1},
 			{"kind": "challenges", "target": 3},
-			{"kind": "equity", "target": 30000.0},
+			{"kind": "equity", "target": 125000.0},
 		]},
 	{"number": 7, "id": "founder", "titleKey": "career.rank.founder.title",
-		"descKey": "career.rank.founder.desc", "salary": 3500.0, "xp": 400,
+		"descKey": "career.rank.founder.desc", "salary": 8000.0, "xp": 400,
 		"requirements": [
 			{"kind": "branches", "target": 3},
 			{"kind": "challenges", "target": 5},
-			{"kind": "equity", "target": 60000.0},
+			{"kind": "equity", "target": 150000.0},
 			{"kind": "xp", "target": 4500},
 			{"kind": "certificates", "target": 3},
 		]},
 	{"number": 8, "id": "ceo", "titleKey": "career.rank.ceo.title",
-		"descKey": "career.rank.ceo.desc", "salary": 6000.0, "xp": 500,
+		"descKey": "career.rank.ceo.desc", "salary": 12000.0, "xp": 500,
 		"requirements": []},
 ]
 

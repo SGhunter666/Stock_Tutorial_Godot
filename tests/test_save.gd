@@ -70,3 +70,26 @@ func run() -> void:
 	SmaSaveService.clear(test_path)
 	check(not SmaSaveService.exists(test_path), "save service clears the slot")
 	check(not SmaSaveService.exists(test_path + ".bak"), "clearing a slot also clears its backup")
+
+	describe("save-multi-slots")
+	eq(SmaSaveService.slot_path(1), SmaSaveService.SAVE_PATH, "slot 1 maps to legacy career.json")
+	eq(SmaSaveService.slot_path(4), "user://saves/career_slot_4.json", "slot 4 has dedicated file")
+	eq(SmaSaveService.list_slots().size(), SmaSaveService.SLOT_COUNT, "all 4 slots listed")
+	var slot4_path := SmaSaveService.slot_path(4)
+	SmaSaveService.clear(slot4_path)
+	eq(bool(SmaSaveService.slot_summary(4)["exists"]), false, "empty slot 4 reports exists=false")
+	check(SmaSaveService.write({
+		"version": 1, "savedAt": 12345,
+		"settings": {"playerName": "测试学员"},
+		"exchange": {"dayIndex": 7, "account": {"cash": 104500.0, "equityHistory": [{"day": 7, "equity": 104500.0}]}},
+		"career": {"rank": 3},
+		"narrative": {"seen": {"opening": true, "epilogue": true}},
+	}, slot4_path), "slot 4 writes cleanly")
+	var s4 := SmaSaveService.slot_summary(4)
+	eq(bool(s4["exists"]), true, "slot 4 summary detects save")
+	eq(String(s4["playerName"]), "测试学员", "slot 4 summary reads player name")
+	eq(int(s4["day"]), 7, "slot 4 summary reads day")
+	approx(float(s4["equity"]), 104500.0, 0.01, "slot 4 summary reads equity")
+	eq(int(s4["rank"]), 3, "slot 4 summary reads career rank")
+	eq(bool(s4["graduated"]), true, "slot 4 summary detects graduation")
+	SmaSaveService.clear(slot4_path)

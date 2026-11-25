@@ -1,5 +1,5 @@
-## Trade-based OHLCV aggregation. The 1m display carries the last traded price
-## through quiet minutes with zero volume and exposes only elapsed minutes.
+## Trade-based OHLCV aggregation with a separate stream of 1m reference prices.
+## Quote samples can change the visible candle without adding trade volume.
 class_name SmaMinuteSeries
 extends RefCounted
 
@@ -24,33 +24,53 @@ static func _clock_text(minutes: int) -> String:
 
 
 static func apply_trade(series: Dictionary, trade: Dictionary) -> Dictionary:
-	var minute := minute_index_for_second(int(trade.get("second", 0)))
+	return _apply_sample(series, String(trade.get("date", "")), int(trade.get("second", 0)),
+		float(trade.get("price", 0.0)), int(trade.get("qty", 0)), 1)
+
+
+static func apply_quote(series: Dictionary, date: String, second: int,
+		price: float, previous_price: float) -> void:
+	if not series.has("quotes"):
+		var quotes := {"intraday": [], "current": null}
+		series["quotes"] = quotes
+		if second % 60 != 0:
+			var trade_bar: Variant = series.get("current")
+			if trade_bar != null and int(trade_bar["minute"]) == minute_index_for_second(second):
+				quotes["current"] = trade_bar.duplicate()
+				quotes["current"]["v"] = 0
+				quotes["current"]["trades"] = 0
+			else:
+				_apply_sample(quotes, date, second, previous_price, 0, 0)
+	_apply_sample(series["quotes"], date, second, price, 0, 0)
+
+
+static func _apply_sample(series: Dictionary, date: String, second: int,
+		price: float, quantity: int, trade_count: int) -> Dictionary:
+	var minute := minute_index_for_second(second)
 	var current: Variant = series.get("current", null)
 	if current != null and int(current["minute"]) != minute:
 		finalize_minute(series)
 		current = null
 	if current == null:
-		var price := float(trade.get("price", 0.0))
 		series["current"] = {
-			"date": String(trade.get("date", "")),
+			"date": date,
 			"minute": minute,
 			"time": _clock_text(9 * 60 + 30 + minute),
 			"o": price,
 			"h": price,
 			"l": price,
 			"c": price,
-			"v": int(trade.get("qty", 0)),
-			"trades": 1,
+			"v": quantity,
+			"trades": trade_count,
 			"finalized": false,
 		}
 		return series["current"]
 	var bar: Dictionary = series["current"]
-	var price := float(trade.get("price", 0.0))
 	bar["h"] = maxf(float(bar["h"]), price)
 	bar["l"] = minf(float(bar["l"]), price)
 	bar["c"] = price
-	bar["v"] = int(bar["v"]) + int(trade.get("qty", 0))
-	bar["trades"] = int(bar["trades"]) + 1
+	bar["v"] = int(bar["v"]) + quantity
+	bar["trades"] = int(bar["trades"]) + trade_count
 	return bar
 
 
@@ -66,6 +86,7 @@ static func finalize_minute(series: Dictionary) -> Variant:
 
 
 static func finalize_day(series: Dictionary, date: String) -> Variant:
+	series.erase("quotes")
 	finalize_minute(series)
 	var bars: Array = series.get("intraday", [])
 	if bars.is_empty():
@@ -188,18 +209,28 @@ static func _aggregate_daily(daily: Array, key_of: Callable) -> Array:
 	return result
 
 
-static func _live_minutes(bars: Array, date: String, second: int, opening_price: float) -> Array:
+static func _live_minutes(bars: Array, quotes: Array, date: String, second: int,
+		opening_price: float) -> Array:
 	var active_minute := minute_index_for_second(second)
 	var result: Array = []
 	var trade_index := 0
+	var quote_index := 0
 	var reference := opening_price
 	for minute in range(active_minute + 1):
 		var partial := minute == active_minute
+		var trade: Dictionary = {}
 		if trade_index < bars.size() and int(bars[trade_index]["minute"]) == minute:
-			var bar := _base_candle(bars[trade_index], {"partial": partial})
+			trade = bars[trade_index]
+			trade_index += 1
+		var quote: Dictionary = trade
+		if quote_index < quotes.size() and int(quotes[quote_index]["minute"]) == minute:
+			quote = quotes[quote_index]
+			quote_index += 1
+		if not quote.is_empty():
+			var bar := _base_candle(quote, {"partial": partial, "v": int(trade.get("v", 0)),
+				"trades": int(trade.get("trades", 0))})
 			reference = float(bar["c"])
 			result.append(bar)
-			trade_index += 1
 		else:
 			result.append({
 				"d": date, "end": date, "time": _clock_text(9 * 60 + 30 + minute),
@@ -209,15 +240,20 @@ static func _live_minutes(bars: Array, date: String, second: int, opening_price:
 	return result
 
 
-static func candles(series: Dictionary, timeframe: String, date: String,
-		second: int, opening_price: float) -> Array:
-	var bars: Array = []
-	bars.append_array(series.get("intraday", []))
+static func _current_bars(series: Dictionary) -> Array:
+	var bars: Array = series.get("intraday", []).duplicate()
 	var current: Variant = series.get("current", null)
 	if current != null:
 		bars.append(current)
+	return bars
+
+
+static func candles(series: Dictionary, timeframe: String, date: String,
+		second: int, opening_price: float) -> Array:
+	var bars := _current_bars(series)
 	if timeframe == "1m":
-		return _live_minutes(bars, date, second, opening_price)
+		return _live_minutes(bars, _current_bars(series.get("quotes", {})),
+			date, second, opening_price)
 	if INTRADAY_TIMEFRAMES.has(timeframe):
 		return _aggregate_intraday(bars, int(_TIMEFRAME_MINUTES[timeframe]))
 	var daily: Array = series.get("daily", []).duplicate(true)

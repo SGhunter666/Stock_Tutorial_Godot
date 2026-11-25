@@ -4,8 +4,8 @@ extends "res://tests/test_base.gd"
 func run() -> void:
 	describe("exchange-init")
 	var exchange := SmaExchange.new("test-seed", 100000.0)
-	eq(exchange.state["companies"].size(), 54, "universe has 50 companies and 4 ETFs")
-	eq(exchange.state["quotes"].size(), 54, "every instrument has a quote")
+	eq(exchange.state["companies"].size(), 61, "universe has 57 companies and 4 ETFs")
+	eq(exchange.state["quotes"].size(), 61, "every instrument has a quote")
 	approx(exchange.equity(), 100000.0, 0.001, "initial equity equals cash")
 
 	describe("exchange-buy")
@@ -104,6 +104,19 @@ func run() -> void:
 			"same seed quote %s" % ticker)
 	approx(left.equity(), right.equity(), 0.0, "same seed equity")
 
+	describe("exchange-fast-forward-parity")
+	var ff_full := SmaExchange.new("ff-parity", 100000.0)
+	var ff_fast := SmaExchange.new("ff-parity", 100000.0)
+	for _i in 120:
+		ff_full.advance_second(true)
+		ff_fast.advance_second(false)
+	for ticker in ff_full.state["companies"].keys():
+		approx(float(ff_full.quote(ticker)["last"]), float(ff_fast.quote(ticker)["last"]), 0.0,
+			"fast-forward price parity %s" % ticker)
+	approx(ff_full.equity(), ff_fast.equity(), 0.0, "fast-forward equity parity")
+	eq(str(ff_full.state["rngState"]), str(ff_fast.state["rngState"]),
+		"fast-forward RNG state parity")
+
 	describe("exchange-save-roundtrip")
 	var restored := SmaExchange.from_dict(exchange.to_dict())
 	check(restored != null, "save payload restores")
@@ -133,6 +146,7 @@ func run() -> void:
 	eq(next_session.size(), 1, "new session starts with one candle")
 	eq(next_session[0]["time"], "09:30", "next session restarts the minute chart")
 	_check_live_minutes()
+	_check_intraday_quotes()
 
 	describe("exchange-margin")
 	var snapshot := SmaMargin.margin_snapshot(clock_exchange.state)
@@ -182,3 +196,43 @@ func _check_live_minutes() -> void:
 	bars = SmaMinuteSeries.candles(series, "1m", date, 180, 100.0)
 	check(bars.size() == 4 and bars[2]["time"] == "09:32" and bars[2]["v"] == 0
 		and not bars[2]["partial"] and bars[3]["partial"], "quiet minutes follow the clock without fake volume")
+
+
+func _check_intraday_quotes() -> void:
+	describe("per-second-reference-price")
+	var market := SmaExchange.new("live-quote-regression")
+	var previous := float(market.get_candles("APLA").back()["c"])
+	var first_closed: Dictionary = {}
+	for second in range(1, 62):
+		market.advance_second()
+		var bars := market.get_candles("APLA")
+		var live: Dictionary = bars.back()
+		check(live["partial"] and float(live["c"]) != previous,
+			"the active candle changes on simulated second %d" % second)
+		previous = float(live["c"])
+		if second == 60:
+			first_closed = bars[0].duplicate()
+			check(not first_closed["partial"] and live["o"] == live["c"]
+				and live["h"] == live["l"], "the new minute starts with a single price")
+		if second == 61:
+			eq(bars[0], first_closed, "closed candle is frozen while the new candle moves")
+			check(live["o"] != live["c"], "the new candle grows from its first price")
+	var displayed_volume := 0
+	for bar in market.get_candles("APLA"):
+		displayed_volume += int(bar["v"])
+	eq(displayed_volume, market.quote("APLA")["volume"], "reference ticks do not create volume")
+	var restored := SmaExchange.from_dict(JSON.parse_string(JSON.stringify(market.to_dict())))
+	check(restored != null, "a save with an active reference candle restores")
+	if restored != null:
+		market.advance_second()
+		restored.advance_second()
+		eq(restored.get_candles("APLA"), market.get_candles("APLA"),
+			"the price and wick continue identically after save and load")
+	var legacy := SmaMinuteSeries.create()
+	var date := SmaCalendar.iso_date(0)
+	SmaMinuteSeries.apply_trade(legacy, {"date": date, "second": 60, "price": 98.0, "qty": 2})
+	SmaMinuteSeries.apply_trade(legacy, {"date": date, "second": 60, "price": 102.0, "qty": 3})
+	SmaMinuteSeries.apply_quote(legacy, date, 60, 101.0, 100.0)
+	var next: Dictionary = SmaMinuteSeries.candles(legacy, "1m", date, 60, 100.0).back()
+	check(next["o"] == next["c"] and next["h"] == next["l"] and next["v"] == 5,
+		"the first quote at a minute boundary starts flat even if trades arrived first")

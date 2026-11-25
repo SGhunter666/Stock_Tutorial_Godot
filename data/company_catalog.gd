@@ -4,9 +4,9 @@ class_name SmaCompanyCatalog
 extends RefCounted
 
 const CATALOG_PATH := "res://data/companies.json"
-const EXPECTED_COUNT := 50
+const EXPECTED_COUNT := 57
 const EXPECTED_REFERENCES := 20
-const EXPECTED_ORIGINALS := 30
+const EXPECTED_ORIGINALS := 37
 
 static var _cache: Dictionary = {}
 

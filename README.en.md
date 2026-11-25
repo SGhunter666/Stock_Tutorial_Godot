@@ -2,7 +2,7 @@
 
 A single-player financial education and trading simulation built with **Godot 4**. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-03.1`
+- Version: `beta-06`
 - Engine: Godot `4.7+` (tested on `4.7.2`)
 - Renderer: GL Compatibility
 - Languages: Simplified Chinese / English
@@ -24,19 +24,19 @@ After reviewing your first trade, open **Opening Gap** from the dashboard. Make 
 
 | Item | Count / Content |
 | --- | --- |
-| Simulated stocks | 50 fictional companies |
+| Simulated stocks | 57 fictional companies (11 balanced sectors, ≥ 3 companies each) |
 | ETFs | 4: `MKT`, `TECH`, `DIV`, `SMAL` |
-| Academy | 32 core units + 6 branch units = 38 units |
+| Academy | 32 core units (core + 4 parallel tracks, 85% placement test-out) + 6 branch units = 38 units |
 | Academy stages | 8 |
 | Glossary | 85 terms |
-| Story | 16 stories, 36 triggers, 7 main characters |
+| Story & Campaigns | 16 stories, 36 triggers, 7 main characters + playable Opening Gap & Black Friday crisis campaigns |
 | Challenges | 14 goal-based trading challenges |
 | Achievements | 30 |
 | Career ranks | 8 |
 | Fund roles | 7 |
 | History lab | 4 real daily-bar scenarios |
-| Pages | 28 |
-| Save | Local JSON, one career slot, export/import |
+| Pages | 30 (28 grouped sidebar surfaces in 6 collapsible domains + 2 playable scenario screens) |
+| Save | Local JSON, 4 independent career slots, export/import & Graduation Report Card JSON export |
 
 The default seed is `academy-2026` and the default starting cash is **USD 100,000**. A trading day runs from **09:30 to 16:00** and contains 23,400 simulated seconds.
 
@@ -134,7 +134,7 @@ The start screen offers:
 - **New game**: create a career save and play the opening story.
 - **Continue**: load `user://saves/career.json`.
 
-The simulation starts paused until the opening story finishes.
+The market clock starts automatically after the opening story or when you load a career. It pauses during story dialogue.
 New careers begin with Today’s Task on the dashboard. Write an optional trade plan, place a simulated order, and review its fill, fees, position size and closing cash share.
 
 ### Windows build

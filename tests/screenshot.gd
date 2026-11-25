@@ -58,6 +58,8 @@ func _ready() -> void:
 	main.navigate("trade")
 	await _settle(6)
 	await _shot("trade")
+	Game.academy_mark_section_read("u19", "s1")
+	main._screens["trade"].refresh()
 	main._screens["trade"]._on_type("stop")
 	await _settle(4)
 	await _shot("trade_stop")
@@ -329,11 +331,12 @@ func _ready() -> void:
 	main._screens["multiasset"].refresh()
 	await _settle(4)
 	await _shot("multiasset_positions")
-	var asset_scroll: ScrollContainer = main._screens["multiasset"].get_child(0).get_child(0)
-	asset_scroll.scroll_vertical = 100000
+	main._screens["multiasset"]._active_tab = "crypto"
+	main._screens["multiasset"].refresh("tab")
 	await _settle(4)
 	await _shot("multiasset_bottom")
-	asset_scroll.scroll_vertical = 0
+	main._screens["multiasset"]._active_tab = "bonds"
+	main._screens["multiasset"].refresh("tab")
 
 	main.navigate("history")
 	await _settle(6)
@@ -415,14 +418,15 @@ func _ready() -> void:
 	main.navigate("career")
 	await _settle(6)
 	await _shot("career")
-	var career_scroll: ScrollContainer = main._screens["career"].get_child(0).get_child(0)
-	career_scroll.scroll_vertical = 100000
+	main._screens["career"]._active_tab = "certs"
+	main._screens["career"].refresh("tab")
 	await _settle(4)
 	await _shot("career_ladder")
-	career_scroll.scroll_vertical = 0
+	main._screens["career"]._active_tab = "promotion"
+	main._screens["career"].refresh("tab")
 
 	Game.create_fund({
-		"name": "Atlas Capital", "strategy": "longOnly", "riskProfile": "balanced",
+		"name": I18n.t("fund.defaultName"), "strategy": "longOnly", "riskProfile": "balanced",
 		"initialAum": 1000000.0, "managementRate": 0.02, "performanceRate": 0.2,
 		"benchmarkId": "index", "hurdleRate": 0.0, "leverageEnabled": false,
 		"taxProfileId": "none",
@@ -432,24 +436,26 @@ func _ready() -> void:
 	main.navigate("fund")
 	await _settle(8)
 	await _shot("fund")
-	var fund_scroll: ScrollContainer = main._screens["fund"].get_child(0).get_child(0)
-	fund_scroll.scroll_vertical = 100000
+	main._screens["fund"]._active_tab = "risk"
+	main._screens["fund"].refresh("tab")
 	await _settle(4)
 	await _shot("fund_bottom")
-	fund_scroll.scroll_vertical = 0
+	main._screens["fund"]._active_tab = "quant"
 	Game.fund_generate_plan()
-	main._screens["fund"].refresh()
+	main._screens["fund"].refresh("tab")
 	await _settle(6)
-	fund_scroll.scroll_vertical = 700
-	await _settle(4)
 	await _shot("fund_plan")
-	fund_scroll.scroll_vertical = 0
 	main._screens["fund"]._run_optimizer()
 	await _settle(8)
-	fund_scroll.ensure_control_visible(fund_scroll.get_child(0).get_child(7))
+	var fund_scroll: ScrollContainer = main._screens["fund"]._scroll
+	var fund_body: Control = main._screens["fund"]._body
+	if fund_body.get_child_count() > 0:
+		fund_scroll.ensure_control_visible(fund_body.get_child(fund_body.get_child_count() - 1))
 	await _settle(6)
 	await _shot("fund_optimizer")
 	fund_scroll.scroll_vertical = 0
+	main._screens["fund"]._active_tab = "overview"
+	main._screens["fund"].refresh("tab")
 
 	main.navigate("quant")
 	await _settle(10)
@@ -554,11 +560,15 @@ func _ready() -> void:
 	await _settle(8)
 	await _shot("replay_en")
 	main.navigate("fund")
+	main._screens["fund"]._active_tab = "quant"
+	main._screens["fund"].refresh("tab")
 	await _settle(8)
 	main._screens["fund"]._run_optimizer()
 	await _settle(8)
-	var fund_scroll_en: ScrollContainer = main._screens["fund"].get_child(0).get_child(0)
-	fund_scroll_en.ensure_control_visible(fund_scroll_en.get_child(0).get_child(7))
+	var fund_scroll_en: ScrollContainer = main._screens["fund"]._scroll
+	var fund_body_en: Control = main._screens["fund"]._body
+	if fund_body_en.get_child_count() > 0:
+		fund_scroll_en.ensure_control_visible(fund_body_en.get_child(fund_body_en.get_child_count() - 1))
 	await _settle(6)
 	await _shot("fund_optimizer_en")
 	I18n.set_locale("zh_CN")

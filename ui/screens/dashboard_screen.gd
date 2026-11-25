@@ -25,10 +25,13 @@ func refresh(_reason: String = "") -> void:
 	if game == null or not game.started:
 		return
 	_render_header()
+	_body.add_child(_render_objective())
 	if game.has_intro_task():
 		_body.add_child(_render_intro())
 	elif game.opening_gap_unlocked():
 		_body.add_child(_render_opening_gap())
+	if game.black_friday_unlocked():
+		_body.add_child(_render_black_friday())
 	var columns := SmaKit.hbox(12)
 	var learning := _render_learning()
 	learning.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -68,13 +71,77 @@ func _render_header() -> void:
 	var header := SmaKit.hbox(10)
 	var title_box := SmaKit.vbox(0)
 	title_box.add_child(SmaKit.caption(I18n.t("dashboard.eyebrow")))
-	title_box.add_child(SmaKit.label(I18n.t(greeting_key), 22))
+	title_box.add_child(SmaKit.label("%s · %s" % [
+		I18n.t(greeting_key), game.display_player_name()], 22))
 	title_box.add_child(SmaKit.muted(SmaCalendar.iso_date(game.get_day()), 12))
 	header.add_child(title_box)
 	header.add_child(SmaKit.hspacer())
 	header.add_child(SmaKit.button(I18n.t("dashboard.openAcademy"),
 		_go_academy, true))
 	_body.add_child(header)
+
+
+func _render_objective() -> Control:
+	var obj: Dictionary = game.current_objective()
+	var card := SmaKit.card(12)
+	var box := SmaKit.vbox(6)
+	card.add_child(box)
+	var head := SmaKit.hbox(8)
+	head.add_child(SmaKit.label(I18n.t(String(obj.get("actKey", "objective.act1"))),
+		11, SmaUiTheme.ACCENT))
+	head.add_child(SmaKit.label(String(obj.get("title", "")), 15))
+	head.add_child(SmaKit.hspacer())
+	var target_screen := String(obj.get("target", "academy"))
+	var jump := SmaKit.button(String(obj.get("button", I18n.t("objective.goAcademy"))), func():
+		var main := get_tree().get_first_node_in_group("main") as SmaMain
+		if main != null:
+			main.navigate(target_screen), true)
+	jump.disabled = (target_screen in ["opening_gap", "black_friday"]) \
+		and (game.is_story_paused() or game.is_fast_forwarding())
+	head.add_child(jump)
+	box.add_child(head)
+	_add_intro_text(box, String(obj.get("detail", "")))
+	var path_hint := String(obj.get("pathHint", ""))
+	if path_hint != "":
+		var hint_lbl := SmaKit.caption(path_hint)
+		hint_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(hint_lbl)
+	var ch: Dictionary = obj.get("challenge", {})
+	if bool(ch.get("active", false)):
+		var def: Dictionary = ch.get("definition", {})
+		box.add_child(SmaKit.label(I18n.t("objective.activeChallenge", {
+			"name": I18n.t(String(def.get("titleKey", ""))),
+			"days": int(ch.get("daysLeft", 0)),
+		}), 12, SmaUiTheme.INFO))
+	return card
+
+
+func _render_black_friday() -> Control:
+	var card := SmaKit.card(14)
+	var content := SmaKit.vbox(8)
+	card.add_child(content)
+	content.add_child(SmaKit.title(I18n.t("bf.title"), 19))
+	_add_intro_text(content, I18n.t("bf.dashboardHint"))
+	var state: Dictionary = game.black_friday
+	var label := "bf.start"
+	if not state.is_empty():
+		var attempts: Array = state["attempts"]
+		var last: Dictionary = attempts.back()
+		label = "bf.resume"
+		if int(last["stage"]) == SmaBlackFriday.Stage.REVIEWED or (attempts.size() == 2 \
+				and int(last["stage"]) == SmaBlackFriday.Stage.CLOSED):
+			label = "bf.viewResults"
+	var actions := SmaKit.flow(8)
+	var button := SmaKit.button(I18n.t(label), func():
+		var main := get_tree().get_first_node_in_group("main") as SmaMain
+		if main != null:
+			main.navigate("black_friday"), true)
+	button.name = "BlackFridayEntry"
+	button.focus_mode = Control.FOCUS_ALL
+	button.disabled = game.is_story_paused() or game.is_fast_forwarding()
+	actions.add_child(button)
+	content.add_child(actions)
+	return card
 
 
 func _render_opening_gap() -> Control:

@@ -230,14 +230,16 @@ func run() -> void:
 
 	describe("academy-stage-three")
 	var stage_three := SmaAcademy.create_state()
-	check(not SmaAcademy.is_unit_unlocked(stage_three, "u9"), "u9 waits for stage two")
-	for unit_id in ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8"]:
+	check(not SmaAcademy.is_unit_unlocked(stage_three, "u9"), "u9 waits for stage one core")
+	for unit_id in ["u1", "u2", "u3", "u4"]:
 		SmaAcademy.ensure_unit(stage_three, unit_id)["completed"] = true
-	check(SmaAcademy.is_unit_unlocked(stage_three, "u9"), "completing u8 unlocks u9")
+	check(SmaAcademy.is_unit_unlocked(stage_three, "u5"), "completing u4 opens Fundamentals track (u5)")
+	check(SmaAcademy.is_unit_unlocked(stage_three, "u9"), "completing u4 opens Execution track (u9)")
+	check(SmaAcademy.is_unit_unlocked(stage_three, "u13"), "completing u4 opens Macro/Quant track (u13)")
 	for unit_id in ["u9", "u10", "u11", "u12"]:
 		eq(SmaAcademy.unit(unit_id).get("stage", ""), "stage3",
 			"%s belongs to stage three" % unit_id)
-	check(not SmaAcademy.is_unit_unlocked(stage_three, "u13"), "stage four stays locked")
+	check(not SmaAcademy.is_unit_unlocked(stage_three, "u17"), "u17 waits for u10")
 
 	describe("academy-demo-practice")
 	var demo_state := SmaAcademy.create_state()
@@ -304,15 +306,13 @@ func run() -> void:
 
 	describe("academy-stage-four")
 	var stage_four := SmaAcademy.create_state()
-	check(not SmaAcademy.is_unit_unlocked(stage_four, "u13"), "u13 waits for stage three")
-	for unit_id in ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8",
-			"u9", "u10", "u11", "u12"]:
-		SmaAcademy.ensure_unit(stage_four, unit_id)["completed"] = true
-	check(SmaAcademy.is_unit_unlocked(stage_four, "u13"), "completing u12 unlocks u13")
+	check(not SmaAcademy.is_unit_unlocked(stage_four, "u13"), "u13 waits for core u4")
+	SmaAcademy.ensure_unit(stage_four, "u4")["completed"] = true
+	check(SmaAcademy.is_unit_unlocked(stage_four, "u13"), "completing u4 unlocks u13")
 	for unit_id in ["u13", "u14", "u15", "u16"]:
 		eq(SmaAcademy.unit(unit_id).get("stage", ""), "stage4",
 			"%s belongs to stage four" % unit_id)
-	check(not SmaAcademy.is_unit_unlocked(stage_four, "u17"), "stage five stays locked")
+	check(not SmaAcademy.is_unit_unlocked(stage_four, "u17"), "stage five waits for u10")
 
 	describe("academy-stage-four-demos")
 	for unit_id in ["u13", "u14", "u15", "u16"]:
@@ -353,11 +353,9 @@ func run() -> void:
 
 	describe("academy-stage-five")
 	var stage_five := SmaAcademy.create_state()
-	check(not SmaAcademy.is_unit_unlocked(stage_five, "u17"), "u17 waits for stage four")
-	for unit_id in ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8",
-			"u9", "u10", "u11", "u12", "u13", "u14", "u15", "u16"]:
-		SmaAcademy.ensure_unit(stage_five, unit_id)["completed"] = true
-	check(SmaAcademy.is_unit_unlocked(stage_five, "u17"), "completing u16 unlocks u17")
+	check(not SmaAcademy.is_unit_unlocked(stage_five, "u17"), "u17 waits for u10")
+	SmaAcademy.ensure_unit(stage_five, "u10")["completed"] = true
+	check(SmaAcademy.is_unit_unlocked(stage_five, "u17"), "completing u10 unlocks u17")
 	for unit_id in ["u17", "u18", "u19", "u20"]:
 		eq(SmaAcademy.unit(unit_id).get("stage", ""), "stage5",
 			"%s belongs to stage five" % unit_id)
@@ -419,12 +417,11 @@ func run() -> void:
 
 	describe("academy-stage-six")
 	var stage_six := SmaAcademy.create_state()
-	check(not SmaAcademy.is_unit_unlocked(stage_six, "u21"), "u21 waits for stage five")
-	for unit_id in ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8",
-			"u9", "u10", "u11", "u12", "u13", "u14", "u15", "u16",
-			"u17", "u18", "u19", "u20"]:
-		SmaAcademy.ensure_unit(stage_six, unit_id)["completed"] = true
-	check(SmaAcademy.is_unit_unlocked(stage_six, "u21"), "completing u20 unlocks u21")
+	check(not SmaAcademy.is_unit_unlocked(stage_six, "u21"), "u21 waits for u15 and u19")
+	SmaAcademy.ensure_unit(stage_six, "u15")["completed"] = true
+	check(not SmaAcademy.is_unit_unlocked(stage_six, "u21"), "u21 still waits for u19")
+	SmaAcademy.ensure_unit(stage_six, "u19")["completed"] = true
+	check(SmaAcademy.is_unit_unlocked(stage_six, "u21"), "completing u15 + u19 unlocks u21")
 	for unit_id in ["u21", "u22", "u23", "u24"]:
 		eq(SmaAcademy.unit(unit_id).get("stage", ""), "stage6",
 			"%s belongs to stage six" % unit_id)
@@ -644,19 +641,38 @@ func run() -> void:
 
 	describe("academy-branches")
 	eq(SmaAcademy.branch_units().size(), 6, "six professional branches are exported")
+	var mid_track_state := SmaAcademy.create_state()
+	SmaAcademy.ensure_unit(mid_track_state, "u14")["completed"] = true
+	check(SmaAcademy.is_unit_unlocked(mid_track_state, "b1"),
+		"mid-track u14 unlocks branch b1")
+	check(not SmaAcademy.is_unit_unlocked(mid_track_state, "b6"),
+		"b6 waits for u20 or u32")
 	var branch_state := SmaAcademy.create_state()
-	for unit_id in ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8",
-			"u9", "u10", "u11", "u12", "u13", "u14", "u15", "u16",
-			"u17", "u18", "u19", "u20", "u21", "u22", "u23", "u24",
-			"u25", "u26", "u27", "u28", "u29", "u30", "u31", "u32"]:
-		SmaAcademy.ensure_unit(branch_state, unit_id)["completed"] = true
+	SmaAcademy.ensure_unit(branch_state, "u32")["completed"] = true
 	check(SmaAcademy.is_unit_unlocked(branch_state, "b1"),
-		"completing u32 unlocks branch b1")
+		"completing u32 unlocks branch b1 via altPrerequisites")
 	for unit_id in ["b1", "b2", "b3", "b4", "b5", "b6"]:
 		var branch_entry := SmaAcademy.unit(unit_id)
 		eq(branch_entry.get("stage", ""), "branches", "%s belongs to the branches" % unit_id)
 		eq(branch_entry.get("optional", false), true, "%s is optional" % unit_id)
-		eq(branch_entry.get("prerequisites", []), ["u32"], "%s waits for u32" % unit_id)
+		check(SmaAcademy.is_unit_unlocked(branch_state, unit_id), "%s unlocks on u32" % unit_id)
+
+	describe("academy-test-out")
+	var testout_state := SmaAcademy.create_state()
+	var fail_out := SmaAcademy.record_test_out(testout_state, "u4", 80, 1)
+	eq(bool(fail_out.get("passed", true)), false, "score 80 fails 85% test-out")
+	eq(SmaAcademy.is_unit_complete(testout_state, "u4"), false, "failed test-out does not complete unit")
+	check(not SmaAcademy.is_tool_unlocked(testout_state, "order.limit"),
+		"failed test-out does not unlock tool")
+	var pass_out := SmaAcademy.record_test_out(testout_state, "u4", 85, 2)
+	eq(bool(pass_out.get("passed", false)), true, "score 85 passes test-out")
+	eq(bool(pass_out.get("testedOut", false)), true, "test-out flag recorded")
+	eq(SmaAcademy.is_unit_complete(testout_state, "u4"), true, "passing test-out completes unit")
+	check(SmaAcademy.is_tool_unlocked(testout_state, "order.limit"),
+		"passing test-out unlocks unit tools")
+	var testout_rt := SmaAcademy.normalize_state(JSON.parse_string(JSON.stringify(testout_state)))
+	eq(bool(SmaAcademy.ensure_unit(testout_rt, "u4").get("testedOut", false)), true,
+		"testedOut survives JSON persistence")
 	eq(SmaAcademy.branch_for_unit("b1").get("nameKey", ""), "branch.asset.name",
 		"branch metadata is available by unit id")
 	eq(SmaAcademy.overall_progress(branch_state)["total"], 32,

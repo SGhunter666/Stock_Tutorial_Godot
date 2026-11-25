@@ -1,0 +1,47 @@
+{
+  "id": "black_friday",
+  "version": 1,
+  "fund_name_key": "fund.defaultName",
+  "cash_cents": 8000000,
+  "liquid_shares": 5000,
+  "illiquid_shares": 4200,
+  "total_units": 1000000,
+  "fee_cents": 15000,
+  "drawdown_limit_pct": 20,
+  "redemptions": {
+    "open_cents": 12000000,
+    "crunch_cents": 18000000
+  },
+  "trade_blocks": {
+    "open_sell_shares": 2000,
+    "open_buy_shares": 2400,
+    "crunch_sell_shares": 2200,
+    "crunch_buy_shares": 1600
+  },
+  "points": [
+    {
+      "time": "16:00",
+      "liquid_cents": 10000,
+      "illiquid_cents": 10000
+    },
+    {
+      "time": "09:30",
+      "liquid_cents": 8900,
+      "liquid_bid_cents": 8600,
+      "liquid_ask_cents": 9000,
+      "illiquid_cents": 8600
+    },
+    {
+      "time": "11:00",
+      "liquid_cents": 8100,
+      "liquid_bid_cents": 7550,
+      "liquid_ask_cents": 8250,
+      "illiquid_cents": 7400
+    },
+    {
+      "time": "14:30",
+      "liquid_cents": 8700,
+      "illiquid_cents": 8200
+    }
+  ]
+}

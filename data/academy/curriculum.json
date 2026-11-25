@@ -220,7 +220,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage1"
+      "stage": "stage1",
+      "track": "core"
     },
     {
       "id": "u2",
@@ -413,7 +414,7 @@
       "practice": {
         "id": "u2-p1",
         "check": "buy-under-budget",
-        "target": 1000,
+        "target": 2500,
         "titleKey": "practice.u2.title",
         "requirementKey": "practice.u2.requirement",
         "hintKey": "practice.u2.hint",
@@ -425,7 +426,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage1"
+      "stage": "stage1",
+      "track": "core"
     },
     {
       "id": "u3",
@@ -605,7 +607,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage1"
+      "stage": "stage1",
+      "track": "core"
     },
     {
       "id": "u4",
@@ -809,7 +812,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage1"
+      "stage": "stage1",
+      "track": "core"
     },
     {
       "id": "u5",
@@ -1015,7 +1019,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage2"
+      "stage": "stage2",
+      "track": "fundamentals"
     },
     {
       "id": "u6",
@@ -1154,7 +1159,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage2"
+      "stage": "stage2",
+      "track": "fundamentals"
     },
     {
       "id": "u7",
@@ -1283,7 +1289,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage2"
+      "stage": "stage2",
+      "track": "fundamentals"
     },
     {
       "id": "u8",
@@ -1403,7 +1410,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage2"
+      "stage": "stage2",
+      "track": "fundamentals"
     },
     {
       "id": "u9",
@@ -1414,7 +1422,7 @@
       "summaryKey": "curriculum.u9.summary",
       "minutes": 14,
       "prerequisites": [
-        "u8"
+        "u4"
       ],
       "unlocks": [],
       "sections": [
@@ -1522,7 +1530,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage3"
+      "stage": "stage3",
+      "track": "execution"
     },
     {
       "id": "u10",
@@ -1645,7 +1654,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage3"
+      "stage": "stage3",
+      "track": "execution"
     },
     {
       "id": "u11",
@@ -1656,7 +1666,7 @@
       "summaryKey": "curriculum.u11.summary",
       "minutes": 16,
       "prerequisites": [
-        "u10"
+        "u6"
       ],
       "unlocks": [],
       "sections": [
@@ -1769,7 +1779,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage3"
+      "stage": "stage3",
+      "track": "fundamentals"
     },
     {
       "id": "u12",
@@ -1881,7 +1892,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage3"
+      "stage": "stage3",
+      "track": "fundamentals"
     },
     {
       "id": "u13",
@@ -1892,7 +1904,7 @@
       "summaryKey": "curriculum.u13.summary",
       "minutes": 15,
       "prerequisites": [
-        "u12"
+        "u4"
       ],
       "unlocks": [],
       "sections": [
@@ -2008,7 +2020,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage4"
+      "stage": "stage4",
+      "track": "macro_quant"
     },
     {
       "id": "u14",
@@ -2127,7 +2140,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage4"
+      "stage": "stage4",
+      "track": "macro_quant"
     },
     {
       "id": "u15",
@@ -2250,7 +2264,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage4"
+      "stage": "stage4",
+      "track": "macro_quant"
     },
     {
       "id": "u16",
@@ -2369,7 +2384,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage4"
+      "stage": "stage4",
+      "track": "macro_quant"
     },
     {
       "id": "u17",
@@ -2380,7 +2396,7 @@
       "summaryKey": "curriculum.u17.summary",
       "minutes": 16,
       "prerequisites": [
-        "u16"
+        "u10"
       ],
       "unlocks": [],
       "sections": [
@@ -2493,7 +2509,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage5"
+      "stage": "stage5",
+      "track": "execution"
     },
     {
       "id": "u18",
@@ -2615,7 +2632,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage5"
+      "stage": "stage5",
+      "track": "execution"
     },
     {
       "id": "u19",
@@ -2745,7 +2763,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage5"
+      "stage": "stage5",
+      "track": "execution"
     },
     {
       "id": "u20",
@@ -2868,7 +2887,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage5"
+      "stage": "stage5",
+      "track": "execution"
     },
     {
       "id": "u21",
@@ -2879,7 +2899,8 @@
       "summaryKey": "curriculum.u21.summary",
       "minutes": 16,
       "prerequisites": [
-        "u20"
+        "u15",
+        "u19"
       ],
       "unlocks": [],
       "sections": [
@@ -3003,7 +3024,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage6"
+      "stage": "stage6",
+      "track": "derivatives"
     },
     {
       "id": "u22",
@@ -3123,7 +3145,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage6"
+      "stage": "stage6",
+      "track": "derivatives"
     },
     {
       "id": "u23",
@@ -3245,7 +3268,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage6"
+      "stage": "stage6",
+      "track": "derivatives"
     },
     {
       "id": "u24",
@@ -3373,7 +3397,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage6"
+      "stage": "stage6",
+      "track": "derivatives"
     },
     {
       "id": "u25",
@@ -3491,7 +3516,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage7"
+      "stage": "stage7",
+      "track": "derivatives"
     },
     {
       "id": "u26",
@@ -3613,7 +3639,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage7"
+      "stage": "stage7",
+      "track": "derivatives"
     },
     {
       "id": "u27",
@@ -3728,7 +3755,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage7"
+      "stage": "stage7",
+      "track": "derivatives"
     },
     {
       "id": "u28",
@@ -3850,7 +3878,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage7"
+      "stage": "stage7",
+      "track": "derivatives"
     },
     {
       "id": "u29",
@@ -3978,7 +4007,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage8"
+      "stage": "stage8",
+      "track": "derivatives"
     },
     {
       "id": "u30",
@@ -4096,7 +4126,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage8"
+      "stage": "stage8",
+      "track": "derivatives"
     },
     {
       "id": "u31",
@@ -4215,7 +4246,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage8"
+      "stage": "stage8",
+      "track": "derivatives"
     },
     {
       "id": "u32",
@@ -4336,7 +4368,8 @@
         "passScore": 80
       },
       "ported": true,
-      "stage": "stage8"
+      "stage": "stage8",
+      "track": "derivatives"
     },
     {
       "id": "b1",
@@ -4350,7 +4383,7 @@
       "summaryKey": "curriculum.b1.summary",
       "minutes": 22,
       "prerequisites": [
-        "u32"
+        "u14"
       ],
       "unlocks": [],
       "sections": [
@@ -4540,7 +4573,11 @@
       "quiz": {
         "id": "b1",
         "passScore": 80
-      }
+      },
+      "track": "branch",
+      "altPrerequisites": [
+        "u32"
+      ]
     },
     {
       "id": "b2",
@@ -4554,7 +4591,7 @@
       "summaryKey": "curriculum.b2.summary",
       "minutes": 24,
       "prerequisites": [
-        "u32"
+        "u15"
       ],
       "unlocks": [],
       "sections": [
@@ -4744,7 +4781,11 @@
       "quiz": {
         "id": "b2",
         "passScore": 80
-      }
+      },
+      "track": "branch",
+      "altPrerequisites": [
+        "u32"
+      ]
     },
     {
       "id": "b3",
@@ -4758,7 +4799,7 @@
       "summaryKey": "curriculum.b3.summary",
       "minutes": 24,
       "prerequisites": [
-        "u32"
+        "u16"
       ],
       "unlocks": [],
       "sections": [
@@ -4952,7 +4993,11 @@
       "quiz": {
         "id": "b3",
         "passScore": 80
-      }
+      },
+      "track": "branch",
+      "altPrerequisites": [
+        "u32"
+      ]
     },
     {
       "id": "b4",
@@ -4966,7 +5011,7 @@
       "summaryKey": "curriculum.b4.summary",
       "minutes": 22,
       "prerequisites": [
-        "u32"
+        "u12"
       ],
       "unlocks": [],
       "sections": [
@@ -5156,7 +5201,11 @@
       "quiz": {
         "id": "b4",
         "passScore": 80
-      }
+      },
+      "track": "branch",
+      "altPrerequisites": [
+        "u32"
+      ]
     },
     {
       "id": "b5",
@@ -5170,7 +5219,7 @@
       "summaryKey": "curriculum.b5.summary",
       "minutes": 22,
       "prerequisites": [
-        "u32"
+        "u13"
       ],
       "unlocks": [],
       "sections": [
@@ -5360,7 +5409,11 @@
       "quiz": {
         "id": "b5",
         "passScore": 80
-      }
+      },
+      "track": "branch",
+      "altPrerequisites": [
+        "u32"
+      ]
     },
     {
       "id": "b6",
@@ -5374,7 +5427,7 @@
       "summaryKey": "curriculum.b6.summary",
       "minutes": 22,
       "prerequisites": [
-        "u32"
+        "u20"
       ],
       "unlocks": [],
       "sections": [
@@ -5564,7 +5617,11 @@
       "quiz": {
         "id": "b6",
         "passScore": 80
-      }
+      },
+      "track": "branch",
+      "altPrerequisites": [
+        "u32"
+      ]
     }
   ],
   "quizzes": {

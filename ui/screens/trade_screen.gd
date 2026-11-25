@@ -1,5 +1,5 @@
-## Trading desk: quote header, candle chart, order book, ticket, position and
-## working orders. All mutations go through Game actions.
+## Trading desk: quote header, candle chart, depth order book, quick-size
+## ticket, position controls and working orders. All mutations go through Game.
 class_name SmaTradeScreen
 extends SmaScreen
 
@@ -14,6 +14,8 @@ var _timeframe_group := ButtonGroup.new()
 var _timeframe_buttons: Dictionary = {}
 var _range_group := ButtonGroup.new()
 var _range_buttons: Dictionary = {}
+var _side_buttons: Dictionary = {}
+var _type_buttons: Dictionary = {}
 var _limit_type_button: Button
 var _limit_hint: Label
 var _stop_row: HBoxContainer
@@ -30,19 +32,25 @@ var _sensitivity_label: Label
 var _watch_button: Button
 var _indicators_card: PanelContainer
 var _indicator_labels: Dictionary = {}
+var _indicator_cache_key := ""
 var _last_label: Label
 var _change_label: Label
 var _stat_labels: Dictionary = {}
 var _chart: SmaCandleChart
 var _start_chart: Button
+var _ma_toggle: Button
+var _boll_toggle: Button
+var _reset_pan_button: Button
 var _book_rows: Array = []
 var _book_meta: Label
+var _book_depth_hint: Label
 var _qty: SpinBox
 var _limit: SpinBox
 var _ticket_ticker := ""
 var _limit_row: HBoxContainer
 var _estimate_label: Label
 var _fee_label: Label
+var _weight_label: Label
 var _available_label: Label
 var _feedback: Label
 var _intro_review: Button
@@ -59,6 +67,8 @@ var _submit_button: Button
 var _oco_action := "closeLong"
 var _oco_key := ""
 var _position_box: VBoxContainer
+var _position_key := ""
+var _position_pnl_labels: Dictionary = {}
 var _orders_box: VBoxContainer
 var _orders_key := ""
 var _order_buttons: Dictionary = {}
@@ -152,30 +162,46 @@ func _build() -> void:
 	chart_head.add_child(SmaKit.hspacer())
 	for timeframe in SmaMinuteSeries.CHART_TIMEFRAMES:
 		var button := SmaKit.toggle(timeframe, _timeframe_group)
-		button.custom_minimum_size.x = 44
+		button.custom_minimum_size.x = 40
 		button.pressed.connect(_on_timeframe.bind(timeframe))
 		_timeframe_buttons[timeframe] = button
 		chart_head.add_child(button)
 	chart_box.add_child(chart_head)
 	_range_group.allow_unpress = true
-	var range_row := SmaKit.hbox(6)
+	var range_row := SmaKit.flow(6)
 	range_row.add_child(SmaKit.caption(I18n.t("chart.range")))
 	for count in RANGE_OPTIONS:
 		var range_button := SmaKit.toggle("%d" % int(count), _range_group)
-		range_button.custom_minimum_size.x = 38
+		range_button.custom_minimum_size.x = 36
 		range_button.add_theme_font_size_override("font_size", 10)
 		range_button.pressed.connect(_on_range.bind(int(count)))
 		_range_buttons[int(count)] = range_button
 		range_row.add_child(range_button)
-	range_row.add_child(SmaKit.hspacer())
+	_ma_toggle = SmaKit.toggle("MA")
+	_ma_toggle.button_pressed = true
+	_ma_toggle.add_theme_font_size_override("font_size", 10)
+	_ma_toggle.toggled.connect(func(_v): _sync_chart_overlays())
+	range_row.add_child(_ma_toggle)
+	_boll_toggle = SmaKit.toggle("BOLL")
+	_boll_toggle.button_pressed = false
+	_boll_toggle.add_theme_font_size_override("font_size", 10)
+	_boll_toggle.toggled.connect(func(_v): _sync_chart_overlays())
+	range_row.add_child(_boll_toggle)
+	_reset_pan_button = SmaKit.button(I18n.t("chart.latest"), _reset_chart_pan)
+	_reset_pan_button.add_theme_font_size_override("font_size", 10)
+	_reset_pan_button.visible = false
+	range_row.add_child(_reset_pan_button)
 	range_row.add_child(SmaKit.caption(I18n.t("chart.hint")))
 	chart_box.add_child(range_row)
-	_start_chart = SmaKit.button(I18n.t("intro.chartAdvance"), game.step_minute)
+	_start_chart = SmaKit.button(I18n.t("header.play"), game.toggle_pause)
 	_start_chart.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	chart_box.add_child(_start_chart)
 	_chart = SmaCandleChart.new()
 	_chart.custom_minimum_size.y = 300
 	_chart.visible_count_changed.connect(_on_chart_range_changed)
+	_chart.pan_changed.connect(func(panned: bool):
+		if _reset_pan_button != null:
+			_reset_pan_button.visible = panned)
 	chart_box.add_child(_chart)
 	left.add_child(chart_card)
 
@@ -208,34 +234,29 @@ func _build() -> void:
 	_book_meta = SmaKit.caption("")
 	book_top.add_child(_book_meta)
 	book_top.add_child(SmaKit.hspacer())
+	book_top.add_child(SmaKit.caption(I18n.t("trade.bookClickHint")))
 	book_box.add_child(book_top)
 	var book_header := SmaKit.hbox(8)
-	book_header.add_child(SmaKit.hspacer())
+	book_header.add_child(SmaKit.cell(I18n.t("trade.depthBar"), 1.6,
+		HORIZONTAL_ALIGNMENT_LEFT, SmaUiTheme.DIM, 10))
 	book_header.add_child(_book_cell(I18n.t("trade.price"), SmaUiTheme.DIM))
 	book_header.add_child(_book_cell(I18n.t("trade.volume"), SmaUiTheme.DIM))
 	book_box.add_child(book_header)
-	var ask_box := SmaKit.vbox(1)
-	var bid_box := SmaKit.vbox(1)
+	var ask_box := SmaKit.vbox(2)
+	var bid_box := SmaKit.vbox(2)
 	for index in 6:
-		var ask_row := SmaKit.hbox(8)
-		ask_row.add_child(SmaKit.hspacer())
-		var ask_price := _book_cell("—", SmaUiTheme.NEGATIVE)
-		var ask_size := _book_cell("—", SmaUiTheme.MUTED)
-		ask_row.add_child(ask_price)
-		ask_row.add_child(ask_size)
-		ask_box.add_child(ask_row)
-		var bid_row := SmaKit.hbox(8)
-		bid_row.add_child(SmaKit.hspacer())
-		var bid_price := _book_cell("—", SmaUiTheme.POSITIVE)
-		var bid_size := _book_cell("—", SmaUiTheme.MUTED)
-		bid_row.add_child(bid_price)
-		bid_row.add_child(bid_size)
-		bid_box.add_child(bid_row)
-		_book_rows.append({"ask_price": ask_price, "ask_size": ask_size,
-			"bid_price": bid_price, "bid_size": bid_size})
+		var ask_item := _create_book_row(SmaUiTheme.NEGATIVE)
+		ask_box.add_child(ask_item["container"])
+		var bid_item := _create_book_row(SmaUiTheme.POSITIVE)
+		bid_box.add_child(bid_item["container"])
+		_book_rows.append({"ask": ask_item, "bid": bid_item})
 	book_box.add_child(ask_box)
 	book_box.add_child(SmaKit.separator())
 	book_box.add_child(bid_box)
+	_book_depth_hint = SmaKit.caption("")
+	_book_depth_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_book_depth_hint.visible = false
+	book_box.add_child(_book_depth_hint)
 	left.add_child(book_card)
 
 	_right_scroll = SmaKit.scroll()
@@ -247,7 +268,7 @@ func _build() -> void:
 	_right_scroll.add_child(right)
 
 	var ticket_card := SmaKit.card(12)
-	var ticket := SmaKit.vbox(9)
+	var ticket := SmaKit.vbox(8)
 	ticket_card.add_child(ticket)
 	ticket.add_child(SmaKit.label(I18n.t("trade.title"), 14))
 	var side_row := SmaKit.hbox(4)
@@ -255,6 +276,7 @@ func _build() -> void:
 		var button := SmaKit.toggle(I18n.t(String(entry[1])), _side_group)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_on_side.bind(String(entry[0])))
+		_side_buttons[String(entry[0])] = button
 		side_row.add_child(button)
 	ticket.add_child(side_row)
 	var type_row := SmaKit.hbox(4)
@@ -263,6 +285,7 @@ func _build() -> void:
 		var button := SmaKit.toggle(I18n.t(String(entry[1])), _type_group)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_on_type.bind(String(entry[0])))
+		_type_buttons[String(entry[0])] = button
 		if String(entry[0]) == "limit":
 			_limit_type_button = button
 		type_row.add_child(button)
@@ -282,6 +305,20 @@ func _build() -> void:
 	_qty.value_changed.connect(func(_value): _update_estimate())
 	qty_row.add_child(_qty)
 	ticket.add_child(qty_row)
+
+	var quick_row := SmaKit.hbox(4)
+	for spec in [["25%", 0.25], ["50%", 0.5], ["Max", 1.0]]:
+		var btn := SmaKit.button(String(spec[0]), _apply_quick_ratio.bind(float(spec[1])))
+		btn.add_theme_font_size_override("font_size", 10)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		quick_row.add_child(btn)
+	for amount in [1000.0, 5000.0]:
+		var btn := SmaKit.button("$%dk" % int(amount / 1000.0), _apply_quick_amount.bind(amount))
+		btn.add_theme_font_size_override("font_size", 10)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		quick_row.add_child(btn)
+	ticket.add_child(quick_row)
+
 	_limit_row = SmaKit.hbox(8)
 	_limit_row.add_child(SmaKit.label(I18n.t("trade.limit_price"), 12, SmaUiTheme.MUTED))
 	_limit_row.add_child(SmaKit.hspacer())
@@ -331,7 +368,10 @@ func _build() -> void:
 	_fee_label = SmaKit.muted("—")
 	fee_row.add_child(_fee_label)
 	ticket.add_child(fee_row)
+	_weight_label = SmaKit.caption("")
+	ticket.add_child(_weight_label)
 	_available_label = SmaKit.caption("")
+	_available_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ticket.add_child(_available_label)
 	_submit_button = SmaKit.button(I18n.t("trade.submit"), _submit, true)
 	_submit_button.custom_minimum_size.y = 38
@@ -367,10 +407,10 @@ func _build() -> void:
 	position_card.add_child(position_box)
 	position_box.add_child(SmaKit.label(I18n.t("trade.position"), 13))
 	position_box.add_child(SmaKit.header_row(["common.side", "common.qty",
-		"portfolio.avg_cost", "portfolio.unrealized"], [1.0, 0.9, 0.9, 1.2],
+		"portfolio.avg_cost", "portfolio.unrealized"], [0.9, 0.8, 0.9, 1.2],
 		[HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
 			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT]))
-	_position_box = SmaKit.vbox(3)
+	_position_box = SmaKit.vbox(4)
 	position_box.add_child(_position_box)
 	right.add_child(position_card)
 
@@ -385,6 +425,125 @@ func _build() -> void:
 	right.add_child(orders_card)
 
 	_select_defaults()
+	refresh()
+
+
+func _create_book_row(accent: Color) -> Dictionary:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0)
+	style.set_content_margin_all(2)
+	panel.add_theme_stylebox_override("panel", style)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var row := SmaKit.hbox(8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(row)
+	var bar_host := Control.new()
+	bar_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar_host.size_flags_stretch_ratio = 1.6
+	bar_host.custom_minimum_size.y = 16
+	bar_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bar := ColorRect.new()
+	bar.color = Color(accent.r, accent.g, accent.b, 0.24)
+	bar.anchor_top = 0.1
+	bar.anchor_bottom = 0.9
+	bar.anchor_left = 0.0
+	bar.anchor_right = 0.0
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_host.add_child(bar)
+	row.add_child(bar_host)
+	var price := _book_cell("—", accent)
+	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var size_lbl := _book_cell("—", SmaUiTheme.MUTED)
+	size_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(price)
+	row.add_child(size_lbl)
+	var item := {"container": panel, "bar": bar, "price": price, "size": size_lbl, "value": 0.0}
+	panel.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if float(item["value"]) > 0.0:
+				_pick_book_price(float(item["value"])))
+	return item
+
+
+func _pick_book_price(price: float) -> void:
+	if _order_type == "stop":
+		_stop_price.value = SmaFormat.round_to(price, 2)
+		_update_estimate()
+		return
+	if game.academy_is_tool_unlocked("order.limit"):
+		if _order_type != "limit":
+			_type_buttons["limit"].set_pressed_no_signal(true)
+			_on_type("limit")
+		_limit.value = SmaFormat.round_to(price, 2)
+		_update_estimate()
+
+
+func _sync_chart_overlays() -> void:
+	if _chart == null:
+		return
+	_chart.set_indicators(
+		_ma_toggle.button_pressed if _ma_toggle != null else true,
+		_boll_toggle.button_pressed if _boll_toggle != null else false)
+
+
+func _reset_chart_pan() -> void:
+	if _chart != null:
+		_chart.reset_pan()
+
+
+func _apply_quick_ratio(ratio: float) -> void:
+	if game == null or not game.started or game.exchange == null:
+		return
+	var ticker: String = game.selected_ticker
+	var qty := 0
+	if _side == "sell":
+		var held: int = game.exchange.available_shares(ticker)
+		qty = maxi(1, int(floor(float(held) * ratio))) if held > 0 else 1
+	elif _side == "cover":
+		var short_held: int = game.exchange.available_short_shares(ticker)
+		qty = maxi(1, int(floor(float(short_held) * ratio))) if short_held > 0 else 1
+	else:
+		var price := _current_price()
+		if price <= 0.0:
+			return
+		var bp: float = game.effective_buying_power()
+		var unit_cost := price * (1.0 + float(game.exchange.fee_bps) / 10000.0)
+		qty = maxi(1, int(floor((bp * ratio) / maxf(0.01, unit_cost))))
+	_qty.value = clampi(qty, 1, int(_qty.max_value))
+	_update_estimate()
+
+
+func _apply_quick_amount(amount: float) -> void:
+	if game == null or not game.started:
+		return
+	var price := _current_price()
+	if price <= 0.0:
+		return
+	var qty := maxi(1, int(floor(amount / price)))
+	_qty.value = clampi(qty, 1, int(_qty.max_value))
+	_update_estimate()
+
+
+func _quick_close(side: String, qty: int) -> void:
+	if game == null or not game.started or qty <= 0:
+		return
+	var result: Dictionary = game.submit_order({
+		"ticker": game.selected_ticker,
+		"side": side,
+		"type": "market",
+		"qty": qty,
+	})
+	if bool(result.get("ok", false)):
+		_feedback.text = I18n.t("trade.order_filled")
+		_feedback.add_theme_color_override("font_color", SmaUiTheme.POSITIVE)
+		_orders_key = ""
+		_position_key = ""
+	else:
+		var error_key := String(result.get("error", "order.invalid"))
+		_feedback.text = I18n.t("error.%s" % error_key)
+		_feedback.add_theme_color_override("font_color", SmaUiTheme.NEGATIVE)
 	refresh()
 
 
@@ -427,7 +586,7 @@ func _open_alerts() -> void:
 
 func _book_cell(text: String, color: Color) -> Label:
 	var node := SmaKit.label(text, 11, color)
-	node.custom_minimum_size.x = 92
+	node.custom_minimum_size.x = 84
 	node.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	node.size_flags_horizontal = Control.SIZE_SHRINK_END
 	return node
@@ -490,9 +649,12 @@ func refresh(reason: String = "") -> void:
 	]
 	var financials: Dictionary = company.get("financials", {})
 	var dividend_yield := float(financials.get("dividendPerShare", 0.0)) / maxf(0.01, last) * 100.0
+	var live_cap := float(company.get("sharesOutstanding", company.get("shares", 0.0))) * last
+	if live_cap <= 0.0:
+		live_cap = float(company.get("marketCap", 0.0))
 	_profile_label.text = "%s %.2f%% · %s %s" % [
 		I18n.t("company.dividendYield"), dividend_yield,
-		I18n.t("company.marketCap"), SmaFormat.compact(float(company.get("marketCap", 0.0))),
+		I18n.t("company.marketCap"), SmaFormat.compact(live_cap),
 	]
 	var sensitivity := SmaIndustry.sector_sensitivity(String(company.get("sector", "")))
 	_sensitivity_label.text = "%s · %s / %s / %s" % [
@@ -501,6 +663,29 @@ func refresh(reason: String = "") -> void:
 		_signed_num(float(sensitivity["rates"])),
 		_signed_num(float(sensitivity["energy"])),
 	]
+	_update_quote_numbers(quote)
+	if _order_type == "limit" and _ticket_ticker != ticker:
+		_limit.set_value_no_signal(maxf(0.01, SmaFormat.round_to(last, 2)))
+	var ticker_changed := _ticket_ticker != ticker
+	_ticket_ticker = ticker
+	if _order_type == "stop" and _stop_ticker != ticker:
+		_reset_stop_price()
+	if ticker_changed:
+		_position_key = ""
+		_indicator_cache_key = ""
+	_update_tool_gates()
+	_update_book(ticker)
+	_update_chart(ticker)
+	_update_indicators(ticker, last)
+	_update_position(ticker)
+	_update_orders()
+	_update_available()
+	_update_estimate()
+	_update_oco(ticker, last)
+
+
+func _update_quote_numbers(quote: Dictionary) -> void:
+	var last := float(quote.get("last", 0.0))
 	var change := float(quote.get("changePct", 0.0))
 	_last_label.text = SmaFormat.money(last)
 	_change_label.text = SmaFormat.pct(change)
@@ -510,39 +695,62 @@ func refresh(reason: String = "") -> void:
 	_stat_labels["bid"].text = _price_text(quote.get("bid", null))
 	_stat_labels["ask"].text = _price_text(quote.get("ask", null))
 	_stat_labels["volume"].text = SmaFormat.compact(float(quote.get("volume", 0)))
-	if _order_type == "limit" and _ticket_ticker != ticker:
-		_limit.set_value_no_signal(maxf(0.01, SmaFormat.round_to(last, 2)))
-	_ticket_ticker = ticker
-	if _order_type == "stop" and _stop_ticker != ticker:
-		_reset_stop_price()
-	_update_book(ticker)
-	_update_chart(ticker)
-	_update_indicators(ticker, last)
-	_update_position(ticker)
-	_update_orders()
-	_update_available()
-	_update_estimate()
-	_update_limit_gate()
-	_update_oco(ticker, last)
 
 
-func _update_limit_gate() -> void:
-	if _limit_type_button == null or game == null:
+func _update_tool_gates() -> void:
+	if game == null:
 		return
-	var unlocked: bool = game.academy_is_tool_unlocked("order.limit")
-	_limit_type_button.disabled = not unlocked
-	_limit_type_button.tooltip_text = "" if unlocked else I18n.t("unlock.limitOrder.title")
+	var limit_ok: bool = game.academy_is_tool_unlocked("order.limit")
+	var stop_ok: bool = game.academy_is_tool_unlocked("order.stop")
+	var short_ok: bool = game.academy_is_tool_unlocked("trade.short")
+	if _limit_type_button != null:
+		_limit_type_button.disabled = not limit_ok
+		_limit_type_button.tooltip_text = "" if limit_ok else I18n.t("unlock.limitOrder.title")
+	for key in ["stop", "trailing"]:
+		var btn: Button = _type_buttons.get(key)
+		if btn != null:
+			btn.disabled = not stop_ok
+			btn.tooltip_text = "" if stop_ok else I18n.t("unlock.stop.desc")
+	var short_btn: Button = _side_buttons.get("short")
+	if short_btn != null:
+		short_btn.disabled = not short_ok
+		short_btn.tooltip_text = "" if short_ok else I18n.t("unlock.short.desc")
 	if _limit_hint != null:
-		_limit_hint.visible = not unlocked
-		_limit_hint.text = I18n.t("academy.lockedByUnit",
-			{"unit": I18n.t("curriculum.u4.title")})
-	if not unlocked and _order_type == "limit":
+		var hints: Array[String] = []
+		if not limit_ok:
+			hints.append(I18n.t("academy.lockedByUnit", {"unit": I18n.t("curriculum.u4.title")}))
+		elif not short_ok or not stop_ok:
+			hints.append(I18n.t("trade.toolsProgressiveHint"))
+		_limit_hint.visible = not hints.is_empty()
+		_limit_hint.text = " · ".join(hints)
+	if not limit_ok and _order_type == "limit":
 		_order_type = "market"
 		_limit_row.visible = false
+	if not stop_ok and (_order_type == "stop" or _order_type == "trailing"):
+		_order_type = "market"
+		_stop_row.visible = false
+		_trail_row.visible = false
+	if not short_ok and _side == "short":
+		_side = "buy"
+		if _side_buttons.has("buy"):
+			_side_buttons["buy"].set_pressed_no_signal(true)
 
 
 func on_tick() -> void:
-	refresh()
+	if game == null or not game.started or game.exchange == null:
+		return
+	var ticker: String = game.selected_ticker
+	if ticker != _ticket_ticker:
+		refresh("selection")
+		return
+	var quote: Dictionary = game.exchange.quote(ticker)
+	_update_quote_numbers(quote)
+	_update_book(ticker)
+	_update_chart(ticker)
+	_update_position_pnl_live(ticker, float(quote.get("last", 0.0)))
+	_update_orders()
+	_update_available()
+	_update_estimate()
 
 
 func capture_draft() -> Dictionary:
@@ -562,6 +770,11 @@ func restore_draft(draft: Dictionary) -> void:
 	var order_type: String = draft["type"]
 	if order_type == "limit" and _limit_type_button.disabled:
 		order_type = "market"
+	if order_type in ["stop", "trailing"] and _type_buttons.get("stop") != null \
+			and _type_buttons["stop"].disabled:
+		order_type = "market"
+	if side == "short" and _side_buttons.get("short") != null and _side_buttons["short"].disabled:
+		side = "buy"
 	for button in _side_group.get_buttons():
 		button.set_pressed_no_signal(button.text == I18n.t("trade.%s" % side))
 	for button in _type_group.get_buttons():
@@ -605,7 +818,9 @@ func _price_text(value: Variant) -> String:
 
 
 func _update_book(ticker: String) -> void:
-	var book: Dictionary = game.exchange.get_book(ticker, 6)
+	var depth_unlocked: bool = game.academy_is_tool_unlocked("market.depth")
+	var levels := 6 if depth_unlocked else 1
+	var book: Dictionary = game.exchange.get_book(ticker, levels)
 	var asks: Array = book.get("asks", [])
 	var bids: Array = book.get("bids", [])
 	if not asks.is_empty() and not bids.is_empty():
@@ -617,29 +832,58 @@ func _update_book(ticker: String) -> void:
 		]
 	else:
 		_book_meta.text = ""
+	var max_size := 1.0
+	for entry in asks:
+		max_size = maxf(max_size, float(entry.get("size", 0.0)))
+	for entry in bids:
+		max_size = maxf(max_size, float(entry.get("size", 0.0)))
 	for index in _book_rows.size():
-		var row: Dictionary = _book_rows[index]
-		var ask_index := asks.size() - 1 - index
-		if ask_index >= 0:
-			row["ask_price"].text = SmaFormat.num(float(asks[ask_index]["price"]), 2)
-			row["ask_size"].text = SmaFormat.quantity(float(asks[ask_index]["size"]))
+		var pair: Dictionary = _book_rows[index]
+		var ask_item: Dictionary = pair["ask"]
+		var bid_item: Dictionary = pair["bid"]
+		var show_ask := depth_unlocked or index == _book_rows.size() - 1
+		var show_bid := depth_unlocked or index == 0
+		ask_item["container"].visible = show_ask
+		bid_item["container"].visible = show_bid
+		var ask_index := asks.size() - 1 - index if depth_unlocked else 0
+		if show_ask and ask_index >= 0 and ask_index < asks.size():
+			var p := float(asks[ask_index]["price"])
+			var sz := float(asks[ask_index]["size"])
+			ask_item["value"] = p
+			ask_item["price"].text = SmaFormat.num(p, 2)
+			ask_item["size"].text = SmaFormat.quantity(sz)
+			ask_item["bar"].anchor_right = clampf(sz / max_size, 0.04, 1.0)
 		else:
-			row["ask_price"].text = "—"
-			row["ask_size"].text = "—"
-		if index < bids.size():
-			row["bid_price"].text = SmaFormat.num(float(bids[index]["price"]), 2)
-			row["bid_size"].text = SmaFormat.quantity(float(bids[index]["size"]))
+			ask_item["value"] = 0.0
+			ask_item["price"].text = "—"
+			ask_item["size"].text = "—"
+			ask_item["bar"].anchor_right = 0.0
+		if show_bid and index < bids.size():
+			var p := float(bids[index]["price"])
+			var sz := float(bids[index]["size"])
+			bid_item["value"] = p
+			bid_item["price"].text = SmaFormat.num(p, 2)
+			bid_item["size"].text = SmaFormat.quantity(sz)
+			bid_item["bar"].anchor_right = clampf(sz / max_size, 0.04, 1.0)
 		else:
-			row["bid_price"].text = "—"
-			row["bid_size"].text = "—"
+			bid_item["value"] = 0.0
+			bid_item["price"].text = "—"
+			bid_item["size"].text = "—"
+			bid_item["bar"].anchor_right = 0.0
+	if _book_depth_hint != null:
+		_book_depth_hint.visible = not depth_unlocked
+		if not depth_unlocked:
+			_book_depth_hint.text = I18n.t("unlock.depth.desc")
 
 
 func _update_chart(ticker: String) -> void:
 	var candles: Array = game.exchange.get_candles(ticker, _timeframe)
-	_start_chart.visible = candles.is_empty()
+	_start_chart.visible = candles.is_empty() and game.paused
+	_start_chart.disabled = game.is_story_paused() or game.is_fast_forwarding()
 	var title := "%s · %s" % [ticker, _timeframe]
 	if _timeframe == "1m":
 		var second := int(game.exchange.state["second"]) % 60
+		title += " · " + I18n.t("chart.referenceQuote")
 		title += " · " + I18n.t("chart.nextMinute", {"seconds": 60 - second})
 	_chart.set_candles(candles, _timeframe, title)
 	var account: Dictionary = game.exchange.state["account"]
@@ -657,6 +901,39 @@ func _update_chart(ticker: String) -> void:
 	if int(short_position.get("qty", 0)) > 0:
 		short_cost = float(short_position.get("avgPrice", 0.0))
 	_chart.set_position_cost(long_cost, short_cost)
+	_chart.set_price_lines(_collect_price_lines(ticker))
+
+
+func _collect_price_lines(ticker: String) -> Array:
+	var lines: Array = []
+	for alert in game.price_alerts():
+		if bool(alert.get("active", false)) and String(alert.get("ticker", "")) == ticker:
+			var side := String(alert.get("side", "above"))
+			var tag := I18n.t("alerts.above" if side == "above" else "alerts.below")
+			lines.append({
+				"price": float(alert.get("price", 0.0)),
+				"label": "⚑ %s" % tag,
+				"color": SmaUiTheme.INFO,
+			})
+	for order in game.exchange.open_order_rows("player"):
+		if String(order.get("ticker", "")) != ticker:
+			continue
+		var order_type := String(order.get("type", ""))
+		var price := 0.0
+		if order_type == "limit" and order.get("limitPrice") != null:
+			price = float(order["limitPrice"])
+		elif order.get("stopPrice") != null:
+			price = float(order["stopPrice"])
+		if price <= 0.0:
+			continue
+		var is_buy := String(order.get("side", "")) in ["buy", "cover"]
+		lines.append({
+			"price": price,
+			"label": "%s %s" % [I18n.t("trade.%s" % String(order.get("side", "buy"))),
+				I18n.t("trade.%s" % order_type) if I18n.has_key("trade.%s" % order_type) else order_type],
+			"color": SmaUiTheme.POSITIVE if is_buy else SmaUiTheme.NEGATIVE,
+		})
+	return lines
 
 
 func _on_range(count: int) -> void:
@@ -678,7 +955,12 @@ func _update_indicators(ticker: String, last: float) -> void:
 	_indicators_card.visible = String(game.settings.get("layout", "beginner")) == "advanced"
 	if not _indicators_card.visible:
 		return
-	var snapshot := SmaIndicators.snapshot(game.exchange.get_candles(ticker, "1D"), last)
+	var daily: Array = game.exchange.get_candles(ticker, "1D")
+	var cache_key := "%s|%d|%d|%.2f" % [ticker, game.get_day(), daily.size(), last]
+	if cache_key == _indicator_cache_key:
+		return
+	_indicator_cache_key = cache_key
+	var snapshot := SmaIndicators.snapshot(daily, last)
 	if snapshot.is_empty():
 		for key in _indicator_labels.keys():
 			_indicator_labels[key].text = "—"
@@ -716,42 +998,110 @@ func _signed_num(value: float) -> String:
 
 
 func _update_position(ticker: String) -> void:
-	SmaKit.clear_children(_position_box)
 	var long_position: Dictionary = game.exchange.state["account"]["positions"].get(ticker, {})
 	var short_position: Dictionary = game.exchange.state["account"]["shorts"].get(ticker, {})
+	var key := "%s|%d|%.4f|%d|%.4f" % [
+		ticker,
+		int(long_position.get("qty", 0)), float(long_position.get("avgCost", 0.0)),
+		int(short_position.get("qty", 0)), float(short_position.get("avgPrice", 0.0)),
+	]
+	var quote: Dictionary = game.exchange.quote(ticker)
+	var last := float(quote.get("last", 0.0))
+	if key == _position_key:
+		_update_position_pnl_live(ticker, last)
+		return
+	_position_key = key
+	_position_pnl_labels.clear()
+	SmaKit.clear_children(_position_box)
 	if long_position.is_empty() and short_position.is_empty():
 		_position_box.add_child(SmaKit.muted(I18n.t("trade.no_position")))
 		return
-	var quote: Dictionary = game.exchange.quote(ticker)
-	var last := float(quote.get("last", 0.0))
 	if not long_position.is_empty():
 		var qty := int(long_position["qty"])
 		var avg := float(long_position["avgCost"])
 		var unrealized := (last - avg) * qty
-		_position_box.add_child(SmaKit.data_row([
+		var row := SmaKit.data_row([
 			I18n.t("trade.buy"), SmaFormat.quantity(qty), SmaFormat.num(avg, 2),
 			SmaFormat.signed_money(unrealized),
-		], [1.0, 0.9, 0.9, 1.2], [SmaUiTheme.POSITIVE, SmaUiTheme.TEXT, SmaUiTheme.MUTED,
+		], [0.9, 0.8, 0.9, 1.2], [SmaUiTheme.POSITIVE, SmaUiTheme.TEXT, SmaUiTheme.MUTED,
 			SmaKit.value_color(unrealized)], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
-			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT]))
+			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT])
+		_position_pnl_labels["long"] = row.get_child(3)
+		_position_box.add_child(row)
+		var actions := SmaKit.hbox(6)
+		actions.add_child(SmaKit.hspacer())
+		if qty >= 2:
+			var half_btn := SmaKit.button(I18n.t("trade.closeHalf"),
+				_quick_close.bind("sell", int(floor(qty / 2.0))))
+			half_btn.add_theme_font_size_override("font_size", 10)
+			actions.add_child(half_btn)
+		var close_btn := SmaKit.button(I18n.t("trade.closeAll"), _quick_close.bind("sell", qty))
+		close_btn.add_theme_font_size_override("font_size", 10)
+		actions.add_child(close_btn)
+		_position_box.add_child(actions)
 	if not short_position.is_empty():
 		var qty := int(short_position["qty"])
 		var avg := float(short_position["avgPrice"])
 		var unrealized := (avg - last) * qty
-		_position_box.add_child(SmaKit.data_row([
+		var row := SmaKit.data_row([
 			I18n.t("trade.short"), SmaFormat.quantity(qty), SmaFormat.num(avg, 2),
 			SmaFormat.signed_money(unrealized),
-		], [1.0, 0.9, 0.9, 1.2], [SmaUiTheme.NEGATIVE, SmaUiTheme.TEXT, SmaUiTheme.MUTED,
+		], [0.9, 0.8, 0.9, 1.2], [SmaUiTheme.NEGATIVE, SmaUiTheme.TEXT, SmaUiTheme.MUTED,
 			SmaKit.value_color(unrealized)], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
-			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT]))
+			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT])
+		_position_pnl_labels["short"] = row.get_child(3)
+		_position_box.add_child(row)
+		var actions := SmaKit.hbox(6)
+		actions.add_child(SmaKit.hspacer())
+		if qty >= 2:
+			var half_btn := SmaKit.button(I18n.t("trade.closeHalf"),
+				_quick_close.bind("cover", int(floor(qty / 2.0))))
+			half_btn.add_theme_font_size_override("font_size", 10)
+			actions.add_child(half_btn)
+		var close_btn := SmaKit.button(I18n.t("trade.closeAll"), _quick_close.bind("cover", qty))
+		close_btn.add_theme_font_size_override("font_size", 10)
+		actions.add_child(close_btn)
+		_position_box.add_child(actions)
+
+
+func _update_position_pnl_live(ticker: String, last: float) -> void:
+	var long_position: Dictionary = game.exchange.state["account"]["positions"].get(ticker, {})
+	if not long_position.is_empty() and _position_pnl_labels.has("long"):
+		var lbl: Label = _position_pnl_labels["long"]
+		if is_instance_valid(lbl):
+			var unrealized := (last - float(long_position["avgCost"])) * int(long_position["qty"])
+			lbl.text = SmaFormat.signed_money(unrealized)
+			lbl.add_theme_color_override("font_color", SmaKit.value_color(unrealized))
+	var short_position: Dictionary = game.exchange.state["account"]["shorts"].get(ticker, {})
+	if not short_position.is_empty() and _position_pnl_labels.has("short"):
+		var lbl: Label = _position_pnl_labels["short"]
+		if is_instance_valid(lbl):
+			var unrealized := (float(short_position["avgPrice"]) - last) * int(short_position["qty"])
+			lbl.text = SmaFormat.signed_money(unrealized)
+			lbl.add_theme_color_override("font_color", SmaKit.value_color(unrealized))
+
+
+func _order_price_summary(order: Dictionary) -> String:
+	var order_type := String(order.get("type", ""))
+	if order_type == "limit" and order.get("limitPrice") != null:
+		return "@%s" % SmaFormat.money(float(order["limitPrice"]))
+	if order_type == "trailing":
+		var pct := float(order.get("trailPct", 0.0)) * 100.0
+		var stop_v: Variant = order.get("stopPrice")
+		if stop_v != null:
+			return "-%.1f%% (%s)" % [pct, SmaFormat.money(float(stop_v))]
+		return "-%.1f%%" % pct
+	if order.get("stopPrice") != null:
+		return "@%s" % SmaFormat.money(float(order["stopPrice"]))
+	return ""
 
 
 func _update_orders() -> void:
 	var orders: Array = game.exchange.open_order_rows("player")
 	var key_parts: Array[String] = []
 	for order in orders:
-		key_parts.append("%s:%s:%s" % [order.get("id", ""), order.get("status", ""),
-			order.get("filledQty", 0)])
+		key_parts.append("%s:%s:%s:%s" % [order.get("id", ""), order.get("status", ""),
+			order.get("filledQty", 0), str(order.get("stopPrice", ""))])
 	var key := "|".join(key_parts)
 	if key == _orders_key:
 		return
@@ -763,14 +1113,20 @@ func _update_orders() -> void:
 		return
 	for order in orders:
 		var row := SmaKit.hbox(6)
-		var label := "%s %s · %s · %s/%s" % [
-			String(order.get("id", "")),
-			String(order.get("side", "")).capitalize(),
-			String(order.get("type", "")),
+		var side_key := "trade.%s" % String(order.get("side", "buy"))
+		var side_label := I18n.t(side_key) if I18n.has_key(side_key) else String(order.get("side", ""))
+		var type_key := "trade.%s" % String(order.get("type", "market"))
+		var type_label := I18n.t(type_key) if I18n.has_key(type_key) else String(order.get("type", ""))
+		var price_text := _order_price_summary(order)
+		var label := "%s %s %s %s · %s/%s" % [
+			String(order.get("ticker", "")),
+			side_label,
+			type_label,
+			price_text,
 			SmaFormat.quantity(float(order.get("filledQty", 0))),
 			SmaFormat.quantity(float(order.get("qty", 0))),
 		]
-		row.add_child(SmaKit.cell(label, 1.0, HORIZONTAL_ALIGNMENT_LEFT, SmaUiTheme.MUTED, 11))
+		row.add_child(SmaKit.cell(label.strip_edges(), 1.0, HORIZONTAL_ALIGNMENT_LEFT, SmaUiTheme.MUTED, 11))
 		var cancel := SmaKit.button(I18n.t("trade.cancel"), _cancel.bind(String(order.get("id", ""))))
 		cancel.add_theme_font_size_override("font_size", 10)
 		row.add_child(cancel)
@@ -779,10 +1135,13 @@ func _update_orders() -> void:
 
 func _update_available() -> void:
 	var cash: float = float(game.exchange.available_cash())
-	var snapshot := SmaMargin.margin_snapshot(game.exchange.state)
-	_available_label.text = "%s %s · %s %s" % [
+	var bp: float = game.effective_buying_power()
+	var suffix := "" if game.academy_is_tool_unlocked("trade.margin") \
+		else " (%s)" % I18n.t("trade.cashAccount")
+	_available_label.text = "%s %s · %s %s%s" % [
 		I18n.t("trade.available_cash"), SmaFormat.money(cash),
-		I18n.t("trade.buying_power"), SmaFormat.money(float(snapshot["buyingPower"])),
+		I18n.t("trade.buying_power"), SmaFormat.money(bp),
+		suffix,
 	]
 
 
@@ -830,12 +1189,17 @@ func _update_oco(ticker: String, last: float) -> void:
 		_oco_feedback.text = ""
 	else:
 		_oco_qty.max_value = float(available)
-	var unlocked: bool = game.academy_is_tool_unlocked("order.limit")
+	var limit_ok: bool = game.academy_is_tool_unlocked("order.limit")
+	var stop_ok: bool = game.academy_is_tool_unlocked("order.stop")
+	var unlocked := limit_ok and stop_ok
 	_oco_submit.disabled = not unlocked
-	if not unlocked:
-		_oco_feedback.text = I18n.t("error.limitLocked")
+	if not limit_ok:
+		_oco_feedback.text = I18n.t("error.order.limitLocked")
 		_oco_feedback.add_theme_color_override("font_color", SmaUiTheme.WARNING)
-	elif _oco_feedback.text == I18n.t("error.limitLocked"):
+	elif not stop_ok:
+		_oco_feedback.text = I18n.t("error.order.stopLocked")
+		_oco_feedback.add_theme_color_override("font_color", SmaUiTheme.WARNING)
+	elif _oco_feedback.text in [I18n.t("error.limitLocked"), I18n.t("error.order.stopLocked")]:
 		_oco_feedback.text = ""
 
 
@@ -854,13 +1218,34 @@ func _current_price() -> float:
 func _update_estimate() -> void:
 	if _estimate_label == null or game == null or not game.started:
 		return
-	var value := _current_price() * _qty.value
+	var price := _current_price()
+	var value := price * _qty.value
 	var fee := SmaFormat.round_to(value * float(game.exchange.fee_bps) / 10000.0, 2)
 	_estimate_label.text = SmaFormat.money(value)
 	_fee_label.text = SmaFormat.money(fee)
+	if _weight_label != null and game.exchange != null:
+		var equity: float = game.get_equity()
+		var ticker: String = game.selected_ticker
+		var held := int(game.exchange.state["account"]["positions"].get(ticker, {}).get("qty", 0))
+		var short_held := int(game.exchange.state["account"]["shorts"].get(ticker, {}).get("qty", 0))
+		var post_qty := held
+		if _side == "buy":
+			post_qty = held + int(_qty.value)
+		elif _side == "sell":
+			post_qty = maxi(0, held - int(_qty.value))
+		elif _side == "short":
+			post_qty = short_held + int(_qty.value)
+		elif _side == "cover":
+			post_qty = maxi(0, short_held - int(_qty.value))
+		var pct := (float(post_qty) * price / equity * 100.0) if equity > 0.0 else 0.0
+		_weight_label.text = I18n.t("trade.postWeight", {"pct": SmaFormat.pct_plain(pct, 1)})
+		_weight_label.add_theme_color_override("font_color",
+			SmaUiTheme.WARNING if pct > 25.0 else SmaUiTheme.DIM)
 
 
 func _on_side(side: String) -> void:
+	if game != null and side in ["short", "cover"] and not game.academy_is_tool_unlocked("trade.short"):
+		return
 	_side = side
 	_feedback.text = ""
 	if _order_type == "stop":
@@ -869,6 +1254,11 @@ func _on_side(side: String) -> void:
 
 
 func _on_type(order_type: String) -> void:
+	if game != null:
+		if order_type == "limit" and not game.academy_is_tool_unlocked("order.limit"):
+			return
+		if order_type in ["stop", "trailing"] and not game.academy_is_tool_unlocked("order.stop"):
+			return
 	_order_type = order_type
 	_limit_row.visible = order_type == "limit"
 	_stop_row.visible = order_type == "stop"
@@ -925,6 +1315,7 @@ func _submit() -> void:
 		_feedback.text = I18n.t("trade.order_filled") if filled > 0 else I18n.t("trade.order_submitted")
 		_feedback.add_theme_color_override("font_color", SmaUiTheme.POSITIVE)
 		_orders_key = ""
+		_position_key = ""
 	else:
 		var error_key := String(result.get("error", "order.invalid"))
 		_feedback.text = I18n.t("error.%s" % error_key)

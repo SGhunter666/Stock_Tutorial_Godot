@@ -73,10 +73,10 @@ func run() -> void:
 	describe("quant-factor")
 	var exchange := SmaExchange.new("quant-test")
 	var factor := SmaQuant.factor_research(exchange, "momentum", 60)
-	eq(int(factor["count"]), 50, "factor ranks every stock")
+	eq(int(factor["count"]), SmaCompanyCatalog.EXPECTED_COUNT, "factor ranks every stock")
 	eq(int(factor["rows"][0]["rank"]), 1, "rank starts at one")
 	var low_vol := SmaQuant.factor_research(exchange, "lowVol", 20)
-	eq(int(low_vol["count"]), 50, "low-volatility factor works")
+	eq(int(low_vol["count"]), SmaCompanyCatalog.EXPECTED_COUNT, "low-volatility factor works")
 
 	describe("quant-regression")
 	var regression := SmaQuant.factor_regression(exchange, 20, 10)
