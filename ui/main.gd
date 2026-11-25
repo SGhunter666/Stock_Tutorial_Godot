@@ -119,6 +119,20 @@ var _start_continue: Button
 var _top_metrics: Dictionary = {}
 
 
+class SmaCrtScanlines extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		z_index = 90
+	func _draw() -> void:
+		if not SmaUiTheme.is_pixel():
+			return
+		var line_col := Color(0.0, 0.0, 0.0, 0.075)
+		var y := 0.0
+		while y < size.y:
+			draw_rect(Rect2(0.0, y, size.x, 1.0), line_col)
+			y += 3.0
+
+
 func _ready() -> void:
 	add_to_group("main")
 	Game.state_changed.connect(_on_state_changed)
@@ -218,6 +232,10 @@ func _build_ui() -> void:
 	add_child(_dialogue)
 	_build_fast_forward_overlay()
 	_build_toast()
+	if SmaUiTheme.is_pixel() and not bool(Game.settings.get("reducedMotion", false)):
+		var crt := SmaCrtScanlines.new()
+		crt.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(crt)
 	_sync_compact_layout()
 	_update_topbar()
 	_refresh_nav()

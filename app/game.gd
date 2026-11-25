@@ -53,7 +53,7 @@ var paused := true
 var speed := 1
 var selected_ticker := "APLA"
 var settings := {"locale": "zh_CN", "speed": 1, "layout": "beginner",
-	"theme": "dark", "colorScheme": "intl", "playerName": "", "displayMode": "windowed",
+	"theme": "pixel", "colorScheme": "intl", "playerName": "", "displayMode": "windowed",
 	"windowPreset": "auto", "uiScale": "auto",
 	"masterVolume": 0.8, "musicVolume": 0.22, "sfxVolume": 0.75, "muted": false}
 var sandbox_mode := false
@@ -77,7 +77,7 @@ var _fast_forward_active := false
 
 func _ready() -> void:
 	I18n.set_locale(String(settings.get("locale", "zh_CN")))
-	SmaUiTheme.set_theme_mode(String(settings.get("theme", "dark")))
+	SmaUiTheme.set_theme_mode(String(settings.get("theme", "pixel")))
 	SmaUiTheme.set_color_scheme(String(settings.get("colorScheme", "intl")))
 	_apply_layout(String(settings.get("layout", "beginner")))
 	_apply_audio_settings()
@@ -545,7 +545,7 @@ func _apply_layout(value: String) -> void:
 
 
 func set_theme(value: String) -> void:
-	var next_theme := value if ["dark", "light"].has(value) else "dark"
+	var next_theme := value if ["pixel", "dark", "light"].has(value) else "dark"
 	settings["theme"] = next_theme
 	SmaUiTheme.set_theme_mode(next_theme)
 	theme_changed.emit()
@@ -2752,7 +2752,7 @@ func _apply_loaded_save(loaded: Dictionary) -> void:
 	for key in saved_settings.keys():
 		settings[key] = saved_settings[key]
 	I18n.set_locale(String(settings.get("locale", "zh_CN")))
-	SmaUiTheme.set_theme_mode(String(settings.get("theme", "dark")))
+	SmaUiTheme.set_theme_mode(String(settings.get("theme", "pixel")))
 	SmaUiTheme.set_color_scheme(String(settings.get("colorScheme", "intl")))
 	_apply_layout(String(settings.get("layout", "beginner")))
 	_apply_audio_settings()

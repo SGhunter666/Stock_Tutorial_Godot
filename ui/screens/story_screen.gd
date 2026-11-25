@@ -290,17 +290,16 @@ func _update_characters() -> void:
 	for char_id in CHARACTER_ORDER:
 		var info: Dictionary = game.narrative.characters.get(char_id, {})
 		var item := PanelContainer.new()
-		var style := StyleBoxFlat.new()
-		style.bg_color = SmaUiTheme.PANEL_ALT
-		style.border_color = SmaUiTheme.BORDER
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(8)
-		style.set_content_margin_all(8)
+		var style := SmaUiTheme._box(SmaUiTheme.PANEL_ALT, SmaUiTheme.BORDER, SmaUiTheme.card_radius(), 8)
 		item.add_theme_stylebox_override("panel", style)
 		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var hbox := SmaKit.hbox(10)
 		item.add_child(hbox)
 		var portrait_path := String(info.get("portrait", ""))
+		if SmaUiTheme.is_pixel():
+			var px_path := String(info.get("pixelPortrait", "res://assets/portraits/pixel/%s.png" % char_id))
+			if ResourceLoader.exists(px_path):
+				portrait_path = px_path
 		if portrait_path != "" and ResourceLoader.exists(portrait_path):
 			var tex := load(portrait_path) as Texture2D
 			if tex != null:
@@ -309,6 +308,8 @@ func _update_characters() -> void:
 				rect.custom_minimum_size = Vector2(48, 64)
 				rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if SmaUiTheme.is_pixel() \
+					else CanvasItem.TEXTURE_FILTER_LINEAR
 				hbox.add_child(rect)
 		var meta := SmaKit.vbox(2)
 		var accent := SmaUiTheme.ACCENT

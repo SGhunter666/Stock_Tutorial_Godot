@@ -6533,5 +6533,11 @@
   "story.report.honors": "成就与职业证书",
   "story.report.certs": "已获证书 {count} 张",
   "story.exportReport": "导出成绩单 JSON",
-  "story.reportExported": "毕业成绩单已导出为 JSON 文件。"
+  "story.reportExported": "毕业成绩单已导出为 JSON 文件。",
+  "settings.themePixel": "经典像素终端（A+B 融合）",
+  "market.trend": "20日走势",
+  "pixelOffice.tier1": "见习书房 · 单屏看盘台",
+  "pixelOffice.tier2": "远望学院 · 量化研究隔间",
+  "pixelOffice.tier3": "远望一期 · 基金交易大厅",
+  "pixelOffice.alert": "⚠ 风控 / 保证金警报"
 }

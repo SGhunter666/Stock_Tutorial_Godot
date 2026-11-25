@@ -752,6 +752,9 @@ func _ready() -> void:
 	Game.set_theme("dark")
 	if SmaUiTheme.mode != "dark":
 		failures.append("dark theme not restored")
+	Game.set_theme("pixel")
+	if SmaUiTheme.mode != "pixel" or not SmaUiTheme.is_pixel():
+		failures.append("pixel theme not applied")
 	Game.set_color_scheme("cn")
 	if SmaUiTheme.color_scheme != "cn" or SmaUiTheme.POSITIVE.r <= SmaUiTheme.POSITIVE.g:
 		failures.append("CN color scheme not applied")

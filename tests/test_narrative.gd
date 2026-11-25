@@ -89,6 +89,8 @@ func run() -> void:
 	for character_id in service.characters:
 		check(ResourceLoader.exists(String(service.characters[character_id].get("portrait", ""))),
 			"portrait asset exists: " + String(character_id))
+		check(ResourceLoader.exists(String(service.characters[character_id].get("pixelPortrait", ""))),
+			"pixel portrait asset exists: " + String(character_id))
 
 	describe("story-opening")
 	service.handle_event("game_new")

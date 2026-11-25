@@ -30,12 +30,8 @@ static func caption(text: String) -> Label:
 
 static func card(margin: int = 12) -> PanelContainer:
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.PANEL
-	style.border_color = SmaUiTheme.BORDER
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(SmaUiTheme.CARD_RADIUS)
-	style.set_content_margin_all(maxi(5, int(round(float(margin) * SmaUiTheme.density))))
+	var pad := maxi(5, int(round(float(margin) * SmaUiTheme.density)))
+	var style := SmaUiTheme._box(SmaUiTheme.PANEL, SmaUiTheme.BORDER, SmaUiTheme.card_radius(), pad)
 	panel.add_theme_stylebox_override("panel", style)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return panel
@@ -73,17 +69,12 @@ static func button(text: String, callback: Callable = Callable(), primary: bool 
 	node.add_theme_font_size_override("font_size",
 		maxi(9, int(round(12.0 * SmaUiTheme.density))))
 	if primary:
-		var normal := StyleBoxFlat.new()
-		normal.bg_color = SmaUiTheme.ACCENT_DARK
-		normal.border_color = SmaUiTheme.ACCENT
-		normal.set_border_width_all(1)
-		normal.set_corner_radius_all(8)
-		normal.set_content_margin_all(9)
+		var normal := SmaUiTheme.beveled_button_box(SmaUiTheme.ACCENT_DARK, SmaUiTheme.ACCENT, 8, false)
 		node.add_theme_stylebox_override("normal", normal)
-		var hover := normal.duplicate() as StyleBoxFlat
-		hover.bg_color = SmaUiTheme.ACCENT
-		hover.border_color = SmaUiTheme.ACCENT
+		var hover := SmaUiTheme.beveled_button_box(SmaUiTheme.ACCENT, Color.WHITE, 8, false)
 		node.add_theme_stylebox_override("hover", hover)
+		var pressed := SmaUiTheme.beveled_button_box(SmaUiTheme.ACCENT_DARK, SmaUiTheme.ACCENT, 8, true)
+		node.add_theme_stylebox_override("pressed", pressed)
 		node.add_theme_color_override("font_color", Color.WHITE)
 		node.add_theme_color_override("font_hover_color",
 			SmaUiTheme.TEXT if SmaUiTheme.mode == "light" else SmaUiTheme.BG_DEEP)

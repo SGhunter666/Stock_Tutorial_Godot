@@ -53,11 +53,14 @@ func _build() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = SmaUiTheme.PANEL
 	style.border_color = SmaUiTheme.ACCENT_DARK
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(14)
+	style.anti_aliasing = not SmaUiTheme.is_pixel()
+	style.set_border_width_all(2 if SmaUiTheme.is_pixel() else 1)
+	style.set_corner_radius_all(0 if SmaUiTheme.is_pixel() else 14)
 	style.set_content_margin_all(22)
-	style.shadow_color = Color(0, 0, 0, 0.45)
-	style.shadow_size = 18
+	style.shadow_color = Color(0, 0, 0, 0.72 if SmaUiTheme.is_pixel() else 0.45)
+	style.shadow_size = 0 if SmaUiTheme.is_pixel() else 18
+	if SmaUiTheme.is_pixel():
+		style.shadow_offset = Vector2(5, 5)
 	_panel.add_theme_stylebox_override("panel", style)
 	center.add_child(_panel)
 
@@ -99,15 +102,18 @@ func _build() -> void:
 	_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_portrait_frame.visible = false
 	var portrait_style := StyleBoxFlat.new()
-	portrait_style.bg_color = Color(0.05, 0.08, 0.12, 1.0)
+	portrait_style.bg_color = Color(0.04, 0.08, 0.13, 1.0)
+	portrait_style.anti_aliasing = not SmaUiTheme.is_pixel()
 	portrait_style.set_border_width_all(2)
-	portrait_style.set_corner_radius_all(10)
+	portrait_style.set_corner_radius_all(0 if SmaUiTheme.is_pixel() else 10)
 	portrait_style.set_content_margin_all(2)
 	_portrait_frame.add_theme_stylebox_override("panel", portrait_style)
 	_portrait = TextureRect.new()
 	_portrait.custom_minimum_size = Vector2(164, 220)
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if SmaUiTheme.is_pixel() \
+		else CanvasItem.TEXTURE_FILTER_LINEAR
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_portrait_frame.add_child(_portrait)
 	body.add_child(_portrait_frame)
@@ -214,6 +220,13 @@ func refresh() -> void:
 		accent = Color.html(color_text)
 	_speaker.add_theme_color_override("font_color", accent)
 	var portrait_path := String(view.get("portrait", ""))
+	if portrait_path != "" and SmaUiTheme.is_pixel():
+		var char_id := String(view.get("character", ""))
+		var px_path := "res://assets/portraits/pixel/%s.png" % char_id
+		if char_id != "" and ResourceLoader.exists(px_path):
+			portrait_path = px_path
+	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if SmaUiTheme.is_pixel() \
+		else CanvasItem.TEXTURE_FILTER_LINEAR
 	if portrait_path != "" and ResourceLoader.exists(portrait_path):
 		var texture := load(portrait_path) as Texture2D
 		if texture != null:

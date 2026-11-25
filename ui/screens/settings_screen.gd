@@ -113,12 +113,15 @@ func _render_simulation() -> void:
 	var theme_row := SmaKit.hbox(6)
 	theme_row.add_child(SmaKit.label(I18n.t("settings.themeTitle"), 11))
 	var theme_select := OptionButton.new()
+	var theme_modes := ["pixel", "dark", "light"]
+	theme_select.add_item(I18n.t("settings.themePixel"))
 	theme_select.add_item(I18n.t("settings.themeDark"))
 	theme_select.add_item(I18n.t("settings.themeLight"))
-	theme_select.selected = 1 if String(game.settings.get("theme", "dark")) == "light" else 0
-	theme_select.custom_minimum_size.x = 150
+	var current_theme := String(game.settings.get("theme", "pixel"))
+	theme_select.selected = maxi(0, theme_modes.find(current_theme))
+	theme_select.custom_minimum_size.x = 210
 	theme_select.item_selected.connect(func(index):
-		game.set_theme("light" if index == 1 else "dark"))
+		game.set_theme(theme_modes[clampi(index, 0, theme_modes.size() - 1)]))
 	theme_row.add_child(theme_select)
 	box.add_child(theme_row)
 	box.add_child(SmaKit.muted(I18n.t("settings.themeHint"), 10))

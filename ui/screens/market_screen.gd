@@ -83,6 +83,7 @@ func _build() -> void:
 		["market.sector", 1.0, HORIZONTAL_ALIGNMENT_LEFT, ""],
 		["market.last", 0.9, HORIZONTAL_ALIGNMENT_RIGHT, "last"],
 		["market.change", 0.9, HORIZONTAL_ALIGNMENT_RIGHT, "change"],
+		["market.trend", 0.75, HORIZONTAL_ALIGNMENT_CENTER, ""],
 		["market.bid", 0.8, HORIZONTAL_ALIGNMENT_RIGHT, ""],
 		["market.ask", 0.8, HORIZONTAL_ALIGNMENT_RIGHT, ""],
 		["market.volume", 1.0, HORIZONTAL_ALIGNMENT_RIGHT, "volume"],
@@ -155,6 +156,13 @@ func _create_row(ticker: String, company: Dictionary, sector: String,
 	watch_button.pressed.connect(_on_watch_pressed.bind(ticker))
 	watch_cell.add_child(watch_button)
 	row.add_child(watch_cell)
+	var spark_wrap := SmaKit.hbox(0)
+	spark_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spark_wrap.size_flags_stretch_ratio = 0.75
+	var spark := SmaSparkline.new()
+	spark.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	spark_wrap.add_child(spark)
 	var cells := {
 		"ticker": SmaKit.cell(ticker, 0.7),
 		"name": SmaKit.cell(String(company.get("name", ticker)), 2.1),
@@ -165,10 +173,13 @@ func _create_row(ticker: String, company: Dictionary, sector: String,
 		"ask": SmaKit.cell("—", 0.8, HORIZONTAL_ALIGNMENT_RIGHT),
 		"volume": SmaKit.cell("—", 1.0, HORIZONTAL_ALIGNMENT_RIGHT, SmaUiTheme.MUTED),
 	}
-	for key in ["ticker", "name", "sector", "last", "change", "bid", "ask", "volume"]:
+	for key in ["ticker", "name", "sector", "last", "change"]:
+		row.add_child(cells[key])
+	row.add_child(spark_wrap)
+	for key in ["bid", "ask", "volume"]:
 		row.add_child(cells[key])
 	_list.add_child(panel)
-	_rows[ticker] = {"panel": panel, "cells": cells, "sector": sector,
+	_rows[ticker] = {"panel": panel, "cells": cells, "spark": spark, "sector": sector,
 		"name": String(company.get("name", ticker)),
 		"is_etf": is_etf, "locked": false, "watch": watch_button}
 
@@ -386,6 +397,7 @@ func _update_rows() -> void:
 		var cells: Dictionary = entry["cells"]
 		var change := float(quote.get("changePct", 0.0))
 		var last := float(quote.get("last", 0.0))
+		var spark: SmaSparkline = entry.get("spark", null)
 		if locked:
 			cells["ticker"].text = "🔒 %s" % ticker
 			cells["last"].text = "—"
@@ -394,7 +406,18 @@ func _update_rows() -> void:
 			cells["bid"].text = "—"
 			cells["ask"].text = "—"
 			cells["volume"].text = "—"
+			if spark != null:
+				spark.visible = false
 			continue
+		if spark != null:
+			spark.visible = true
+			var bars: Array = game.exchange.get_candles(ticker, "1D")
+			var closes: Array = []
+			var start_idx := maxi(0, bars.size() - 20)
+			for bi in range(start_idx, bars.size()):
+				closes.append(float(bars[bi].get("c", last)))
+			closes.append(last)
+			spark.set_values(closes, change >= 0.0)
 		cells["ticker"].text = ticker
 		cells["last"].text = SmaFormat.num(last, 2)
 		cells["change"].text = SmaFormat.pct(change, 2)

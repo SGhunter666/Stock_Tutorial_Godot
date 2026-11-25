@@ -48,6 +48,10 @@ func _ensure_buses() -> void:
 
 func _build() -> void:
 	_streams["click"] = _tone(760.0, 0.045, 0.10, 0.002, 0.035)
+	_streams["pixel_click"] = _sequence([
+		{"freq": 1046.50, "start": 0.0, "duration": 0.018, "volume": 0.11},
+		{"freq": 659.25, "start": 0.016, "duration": 0.022, "volume": 0.09},
+	])
 	_streams["fill"] = _sequence([
 		{"freq": 620.0, "start": 0.0, "duration": 0.07, "volume": 0.16},
 		{"freq": 880.0, "start": 0.06, "duration": 0.11, "volume": 0.16},
@@ -266,4 +270,4 @@ func play(sound: String) -> void:
 
 
 func play_click() -> void:
-	play("click")
+	play("pixel_click" if SmaUiTheme.is_pixel() else "click")

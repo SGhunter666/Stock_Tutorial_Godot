@@ -1,33 +1,40 @@
 ## Central visual language. Every screen pulls colors, spacing and control styles
-## from here so the UI cannot drift into per-screen one-off styling.
+## from here so the UI can switch cleanly between the signature A+B Retro Pixel
+## Terminal theme ("pixel"), modern dark ("dark"), and daytime light ("light").
 class_name SmaUiTheme
 extends RefCounted
 
 const CARD_RADIUS := 10
 const GAP := 10
 
-## Palette values are runtime variables so the whole UI can switch between the
-## dark terminal look and the light daytime look without per-screen overrides.
-static var BG := Color("#0a1220")
-static var BG_DEEP := Color("#070d18")
-static var PANEL := Color("#111d2e")
-static var PANEL_ALT := Color("#16263a")
-static var PANEL_HOVER := Color("#1b3049")
-static var BORDER := Color("#22384f")
-static var TEXT := Color("#e7f1f8")
-static var MUTED := Color("#89a3ba")
-static var DIM := Color("#5c7488")
+static var BG := Color("#080d16")
+static var BG_DEEP := Color("#05080f")
+static var PANEL := Color("#0e1726")
+static var PANEL_ALT := Color("#162338")
+static var PANEL_HOVER := Color("#1f3350")
+static var BORDER := Color("#3b5b7e")
+static var TEXT := Color("#eef6fc")
+static var MUTED := Color("#a8c2da")
+static var DIM := Color("#7e9ab5")
 static var ACCENT := Color("#5eead4")
 static var ACCENT_DARK := Color("#0f766e")
 static var POSITIVE := Color("#4ade80")
 static var NEGATIVE := Color("#f87171")
 static var WARNING := Color("#fbbf24")
 static var INFO := Color("#60a5fa")
-static var mode := "dark"
+static var mode := "pixel"
 static var color_scheme := "intl"
 
 ## Layout density: 1.0 for the beginner layout, a compact factor for advanced.
 static var density := 1.0
+
+
+static func is_pixel() -> bool:
+	return mode == "pixel"
+
+
+static func card_radius() -> int:
+	return 0 if is_pixel() else CARD_RADIUS
 
 
 static func set_density(value: float) -> void:
@@ -35,7 +42,7 @@ static func set_density(value: float) -> void:
 
 
 static func set_theme_mode(value: String) -> void:
-	mode = value if ["dark", "light"].has(value) else "dark"
+	mode = value if ["pixel", "dark", "light"].has(value) else "dark"
 	if mode == "light":
 		BG = Color("#f2f6fa")
 		BG_DEEP = Color("#ffffff")
@@ -50,6 +57,20 @@ static func set_theme_mode(value: String) -> void:
 		ACCENT_DARK = Color("#0f766e")
 		WARNING = Color("#b45309")
 		INFO = Color("#1d4ed8")
+	elif mode == "pixel":
+		BG = Color("#080d16")
+		BG_DEEP = Color("#05080f")
+		PANEL = Color("#0e1726")
+		PANEL_ALT = Color("#162338")
+		PANEL_HOVER = Color("#213654")
+		BORDER = Color("#3b5b7e")
+		TEXT = Color("#eef6fc")
+		MUTED = Color("#a8c2da")
+		DIM = Color("#7e9ab5")
+		ACCENT = Color("#5eead4")
+		ACCENT_DARK = Color("#0f766e")
+		WARNING = Color("#fbbf24")
+		INFO = Color("#60a5fa")
 	else:
 		BG = Color("#0a1220")
 		BG_DEEP = Color("#070d18")
@@ -93,9 +114,48 @@ static func _box(color: Color, border_color: Color = Color(0, 0, 0, 0),
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
 	style.border_color = border_color
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(radius)
+	if is_pixel():
+		style.anti_aliasing = false
+		style.set_border_width_all(2)
+		style.set_corner_radius_all(0)
+		style.shadow_color = Color(0.01, 0.02, 0.05, 0.85)
+		style.shadow_size = 0
+		style.shadow_offset = Vector2(3, 3)
+	else:
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(radius)
 	style.set_content_margin_all(margin)
+	return style
+
+
+static func beveled_button_box(bg: Color, border: Color, margin: int = 9,
+		depressed: bool = false) -> StyleBoxFlat:
+	if not is_pixel():
+		return _box(bg, border, 8, margin)
+	var style := StyleBoxFlat.new()
+	style.anti_aliasing = false
+	style.bg_color = bg
+	style.border_color = border
+	style.border_blend = false
+	style.set_corner_radius_all(0)
+	if depressed:
+		style.border_width_top = 3
+		style.border_width_left = 3
+		style.border_width_bottom = 1
+		style.border_width_right = 1
+		style.content_margin_left = margin + 1
+		style.content_margin_top = margin + 1
+		style.content_margin_right = maxi(2, margin - 1)
+		style.content_margin_bottom = maxi(2, margin - 1)
+	else:
+		style.border_width_top = 2
+		style.border_width_left = 2
+		style.border_width_bottom = 3
+		style.border_width_right = 3
+		style.set_content_margin_all(margin)
+		style.shadow_color = Color(0.01, 0.02, 0.05, 0.9)
+		style.shadow_size = 0
+		style.shadow_offset = Vector2(2, 2)
 	return style
 
 
@@ -103,21 +163,24 @@ static func build() -> Theme:
 	var theme := Theme.new()
 	var fallback := SystemFont.new()
 	fallback.font_names = PackedStringArray([
+		"Menlo", "Monaco", "Consolas", "PingFang SC", "Hiragino Sans GB",
+		"Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "sans-serif",
+	] if is_pixel() else [
 		"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
 		"Noto Sans CJK SC", "Source Han Sans SC", "Arial Unicode MS", "sans-serif",
 	])
 	fallback.allow_system_fallback = true
-	fallback.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	fallback.antialiasing = TextServer.FONT_ANTIALIASING_NONE if is_pixel() \
+		else TextServer.FONT_ANTIALIASING_GRAY
 	var font: Font = fallback
-	# macOS may resolve SystemFont("PingFang SC") to PingFang HK, which lacks
-	# simplified glyphs such as 远. Load a Simplified-capable system face first.
 	if OS.get_name() == "macOS":
-		for candidate in ["/System/Library/Fonts/STHeiti Light.ttc",
-				"/System/Library/Fonts/STHeiti Medium.ttc",
+		for candidate in ["/System/Library/Fonts/STHeiti Medium.ttc",
+				"/System/Library/Fonts/STHeiti Light.ttc",
 				"/System/Library/Fonts/Supplemental/Songti.ttc"]:
 			var file := FontFile.new()
 			var err := file.load_dynamic_font(candidate)
 			if err == OK and file.get_font_name() != "" and file.has_char(0x8FDC):
+				file.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
 				file.fallbacks.append(fallback)
 				font = file
 				break
@@ -125,15 +188,20 @@ static func build() -> Theme:
 	theme.default_font_size = 13
 
 	theme.set_color("font_color", "Label", TEXT)
-	theme.set_color("font_shadow_color", "Label", Color(0, 0, 0, 0))
+	if is_pixel():
+		theme.set_color("font_shadow_color", "Label", Color(0, 0, 0, 0.82))
+		theme.set_constant("shadow_offset_x", "Label", 1)
+		theme.set_constant("shadow_offset_y", "Label", 1)
+	else:
+		theme.set_color("font_shadow_color", "Label", Color(0, 0, 0, 0))
 
 	theme.set_stylebox("panel", "PanelContainer", _box(PANEL))
 	theme.set_stylebox("panel", "Panel", _box(PANEL))
 
-	theme.set_stylebox("normal", "Button", _box(PANEL_ALT, BORDER, 8, 9))
-	theme.set_stylebox("hover", "Button", _box(PANEL_HOVER, ACCENT_DARK, 8, 9))
-	theme.set_stylebox("pressed", "Button", _box(ACCENT_DARK, ACCENT, 8, 9))
-	theme.set_stylebox("disabled", "Button", _box(PANEL, BORDER, 8, 9))
+	theme.set_stylebox("normal", "Button", beveled_button_box(PANEL_ALT, BORDER, 8, false))
+	theme.set_stylebox("hover", "Button", beveled_button_box(PANEL_HOVER, ACCENT, 8, false))
+	theme.set_stylebox("pressed", "Button", beveled_button_box(ACCENT_DARK, ACCENT, 8, true))
+	theme.set_stylebox("disabled", "Button", _box(PANEL, DIM, 8, 8))
 	var focus := _box(Color.TRANSPARENT, ACCENT, 8, 0)
 	focus.draw_center = false
 	focus.set_border_width_all(2)
@@ -145,14 +213,14 @@ static func build() -> Theme:
 	theme.set_font_size("font_size", "Button", 13)
 
 	theme.set_stylebox("normal", "LineEdit", _box(BG_DEEP, BORDER, 8, 8))
-	theme.set_stylebox("focus", "LineEdit", _box(BG_DEEP, ACCENT_DARK, 8, 8))
+	theme.set_stylebox("focus", "LineEdit", _box(BG_DEEP, ACCENT, 8, 8))
 	theme.set_color("font_color", "LineEdit", TEXT)
 	theme.set_color("font_placeholder_color", "LineEdit", DIM)
 	theme.set_font_size("font_size", "LineEdit", 13)
 
-	theme.set_stylebox("normal", "OptionButton", _box(PANEL_ALT, BORDER, 8, 8))
-	theme.set_stylebox("hover", "OptionButton", _box(PANEL_HOVER, ACCENT_DARK, 8, 8))
-	theme.set_stylebox("pressed", "OptionButton", _box(ACCENT_DARK, ACCENT, 8, 8))
+	theme.set_stylebox("normal", "OptionButton", beveled_button_box(PANEL_ALT, BORDER, 8, false))
+	theme.set_stylebox("hover", "OptionButton", beveled_button_box(PANEL_HOVER, ACCENT, 8, false))
+	theme.set_stylebox("pressed", "OptionButton", beveled_button_box(ACCENT_DARK, ACCENT, 8, true))
 	theme.set_stylebox("focus", "OptionButton", focus)
 	theme.set_color("font_color", "OptionButton", TEXT)
 	theme.set_font_size("font_size", "OptionButton", 13)
@@ -164,8 +232,8 @@ static func build() -> Theme:
 
 	theme.set_stylebox("scroll", "VScrollBar", _box(BG_DEEP, BORDER, 6, 0))
 	theme.set_stylebox("grabber", "VScrollBar", _box(PANEL_HOVER, BORDER, 6, 0))
-	theme.set_stylebox("grabber_highlight", "VScrollBar", _box(ACCENT_DARK, BORDER, 6, 0))
-	theme.set_stylebox("grabber_pressed", "VScrollBar", _box(ACCENT_DARK, ACCENT, 6, 0))
+	theme.set_stylebox("grabber_highlight", "VScrollBar", _box(ACCENT_DARK, ACCENT, 6, 0))
+	theme.set_stylebox("grabber_pressed", "VScrollBar", _box(ACCENT, ACCENT, 6, 0))
 
 	theme.set_stylebox("normal", "SpinBox", _box(BG_DEEP, BORDER, 8, 6))
 	theme.set_color("font_color", "SpinBox", TEXT)

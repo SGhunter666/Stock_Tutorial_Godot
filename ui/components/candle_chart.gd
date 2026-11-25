@@ -289,19 +289,35 @@ func _moving_average(period: int, field: String) -> Array:
 
 
 func _draw_grid() -> void:
+	var pixel := SmaUiTheme.is_pixel()
+	var h_col := Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.52)
+	var v_col := Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.34)
 	for step in 5:
 		var ratio := float(step) / 4.0
-		var y := lerpf(_top, _price_bottom, ratio)
-		draw_line(Vector2(_left, y), Vector2(_right, y),
-			Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.55), 1.0)
+		var y := roundf(lerpf(_top, _price_bottom, ratio)) if pixel else lerpf(_top, _price_bottom, ratio)
+		if pixel:
+			var x_cur := _left
+			while x_cur < _right:
+				draw_rect(Rect2(x_cur, y, 2.0, 1.0), h_col)
+				x_cur += 5.0
+		else:
+			draw_line(Vector2(_left, y), Vector2(_right, y), h_col, 1.0)
 		var price := lerpf(_high, _low, ratio)
 		draw_string(_font, Vector2(_right + 6, y + 3), SmaFormat.num(price, 2),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, _font_size, SmaUiTheme.DIM)
 	for step in 4:
 		var ratio := float(step) / 3.0
-		var x := lerpf(_left, _right, ratio)
-		draw_line(Vector2(x, _top), Vector2(x, _volume_bottom),
-			Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.32), 1.0)
+		var x := roundf(lerpf(_left, _right, ratio)) if pixel else lerpf(_left, _right, ratio)
+		if pixel:
+			var y_cur := _top
+			while y_cur < _volume_bottom:
+				draw_rect(Rect2(x, y_cur, 1.0, 2.0), v_col)
+				y_cur += 5.0
+		else:
+			draw_line(Vector2(x, _top), Vector2(x, _volume_bottom), v_col, 1.0)
+	if pixel:
+		draw_rect(Rect2(_left - 2.0, _top - 2.0, (_right - _left) + 4.0,
+			(_volume_bottom - _top) + 4.0), SmaUiTheme.BORDER, false, 1.0)
 
 
 func _draw_volume(max_volume: float, body_width: float) -> void:
@@ -319,6 +335,7 @@ func _draw_volume(max_volume: float, body_width: float) -> void:
 
 
 func _draw_candles(body_width: float) -> void:
+	var pixel := SmaUiTheme.is_pixel()
 	for index in _visible.size():
 		var bar: Dictionary = _visible[index]
 		var open_price := float(bar["o"])
@@ -331,10 +348,25 @@ func _draw_candles(body_width: float) -> void:
 		var y_high := _price_y(high_price)
 		var y_low := _price_y(low_price)
 		var color := SmaUiTheme.POSITIVE if close_price >= open_price else SmaUiTheme.NEGATIVE
-		draw_line(Vector2(x, y_high), Vector2(x, y_low), color, 1.0)
-		var body_top := minf(y_open, y_close)
-		var body_height := maxf(1.0, absf(y_close - y_open))
-		draw_rect(Rect2(x - body_width * 0.5, body_top, body_width, body_height), color)
+		if pixel:
+			x = roundf(x)
+			y_open = roundf(y_open)
+			y_close = roundf(y_close)
+			y_high = roundf(y_high)
+			y_low = roundf(y_low)
+			var w := maxf(2.0, roundf(body_width))
+			draw_rect(Rect2(x - 1.0, y_high, 2.0, maxf(1.0, y_low - y_high)), color)
+			var body_top := minf(y_open, y_close)
+			var body_height := maxf(2.0, absf(y_close - y_open))
+			var rect := Rect2(roundf(x - w * 0.5), body_top, w, body_height)
+			draw_rect(rect, color)
+			if w >= 5.0 and body_height >= 4.0:
+				draw_rect(rect, Color(0, 0, 0, 0.35), false, 1.0)
+		else:
+			draw_line(Vector2(x, y_high), Vector2(x, y_low), color, 1.0)
+			var body_top := minf(y_open, y_close)
+			var body_height := maxf(1.0, absf(y_close - y_open))
+			draw_rect(Rect2(x - body_width * 0.5, body_top, body_width, body_height), color)
 
 
 func _draw_bollinger(start: int) -> void:

@@ -6533,5 +6533,11 @@
   "story.report.honors": "Achievements & Certificates",
   "story.report.certs": "{count} certificates earned",
   "story.exportReport": "Export Report JSON",
-  "story.reportExported": "Graduation report card exported as JSON."
+  "story.reportExported": "Graduation report card exported as JSON.",
+  "settings.themePixel": "Retro Pixel (A+B Hybrid)",
+  "market.trend": "20D Trend",
+  "pixelOffice.tier1": "Starter Desk · Home CRT",
+  "pixelOffice.tier2": "Farview Academy · Quant Studio",
+  "pixelOffice.tier3": "Farview Fund I · Trading Floor",
+  "pixelOffice.alert": "⚠ Risk / Margin Alert"
 }

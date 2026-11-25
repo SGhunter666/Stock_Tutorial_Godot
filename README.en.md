@@ -2,7 +2,7 @@
 
 A single-player financial education and trading simulation built with **Godot 4**. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-06`
+- Version: `beta-07`
 - Engine: Godot `4.7+` (tested on `4.7.2`)
 - Renderer: GL Compatibility
 - Languages: Simplified Chinese / English
