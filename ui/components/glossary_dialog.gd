@@ -35,7 +35,7 @@ func _build() -> void:
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var panel := SmaKit.card(20)
+	var panel := SmaKit.modal_card(20)
 	panel.custom_minimum_size = Vector2(920, 620)
 	center.add_child(panel)
 	var root := SmaKit.vbox(10)
@@ -136,7 +136,7 @@ func _render_detail() -> void:
 		for related_id in related:
 			var button := SmaKit.button(I18n.t("glossary.terms.%s.name" % String(related_id)),
 				_select_term.bind(String(related_id)))
-			button.add_theme_font_size_override("font_size", 11)
+			SmaKit.set_small_font(button, 11)
 			row.add_child(button)
 		_detail.add_child(row)
 

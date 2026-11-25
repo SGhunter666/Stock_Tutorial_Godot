@@ -184,22 +184,22 @@ func _build() -> void:
 	for count in RANGE_OPTIONS:
 		var range_button := SmaKit.toggle("%d" % int(count), _range_group)
 		range_button.custom_minimum_size.x = 36
-		range_button.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(range_button, 11)
 		range_button.pressed.connect(_on_range.bind(int(count)))
 		_range_buttons[int(count)] = range_button
 		range_row.add_child(range_button)
 	_ma_toggle = SmaKit.toggle("MA")
 	_ma_toggle.button_pressed = true
-	_ma_toggle.add_theme_font_size_override("font_size", 10)
+	SmaKit.set_small_font(_ma_toggle, 11)
 	_ma_toggle.toggled.connect(func(_v): _sync_chart_overlays())
 	range_row.add_child(_ma_toggle)
 	_boll_toggle = SmaKit.toggle("BOLL")
 	_boll_toggle.button_pressed = false
-	_boll_toggle.add_theme_font_size_override("font_size", 10)
+	SmaKit.set_small_font(_boll_toggle, 11)
 	_boll_toggle.toggled.connect(func(_v): _sync_chart_overlays())
 	range_row.add_child(_boll_toggle)
 	_reset_pan_button = SmaKit.button(I18n.t("chart.latest"), _reset_chart_pan)
-	_reset_pan_button.add_theme_font_size_override("font_size", 10)
+	SmaKit.set_small_font(_reset_pan_button, 11)
 	_reset_pan_button.visible = false
 	range_row.add_child(_reset_pan_button)
 	range_row.add_child(SmaKit.caption(I18n.t("chart.hint")))
@@ -327,12 +327,12 @@ func _build() -> void:
 	var quick_row := SmaKit.hbox(4)
 	for spec in [["25%", 0.25], ["50%", 0.5], ["Max", 1.0]]:
 		var btn := SmaKit.button(String(spec[0]), _apply_quick_ratio.bind(float(spec[1])))
-		btn.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(btn, 11)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		quick_row.add_child(btn)
 	for amount in [1000.0, 5000.0]:
 		var btn := SmaKit.button("$%dk" % int(amount / 1000.0), _apply_quick_amount.bind(amount))
-		btn.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(btn, 11)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		quick_row.add_child(btn)
 	ticket.add_child(quick_row)
@@ -1053,10 +1053,10 @@ func _update_position(ticker: String) -> void:
 		if qty >= 2:
 			var half_btn := SmaKit.button(I18n.t("trade.closeHalf"),
 				_quick_close.bind("sell", int(floor(qty / 2.0))))
-			half_btn.add_theme_font_size_override("font_size", 10)
+			SmaKit.set_small_font(half_btn, 11)
 			actions.add_child(half_btn)
 		var close_btn := SmaKit.button(I18n.t("trade.closeAll"), _quick_close.bind("sell", qty))
-		close_btn.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(close_btn, 11)
 		actions.add_child(close_btn)
 		_position_box.add_child(actions)
 	if not short_position.is_empty():
@@ -1076,10 +1076,10 @@ func _update_position(ticker: String) -> void:
 		if qty >= 2:
 			var half_btn := SmaKit.button(I18n.t("trade.closeHalf"),
 				_quick_close.bind("cover", int(floor(qty / 2.0))))
-			half_btn.add_theme_font_size_override("font_size", 10)
+			SmaKit.set_small_font(half_btn, 11)
 			actions.add_child(half_btn)
 		var close_btn := SmaKit.button(I18n.t("trade.closeAll"), _quick_close.bind("cover", qty))
-		close_btn.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(close_btn, 11)
 		actions.add_child(close_btn)
 		_position_box.add_child(actions)
 
@@ -1148,7 +1148,7 @@ func _update_orders() -> void:
 		]
 		row.add_child(SmaKit.cell(label.strip_edges(), 1.0, HORIZONTAL_ALIGNMENT_LEFT, SmaUiTheme.MUTED, 11))
 		var cancel := SmaKit.button(I18n.t("trade.cancel"), _cancel.bind(String(order.get("id", ""))))
-		cancel.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(cancel, 11)
 		row.add_child(cancel)
 		_orders_box.add_child(row)
 

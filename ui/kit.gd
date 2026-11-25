@@ -48,6 +48,28 @@ static func card(margin: int = 12) -> PanelContainer:
 	return panel
 
 
+static func modal_card(margin: int = 20) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var pad := maxi(8, int(round(float(margin) * SmaUiTheme.density)))
+	var bg := Color("#0d1729") if SmaUiTheme.is_pixel() else SmaUiTheme.PANEL
+	var hi := SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT
+	panel.add_theme_stylebox_override("panel", SmaUiTheme.panel_style(bg, hi, pad, true))
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return panel
+
+
+static func set_small_font(node: Control, px: int = 10) -> void:
+	if SmaUiTheme.is_pixel():
+		if px <= 10:
+			node.add_theme_font_override("font", SmaUiTheme.pixel_font_10())
+			node.add_theme_font_size_override("font_size", 10)
+		else:
+			node.add_theme_font_override("font", SmaUiTheme.pixel_font_12())
+			node.add_theme_font_size_override("font_size", 12)
+	else:
+		node.add_theme_font_size_override("font_size", px)
+
+
 static func vbox(separation: int = SmaUiTheme.GAP) -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation",

@@ -255,7 +255,7 @@ func _update_catalog() -> void:
 		var open := SmaKit.button(I18n.t("story.replayShort") if seen else I18n.t("story.locked"),
 			_start_replay.bind(story_id))
 		open.disabled = not seen
-		open.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(open, 10)
 		open.custom_minimum_size.x = 58
 		row.add_child(open)
 		_catalog_box.add_child(row)
@@ -290,8 +290,7 @@ func _update_characters() -> void:
 	for char_id in CHARACTER_ORDER:
 		var info: Dictionary = game.narrative.characters.get(char_id, {})
 		var item := PanelContainer.new()
-		var style := SmaUiTheme._box(SmaUiTheme.PANEL_ALT, SmaUiTheme.BORDER, SmaUiTheme.card_radius(), 8)
-		item.add_theme_stylebox_override("panel", style)
+		item.add_theme_stylebox_override("panel", SmaUiTheme.panel_style(SmaUiTheme.PANEL_ALT, SmaUiTheme.BORDER, 8, false))
 		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var hbox := SmaKit.hbox(10)
 		item.add_child(hbox)
@@ -305,7 +304,7 @@ func _update_characters() -> void:
 			if tex != null:
 				var rect := TextureRect.new()
 				rect.texture = tex
-				rect.custom_minimum_size = Vector2(48, 64)
+				rect.custom_minimum_size = Vector2(96, 128) if SmaUiTheme.is_pixel() else Vector2(48, 64)
 				rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 				rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if SmaUiTheme.is_pixel() \

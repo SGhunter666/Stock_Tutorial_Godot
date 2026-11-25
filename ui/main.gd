@@ -673,6 +673,7 @@ func navigate(screen_id: String, force: bool = false) -> void:
 	else:
 		screen.refresh("nav")
 	if _office_banner != null:
+		_office_banner.set_screen(screen_id)
 		_office_banner.refresh_state()
 	_sync_compact_layout()
 
@@ -694,6 +695,7 @@ func _on_state_changed(reason: String) -> void:
 	_update_topbar()
 	_refresh_nav()
 	if _office_banner != null:
+		_office_banner.set_screen(_current_screen)
 		_office_banner.refresh_state()
 	if _screens.has(_current_screen):
 		_screens[_current_screen].refresh(reason)
@@ -932,7 +934,7 @@ func _show_start_overlay() -> void:
 			SmaPixelArt.card_box(Color("#091322"), SmaUiTheme.ACCENT, Color("#040811"), 4, false))
 		var p_rect := TextureRect.new()
 		p_rect.texture = load("res://assets/portraits/pixel/lin_lan.png") as Texture2D
-		p_rect.custom_minimum_size = Vector2(148, 198)
+		p_rect.custom_minimum_size = Vector2(192, 256)
 		p_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		p_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		p_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

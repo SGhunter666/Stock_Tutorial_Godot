@@ -75,7 +75,7 @@ func _build() -> void:
 	_title = SmaKit.label("", 12, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.DIM)
 	var speaker_pill := PanelContainer.new()
 	speaker_pill.add_theme_stylebox_override("panel", SmaUiTheme.readout_style(10, 4, SmaUiTheme.ACCENT))
-	_speaker = SmaKit.label("", 18 if SmaUiTheme.is_pixel() else 16, SmaUiTheme.ACCENT)
+	_speaker = SmaKit.label("", 22 if SmaUiTheme.is_pixel() else 16, SmaUiTheme.ACCENT)
 	speaker_pill.add_child(_speaker)
 	head.add_child(_title)
 	head.add_child(SmaKit.hspacer())
@@ -101,7 +101,9 @@ func _build() -> void:
 	var body := SmaKit.hbox(18)
 	root.add_child(body)
 	_portrait_frame = PanelContainer.new()
-	_portrait_frame.custom_minimum_size = Vector2(172, 228)
+	var pw := 192 if SmaUiTheme.is_pixel() else 164
+	var ph := 256 if SmaUiTheme.is_pixel() else 220
+	_portrait_frame.custom_minimum_size = Vector2(pw + 8, ph + 8)
 	_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_portrait_frame.visible = false
 	if SmaUiTheme.is_pixel():
@@ -115,7 +117,7 @@ func _build() -> void:
 		portrait_style.set_content_margin_all(2)
 		_portrait_frame.add_theme_stylebox_override("panel", portrait_style)
 	_portrait = TextureRect.new()
-	_portrait.custom_minimum_size = Vector2(164, 220)
+	_portrait.custom_minimum_size = Vector2(pw, ph)
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if SmaUiTheme.is_pixel() \
@@ -123,7 +125,7 @@ func _build() -> void:
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_portrait_frame.add_child(_portrait)
 	body.add_child(_portrait_frame)
-	_text = SmaKit.label("", 18 if SmaUiTheme.is_pixel() else 15)
+	_text = SmaKit.label("", 22 if SmaUiTheme.is_pixel() else 15)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text.custom_minimum_size.y = 112
 	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL

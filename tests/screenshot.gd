@@ -278,6 +278,7 @@ func _ready() -> void:
 			int(chain["expiries"][0]["expiryDay"]))
 		Game.buy_option("APLA", "call", float(contract["strike"]),
 			int(contract["expiryDay"]), 1)
+		_dismiss_story()
 		main._screens["options"].refresh()
 		await _settle(4)
 		await _shot("options_position")
@@ -431,6 +432,7 @@ func _ready() -> void:
 		"benchmarkId": "index", "hurdleRate": 0.0, "leverageEnabled": false,
 		"taxProfileId": "none",
 	})
+	_dismiss_story()
 	Game.fund_buy("APLA", 200)
 	Game.fund_buy("MSFY", 150)
 	main.navigate("fund")
@@ -539,7 +541,7 @@ func _ready() -> void:
 			child._close()
 	await _settle(4)
 
-	Game.set_theme("dark")
+	Game.set_theme("pixel")
 	await _settle(6)
 
 	I18n.set_locale("en")
@@ -578,6 +580,17 @@ func _ready() -> void:
 	SmaSaveService.clear(Game.save_path)
 	Game.save_path = SmaSaveService.SAVE_PATH
 	get_tree().quit(0)
+
+
+func _dismiss_story() -> void:
+	for i in 24:
+		if Game.narrative == null or not Game.narrative.is_active():
+			break
+		var v: Dictionary = Game.narrative.current_view()
+		if String(v.get("type", "")) == "choice":
+			Game.narrative.choose(0)
+		else:
+			Game.narrative.advance()
 
 
 func _settle(frames: int) -> void:

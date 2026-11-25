@@ -412,6 +412,74 @@ static func icon(kind: String) -> ImageTexture:
 				".kssssk.",
 				"..kkkk..",
 			]
+		"cb_unchecked":
+			rows = [
+				".kkkkkk.",
+				"kssssssk",
+				"ksddddsk",
+				"ksddddsk",
+				"ksddddsk",
+				"ksddddsk",
+				"kssssssk",
+				".kkkkkk.",
+			]
+		"cb_checked":
+			rows = [
+				".kkkkkk.",
+				"kGGGGGGk",
+				"kGggggGk",
+				"kGgggwwk",
+				"kGwwgwwk",
+				"kGgwwwgk",
+				"kGggggGk",
+				".kkkkkk.",
+			]
+		"radio_unchecked":
+			rows = [
+				"..kkkk..",
+				".kssssk.",
+				"ksddddsk",
+				"ksddddsk",
+				"ksddddsk",
+				"ksddddsk",
+				".kssssk.",
+				"..kkkk..",
+			]
+		"radio_checked":
+			rows = [
+				"..kkkk..",
+				".kcccck.",
+				"kcddddck",
+				"kcdGGdck",
+				"kcdGGdck",
+				"kcddddck",
+				".kcccck.",
+				"..kkkk..",
+			]
+		"slider_grabber":
+			rows = [
+				".kkkkk.",
+				"kYYYYYk",
+				"kyyyyyk",
+				"kykkkyk",
+				"kyyyyyk",
+				"kykkkyk",
+				"kyyyyyk",
+				"koooook",
+				".kkkkk.",
+			]
+		"slider_grabber_hi":
+			rows = [
+				".kkkkk.",
+				"kwwwwwk",
+				"kYYYYYk",
+				"kYkkkYk",
+				"kYYYYYk",
+				"kYkkkYk",
+				"kYYYYYk",
+				"kyyyyyk",
+				".kkkkk.",
+			]
 		_:
 			rows = [
 				".kkkkkk.",

@@ -235,10 +235,10 @@ func _news_card(item: Dictionary) -> PanelContainer:
 		footer.add_child(SmaKit.muted("%s · %s" % [ticker, company_name], 10))
 		footer.add_child(SmaKit.hspacer())
 		var trade_btn := SmaKit.button(I18n.t("watchlist.trade"), _open_trade.bind(ticker))
-		trade_btn.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(trade_btn, 11)
 		footer.add_child(trade_btn)
 		var fin_btn := SmaKit.button(I18n.t("financials.open"), _open_financials.bind(ticker))
-		fin_btn.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(fin_btn, 11)
 		footer.add_child(fin_btn)
 		box.add_child(footer)
 	return card

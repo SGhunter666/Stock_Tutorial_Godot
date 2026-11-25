@@ -109,13 +109,10 @@ func _render_list() -> void:
 	for row in game.etf_rows():
 		var ticker := String(row["ticker"])
 		var panel := PanelContainer.new()
-		var style := StyleBoxFlat.new()
-		style.bg_color = SmaUiTheme.PANEL_ALT if ticker == _selected else SmaUiTheme.PANEL
-		style.set_content_margin_all(7)
-		style.border_color = SmaUiTheme.ACCENT if ticker == _selected else Color(0, 0, 0, 0)
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(6)
-		panel.add_theme_stylebox_override("panel", style)
+		var sel := ticker == _selected
+		panel.add_theme_stylebox_override("panel", SmaUiTheme.panel_style(
+			SmaUiTheme.PANEL_ALT if sel else SmaUiTheme.PANEL,
+			SmaUiTheme.ACCENT if sel else SmaUiTheme.BORDER, 7, false))
 		panel.mouse_filter = Control.MOUSE_FILTER_STOP
 		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		panel.gui_input.connect(_on_row_input.bind(ticker))

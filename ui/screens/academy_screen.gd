@@ -241,7 +241,7 @@ func _render_unit() -> void:
 		var full_title := I18n.t(String(section["titleKey"]))
 		var text := "%d. %s%s" % [index + 1, full_title, " ✓" if read else ""]
 		var button := SmaKit.button(text, _select_section.bind(section_id))
-		button.add_theme_font_size_override("font_size", 11)
+		SmaKit.set_small_font(button, 11)
 		button.clip_text = true
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		button.tooltip_text = full_title

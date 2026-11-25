@@ -6546,5 +6546,12 @@
   "pixelOffice.tipIntro": "先给 APLA 写计划再下单！",
   "pixelOffice.tipFund": "严控回撤，守住受托底线。",
   "pixelOffice.tipBull": "大盘走强，切忌盲目追高！",
-  "pixelOffice.tipBear": "大盘承压，留足现金缓冲。"
+  "pixelOffice.tipBear": "大盘承压，留足现金缓冲。",
+  "pixelOffice.tipTrade": "看清买卖价差，单票勿超 25%！",
+  "pixelOffice.tipOptions": "盯紧 Theta 时间损耗与波动率！",
+  "pixelOffice.tipQuant": "先跑样本外验证，严防过拟合！",
+  "pixelOffice.tipAcademy": "学完实操并通过测验解锁新工具！",
+  "pixelOffice.tipPortfolio": "检查仓位集中度与税费摩擦。",
+  "etf.bid": "买一价",
+  "etf.ask": "卖一价"
 }

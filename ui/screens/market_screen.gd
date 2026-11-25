@@ -307,7 +307,7 @@ func _build_heatmap() -> Control:
 		button.clip_text = true
 		button.custom_minimum_size.y = 36
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.add_theme_font_size_override("font_size", 11)
+		SmaKit.set_small_font(button, 11)
 		button.tooltip_text = I18n.t("market.heatmapTooltip", {
 			"sector": SmaKit.sector_label(String(sector))})
 		button.pressed.connect(_on_heatmap_sector.bind(String(sector)))

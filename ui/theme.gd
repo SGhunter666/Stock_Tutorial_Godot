@@ -429,5 +429,16 @@ static func build() -> Theme:
 
 	theme.set_color("font_color", "CheckBox", TEXT)
 	theme.set_color("font_pressed_color", "CheckBox", ACCENT)
+	if is_pixel():
+		theme.set_icon("checked", "CheckBox", SmaPixelArt.icon("cb_checked"))
+		theme.set_icon("unchecked", "CheckBox", SmaPixelArt.icon("cb_unchecked"))
+		theme.set_icon("radio_checked", "CheckBox", SmaPixelArt.icon("radio_checked"))
+		theme.set_icon("radio_unchecked", "CheckBox", SmaPixelArt.icon("radio_unchecked"))
+		theme.set_icon("grabber", "HSlider", SmaPixelArt.icon("slider_grabber"))
+		theme.set_icon("grabber_highlight", "HSlider", SmaPixelArt.icon("slider_grabber_hi"))
+		theme.set_icon("grabber_disabled", "HSlider", SmaPixelArt.icon("cb_unchecked"))
+		theme.set_stylebox("slider", "HSlider", _box(BG_DEEP, BORDER, 0, 4))
+		theme.set_stylebox("grabber_area", "HSlider", _box(ACCENT_DARK, ACCENT, 0, 4))
+		theme.set_stylebox("grabber_area_highlight", "HSlider", _box(POSITIVE.darkened(0.2), ACCENT, 0, 4))
 
 	return theme

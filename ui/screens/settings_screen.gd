@@ -308,14 +308,14 @@ func _render_data() -> void:
 				game.select_save_slot(slot_num)
 				refresh())
 		use_btn.disabled = is_active
-		use_btn.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(use_btn, 11)
 		s_row.add_child(use_btn)
 		if bool(s.get("exists", false)):
 			var load_btn := SmaKit.button(I18n.t("settings.slotLoad"), func():
 				game.select_save_slot(slot_num)
 				game.load_game()
 				refresh())
-			load_btn.add_theme_font_size_override("font_size", 10)
+			SmaKit.set_small_font(load_btn, 11)
 			s_row.add_child(load_btn)
 		slots_box.add_child(s_row)
 	box.add_child(slots_box)

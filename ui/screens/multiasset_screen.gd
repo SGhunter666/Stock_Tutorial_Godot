@@ -240,7 +240,7 @@ func _render_bonds() -> void:
 				SmaUiTheme.MUTED, SmaUiTheme.TEXT, SmaKit.value_color(float(row.get("pnl", 0.0)))])
 		var sell := SmaKit.button(I18n.t("multiasset.sellAll"),
 			_sell_bond.bind(String(row.get("id", "")), int(row.get("qty", 0))))
-		sell.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(sell, 11)
 		sell.custom_minimum_size.x = 64
 		line.add_child(sell)
 		box.add_child(line)
@@ -328,7 +328,7 @@ func _render_fx() -> void:
 				SmaUiTheme.TEXT, SmaKit.value_color(float(row.get("pnl", 0.0)))])
 		var sell := SmaKit.button(I18n.t("multiasset.sellAll"),
 			_sell_fx.bind(String(row.get("id", "")), int(row.get("units", 0))))
-		sell.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(sell, 11)
 		sell.custom_minimum_size.x = 64
 		line.add_child(sell)
 		box.add_child(line)
@@ -418,7 +418,7 @@ func _render_commodities() -> void:
 				SmaUiTheme.TEXT, SmaKit.value_color(float(row.get("pnl", 0.0)))])
 		var sell := SmaKit.button(I18n.t("multiasset.sellAll"),
 			_sell_commodity.bind(String(row.get("id", "")), int(row.get("qty", 0))))
-		sell.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(sell, 11)
 		sell.custom_minimum_size.x = 64
 		line.add_child(sell)
 		box.add_child(line)
@@ -508,7 +508,7 @@ func _render_crypto() -> void:
 				SmaUiTheme.TEXT, SmaKit.value_color(float(row.get("pnl", 0.0)))])
 		var sell := SmaKit.button(I18n.t("multiasset.sellAll"),
 			_sell_crypto.bind(String(row.get("id", "")), units_held))
-		sell.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(sell, 11)
 		sell.custom_minimum_size.x = 64
 		line.add_child(sell)
 		box.add_child(line)

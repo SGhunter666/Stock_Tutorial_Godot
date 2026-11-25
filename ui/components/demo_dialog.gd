@@ -153,7 +153,7 @@ func _build() -> void:
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var panel := SmaKit.card(20)
+	var panel := SmaKit.modal_card(20)
 	panel.custom_minimum_size = Vector2(820, 0)
 	center.add_child(panel)
 	var root := SmaKit.vbox(10)

@@ -266,7 +266,7 @@ func _contract_button(contract: Dictionary, option_type: String, strike: float) 
 	if selected:
 		text = "● " + text
 	var button := SmaKit.button(text, _select_contract.bind(option_type, strike), selected)
-	button.add_theme_font_size_override("font_size", 11)
+	SmaKit.set_small_font(button, 11)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return button
 
@@ -667,14 +667,14 @@ func _refresh_positions() -> void:
 			SmaUiTheme.MUTED, 11))
 		var close := SmaKit.button(I18n.t("options.close"),
 			_close_position.bind(String(row["key"]), absi(int(row["qty"]))))
-		close.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(close, 11)
 		close.custom_minimum_size.x = 54
 		line.add_child(close)
 		if int(row["qty"]) > 0 and int(row["daysLeft"]) == 0 \
 				and float(row.get("intrinsic", 0.0)) > 0.0:
 			var exercise := SmaKit.button(I18n.t("exchange.optionExercise"),
 				_exercise_position.bind(String(row["key"]), absi(int(row["qty"]))))
-			exercise.add_theme_font_size_override("font_size", 10)
+			SmaKit.set_small_font(exercise, 11)
 			exercise.custom_minimum_size.x = 54
 			line.add_child(exercise)
 		_positions_body.add_child(line)

@@ -100,6 +100,7 @@ const TRADER_SEATED := [
 ]
 
 var game: Node
+var _screen_id := "market"
 var _anim_accum := 0.0
 var _frame := 0
 var _tape_scroll := 0.0
@@ -117,6 +118,13 @@ func _init() -> void:
 func setup(game_ref: Node) -> void:
 	game = game_ref
 	_refresh_tape()
+	queue_redraw()
+
+
+func set_screen(screen_id: String) -> void:
+	if _screen_id == screen_id:
+		return
+	_screen_id = screen_id
 	queue_redraw()
 
 
@@ -284,6 +292,11 @@ func _draw_left_zone(tier: int, win_x: int, floor_y: int, alert: bool) -> void:
 		# Elevator floor LED
 		_px(ex + 7, ey - 3, 4, 2, INK)
 		_px(ex + 8, ey - 2, 2, 1, Color("#4ade80") if not alert else Color("#ef4444"))
+		# Framed Gold Award Plaque beside elevator
+		_px(ex + ew + 4, ey + 2, 12, 10, INK)
+		_px(ex + ew + 5, ey + 3, 10, 8, Color("#fbbf24"))
+		_px(ex + ew + 6, ey + 4, 8, 6, Color("#1e293b"))
+		_px(ex + ew + 7, ey + 6, 6, 2, Color("#5eead4"))
 	else:
 		var sx := 4
 		var sy := 23
@@ -540,27 +553,35 @@ func _draw_floor_actors(tier: int, win_x: int, w: int, floor_y: int, alert: bool
 
 
 func _mentor_tip_info(alert: bool) -> Dictionary:
-	var char_id := "lin_lan"
-	var tip := I18n.t("pixelOffice.tipDefault")
 	if alert:
-		char_id = "gu_yan"
-		tip = I18n.t("pixelOffice.alert")
-	elif game != null and game.started:
+		return {"char": "gu_yan", "tip": I18n.t("pixelOffice.alert")}
+	match _screen_id:
+		"options", "futures":
+			return {"char": "lao_chen", "tip": I18n.t("pixelOffice.tipOptions")}
+		"quant", "screener", "statements", "earnings":
+			return {"char": "chen_xi", "tip": I18n.t("pixelOffice.tipQuant")}
+		"academy", "challenges":
+			return {"char": "lin_lan", "tip": I18n.t("pixelOffice.tipAcademy")}
+		"career", "fund":
+			return {"char": "su_he", "tip": I18n.t("pixelOffice.tipFund")}
+		"portfolio", "tax", "multiasset", "etf":
+			return {"char": "gu_yan", "tip": I18n.t("pixelOffice.tipPortfolio")}
+		"trade":
+			if game != null and game.started and game.has_intro_task():
+				return {"char": "lin_lan", "tip": I18n.t("pixelOffice.tipIntro")}
+			return {"char": "lin_lan", "tip": I18n.t("pixelOffice.tipTrade")}
+	if game != null and game.started:
 		if game.has_intro_task():
-			char_id = "lin_lan"
-			tip = I18n.t("pixelOffice.tipIntro")
-		elif game.is_fund_active():
-			char_id = "su_he"
-			tip = I18n.t("pixelOffice.tipFund")
-		elif game.exchange != null:
+			return {"char": "lin_lan", "tip": I18n.t("pixelOffice.tipIntro")}
+		if game.is_fund_active():
+			return {"char": "su_he", "tip": I18n.t("pixelOffice.tipFund")}
+		if game.exchange != null:
 			var idx_chg := float(game.market_index_change())
 			if idx_chg >= 0.8:
-				char_id = "lin_lan"
-				tip = I18n.t("pixelOffice.tipBull")
-			elif idx_chg <= -0.8:
-				char_id = "gu_yan"
-				tip = I18n.t("pixelOffice.tipBear")
-	return {"char": char_id, "tip": tip}
+				return {"char": "lin_lan", "tip": I18n.t("pixelOffice.tipBull")}
+			if idx_chg <= -0.8:
+				return {"char": "gu_yan", "tip": I18n.t("pixelOffice.tipBear")}
+	return {"char": "lin_lan", "tip": I18n.t("pixelOffice.tipDefault")}
 
 
 func _load_portrait(char_id: String) -> Texture2D:

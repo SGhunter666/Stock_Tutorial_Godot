@@ -6546,5 +6546,12 @@
   "pixelOffice.tipIntro": "Plan your APLA trade!",
   "pixelOffice.tipFund": "Guard fund drawdown!",
   "pixelOffice.tipBull": "Strong tape — stay sharp!",
-  "pixelOffice.tipBear": "Weak tape — hold cash!"
+  "pixelOffice.tipBear": "Weak tape — hold cash!",
+  "pixelOffice.tipTrade": "Check spread; cap weight <=25%!",
+  "pixelOffice.tipOptions": "Watch Theta decay & IV!",
+  "pixelOffice.tipQuant": "Check out-of-sample split!",
+  "pixelOffice.tipAcademy": "Pass quiz to unlock tools!",
+  "pixelOffice.tipPortfolio": "Review concentration & fees.",
+  "etf.bid": "Bid",
+  "etf.ask": "Ask"
 }

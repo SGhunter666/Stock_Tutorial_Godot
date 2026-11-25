@@ -39,7 +39,7 @@ func _build() -> void:
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var panel := SmaKit.card(20)
+	var panel := SmaKit.modal_card(20)
 	panel.custom_minimum_size = Vector2(880, 640)
 	center.add_child(panel)
 	var root := SmaKit.vbox(12)
@@ -104,8 +104,8 @@ func render_questions() -> void:
 				var check := CheckBox.new()
 				var base := I18n.t(String(option["key"]), SmaAcademy.formatted_params(question))
 				check.set_meta("base_text", base)
-				check.text = "○ " + base
-				check.add_theme_font_size_override("font_size", 13)
+				check.text = base if SmaUiTheme.is_pixel() else ("○ " + base)
+				SmaKit.set_small_font(check, 13)
 				check.toggled.connect(_on_multi_toggled.bind(check))
 				box.add_child(check)
 				checks.append({"key": String(option["key"]), "control": check})
@@ -118,9 +118,9 @@ func render_questions() -> void:
 				var check := CheckBox.new()
 				var base := I18n.t(String(option["key"]), SmaAcademy.formatted_params(question))
 				check.set_meta("base_text", base)
-				check.text = "○ " + base
+				check.text = base if SmaUiTheme.is_pixel() else ("○ " + base)
 				check.button_group = group
-				check.add_theme_font_size_override("font_size", 13)
+				SmaKit.set_small_font(check, 13)
 				check.toggled.connect(_on_single_toggled.bind(question_id, String(option["key"]), check))
 				box.add_child(check)
 				checks2.append(check)
@@ -135,19 +135,22 @@ func _prompt_text(question: Dictionary) -> String:
 func _on_single_toggled(pressed: bool, question_id: String, option_key: String,
 		check: CheckBox) -> void:
 	if not pressed:
-		check.text = "○ " + String(check.get_meta("base_text"))
+		if not SmaUiTheme.is_pixel():
+			check.text = "○ " + String(check.get_meta("base_text"))
 		return
 	_answers[question_id] = option_key
 	if not _controls.has(question_id):
 		return
-	for other in _controls[question_id]["checks"]:
-		var other_check: CheckBox = other
-		other_check.text = ("● " if other_check == check else "○ ") \
-			+ String(other_check.get_meta("base_text"))
+	if not SmaUiTheme.is_pixel():
+		for other in _controls[question_id]["checks"]:
+			var other_check: CheckBox = other
+			other_check.text = ("● " if other_check == check else "○ ") \
+				+ String(other_check.get_meta("base_text"))
 
 
 func _on_multi_toggled(pressed: bool, check: CheckBox) -> void:
-	check.text = ("● " if pressed else "○ ") + String(check.get_meta("base_text"))
+	if not SmaUiTheme.is_pixel():
+		check.text = ("● " if pressed else "○ ") + String(check.get_meta("base_text"))
 
 
 func _submit() -> void:

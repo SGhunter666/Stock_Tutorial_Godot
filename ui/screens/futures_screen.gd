@@ -349,7 +349,7 @@ func _refresh_positions() -> void:
 			HORIZONTAL_ALIGNMENT_RIGHT, SmaUiTheme.MUTED, 11))
 		var close := SmaKit.button(I18n.t("futures.close"),
 			_close_position.bind(String(row["key"]), int(row["qty"])))
-		close.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(close, 11)
 		close.custom_minimum_size.x = 54
 		line.add_child(close)
 		_positions_body.add_child(line)

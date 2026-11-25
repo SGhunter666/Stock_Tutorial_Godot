@@ -287,7 +287,7 @@ func _build_lab() -> void:
 	var timeframe_group := ButtonGroup.new()
 	for timeframe in TIMEFRAMES:
 		var button := SmaKit.toggle(I18n.t("history.tf.%s" % timeframe), timeframe_group)
-		button.add_theme_font_size_override("font_size", 10)
+		SmaKit.set_small_font(button, 11)
 		button.pressed.connect(_on_timeframe.bind(timeframe))
 		if timeframe == _timeframe:
 			button.button_pressed = true
