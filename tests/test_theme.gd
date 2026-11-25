@@ -6,6 +6,7 @@ func run() -> void:
 	describe("theme-light")
 	SmaUiTheme.set_theme_mode("light")
 	eq(SmaUiTheme.mode, "light", "light mode selected")
+	eq(SmaUiTheme.is_pixel(), true, "light mode remains 100% pixel art")
 	check(SmaUiTheme.BG.r > 0.8, "light background is bright")
 	check(SmaUiTheme.TEXT.r < 0.3, "light text is dark")
 	check(SmaUiTheme.ACCENT_DARK.v > 0.0, "accent remains defined")
@@ -15,6 +16,7 @@ func run() -> void:
 	describe("theme-dark")
 	SmaUiTheme.set_theme_mode("dark")
 	eq(SmaUiTheme.mode, "dark", "dark mode restored")
+	eq(SmaUiTheme.is_pixel(), true, "dark mode remains 100% pixel art")
 	check(SmaUiTheme.BG.r < 0.2, "dark background is dark")
 	check(SmaUiTheme.TEXT.r > 0.8, "dark text is bright")
 
@@ -57,9 +59,17 @@ func run() -> void:
 	check(nine_card is StyleBoxTexture, "pixel theme cards use 9-slice StyleBoxTexture")
 	var snap12 := SmaUiTheme.pixel_snap_font(13)
 	eq(int(snap12["size"]), 12, "13px snaps to exact 12px bitmap grid")
+	var snap20 := SmaUiTheme.pixel_snap_font(16)
+	eq(int(snap20["size"]), 20, "16px snaps to exact 2x 20px 10x10 bitmap grid")
 	var snap24 := SmaUiTheme.pixel_snap_font(18)
 	eq(int(snap24["size"]), 24, "18px snaps to exact 2x 24px 12x12 bitmap grid")
+	var snap30 := SmaUiTheme.pixel_snap_font(30)
+	eq(int(snap30["size"]), 30, "30px snaps to exact 3x 30px 10x10 bitmap grid")
 	check(SmaPixelArt.icon("logo") != null, "pixel logo icon generated")
+	for nav_icon in ["screener", "etf", "options", "futures", "multiasset", "news",
+			"earnings", "macro", "statements", "history", "replay", "tax",
+			"sandbox", "glossary", "boundaries", "roadmap", "opt_arrow", "spin_updown"]:
+		check(SmaPixelArt.icon(nav_icon) != null, "pixel icon generated: %s" % nav_icon)
 	check(SmaPixelArt.ticker_badge("MSFY", "technology", false) != null, "pixel ticker badge generated")
 
 	describe("pixel-beta10-enhancements")

@@ -22,44 +22,162 @@ static func _put(img: Image, gx: int, gy: int, scale: int, col: Color) -> void:
 
 static func card_box(bg: Color, hi: Color, shadow: Color, margin: int = 10,
 		rivets: bool = true) -> StyleBoxTexture:
-	var key := "card|%s|%s|%s|%d|%s" % [bg.to_html(), hi.to_html(), shadow.to_html(), margin, str(rivets)]
+	var key := "card2|%s|%s|%s|%d|%s" % [bg.to_html(), hi.to_html(), shadow.to_html(), margin, str(rivets)]
 	if _style_cache.has(key):
 		return (_style_cache[key] as StyleBoxTexture).duplicate() as StyleBoxTexture
 	var p := 2
-	var gw := 12
-	var gh := 12
+	var gw := 14
+	var gh := 14
+	var bw := gw - 2 # 12x12 card body + 2-grid (4px) hard pixel drop shadow on right/bottom
+	var bh := gh - 2
 	var img := Image.create(gw * p, gh * p, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
-	for gy in gh:
-		for gx in gw:
-			var is_corner := (gx == 0 or gx == gw - 1) and (gy == 0 or gy == gh - 1)
+	var drop := Color(0.02, 0.03, 0.06, 0.56)
+	# 1. Hard notched pixel drop shadow shifted by (+2, +2) grid units (4px)
+	for sy in bh:
+		for sx in bw:
+			if (sx == 0 or sx == bw - 1) and (sy == 0 or sy == bh - 1):
+				continue
+			_put(img, sx + 2, sy + 2, p, drop)
+	# 2. Notched 3D pixel card body
+	for gy in bh:
+		for gx in bw:
+			var is_corner := (gx == 0 or gx == bw - 1) and (gy == 0 or gy == bh - 1)
 			if is_corner:
 				continue
-			var is_outer := gx == 0 or gx == gw - 1 or gy == 0 or gy == gh - 1
-			var is_step := (gx == 1 or gx == gw - 2) and (gy == 1 or gy == gh - 2)
+			var is_outer := gx == 0 or gx == bw - 1 or gy == 0 or gy == bh - 1
+			var is_step := (gx == 1 or gx == bw - 2) and (gy == 1 or gy == bh - 2)
 			if is_outer or is_step:
 				_put(img, gx, gy, p, INK)
 			elif gy == 1 or gx == 1:
 				_put(img, gx, gy, p, hi)
-			elif gy == gh - 2 or gx == gw - 2:
+			elif gy == bh - 2 or gx == bw - 2:
 				_put(img, gx, gy, p, shadow)
 			else:
 				_put(img, gx, gy, p, bg)
 	if rivets:
-		var rivet_col := hi.lerp(bg, 0.35)
-		for pt in [Vector2i(2, 2), Vector2i(gw - 3, 2), Vector2i(2, gh - 3), Vector2i(gw - 3, gh - 3)]:
+		var rivet_col := hi.lerp(bg, 0.25)
+		for pt in [Vector2i(2, 2), Vector2i(bw - 3, 2), Vector2i(2, bh - 3), Vector2i(bw - 3, bh - 3)]:
 			_put(img, pt.x, pt.y, p, rivet_col)
 	var tex := ImageTexture.create_from_image(img)
 	var sb := StyleBoxTexture.new()
 	sb.texture = tex
 	sb.texture_margin_left = 8
 	sb.texture_margin_top = 8
-	sb.texture_margin_right = 8
-	sb.texture_margin_bottom = 8
+	sb.texture_margin_right = 12
+	sb.texture_margin_bottom = 12
 	sb.content_margin_left = margin
 	sb.content_margin_top = margin
-	sb.content_margin_right = margin
-	sb.content_margin_bottom = margin
+	sb.content_margin_right = margin + 4
+	sb.content_margin_bottom = margin + 4
+	_style_cache[key] = sb
+	return sb.duplicate() as StyleBoxTexture
+
+
+static func row_box(bg: Color, rim: Color, pad_h: int = 8, pad_v: int = 6) -> StyleBoxTexture:
+	var key := "row|%s|%s|%d|%d" % [bg.to_html(), rim.to_html(), pad_h, pad_v]
+	if _style_cache.has(key):
+		return (_style_cache[key] as StyleBoxTexture).duplicate() as StyleBoxTexture
+	var p := 2
+	var gw := 10
+	var gh := 10
+	var img := Image.create(gw * p, gh * p, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var top_hi := bg.lightened(0.14)
+	var bot_sh := bg.darkened(0.28)
+	for gy in gh:
+		for gx in gw:
+			if (gx == 0 or gx == gw - 1) and (gy == 0 or gy == gh - 1):
+				continue
+			if gx == 0 or gx == gw - 1 or gy == 0 or gy == gh - 1:
+				_put(img, gx, gy, p, rim)
+			elif gy == 1:
+				_put(img, gx, gy, p, top_hi)
+			elif gy == gh - 2:
+				_put(img, gx, gy, p, bot_sh)
+			else:
+				_put(img, gx, gy, p, bg)
+	var tex := ImageTexture.create_from_image(img)
+	var sb := StyleBoxTexture.new()
+	sb.texture = tex
+	sb.texture_margin_left = 6
+	sb.texture_margin_top = 6
+	sb.texture_margin_right = 6
+	sb.texture_margin_bottom = 6
+	sb.content_margin_left = pad_h
+	sb.content_margin_right = pad_h
+	sb.content_margin_top = pad_v
+	sb.content_margin_bottom = pad_v
+	_style_cache[key] = sb
+	return sb.duplicate() as StyleBoxTexture
+
+
+static func progress_bg_box(bg: Color, rim: Color) -> StyleBoxTexture:
+	var key := "pbg|%s|%s" % [bg.to_html(), rim.to_html()]
+	if _style_cache.has(key):
+		return (_style_cache[key] as StyleBoxTexture).duplicate() as StyleBoxTexture
+	var p := 2
+	var img := Image.create(8 * p, 8 * p, false, Image.FORMAT_RGBA8)
+	img.fill(INK)
+	for gy in range(1, 7):
+		for gx in range(1, 7):
+			_put(img, gx, gy, p, rim if (gy == 6 or gx == 6) else bg)
+	var sb := StyleBoxTexture.new()
+	sb.texture = ImageTexture.create_from_image(img)
+	sb.texture_margin_left = 4
+	sb.texture_margin_top = 4
+	sb.texture_margin_right = 4
+	sb.texture_margin_bottom = 4
+	_style_cache[key] = sb
+	return sb.duplicate() as StyleBoxTexture
+
+
+static func progress_fill_box(fill: Color) -> StyleBoxTexture:
+	var key := "pfill|%s" % fill.to_html()
+	if _style_cache.has(key):
+		return (_style_cache[key] as StyleBoxTexture).duplicate() as StyleBoxTexture
+	var p := 2
+	# 4-grid (8px) tiled LED segment: 3 cols lit + 1 col dark gap!
+	var img := Image.create(4 * p, 8 * p, false, Image.FORMAT_RGBA8)
+	img.fill(INK)
+	var hi := fill.lightened(0.35)
+	var sh := fill.darkened(0.28)
+	for gy in range(1, 7):
+		for gx in 3:
+			var c := hi if gy == 1 else (sh if gy == 6 else fill)
+			_put(img, gx, gy, p, c)
+	var sb := StyleBoxTexture.new()
+	sb.texture = ImageTexture.create_from_image(img)
+	sb.texture_margin_top = 2
+	sb.texture_margin_bottom = 2
+	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
+	_style_cache[key] = sb
+	return sb.duplicate() as StyleBoxTexture
+
+
+static func scroll_box(face: Color, hi: Color, track: bool = false) -> StyleBoxTexture:
+	var key := "scr|%s|%s|%s" % [face.to_html(), hi.to_html(), str(track)]
+	if _style_cache.has(key):
+		return (_style_cache[key] as StyleBoxTexture).duplicate() as StyleBoxTexture
+	var p := 2
+	var img := Image.create(6 * p, 8 * p, false, Image.FORMAT_RGBA8)
+	img.fill(INK)
+	for gy in range(1, 7):
+		for gx in range(1, 5):
+			var c := face
+			if not track and (gy == 1 or gx == 1):
+				c = hi
+			elif not track and gy == 6:
+				c = face.darkened(0.3)
+			_put(img, gx, gy, p, c)
+	var sb := StyleBoxTexture.new()
+	sb.texture = ImageTexture.create_from_image(img)
+	sb.texture_margin_left = 4
+	sb.texture_margin_top = 4
+	sb.texture_margin_right = 4
+	sb.texture_margin_bottom = 4
+	sb.content_margin_left = 4
+	sb.content_margin_right = 4
 	_style_cache[key] = sb
 	return sb.duplicate() as StyleBoxTexture
 
@@ -296,7 +414,7 @@ static func icon(kind: String) -> ImageTexture:
 				"..kkkk..",
 				".kssssk.",
 				"kkkkkkkk",
-				"koooooook".left(8),
+				"kooooook",
 				"kyyyyyyk",
 				"kooooook",
 				"kooooook",
@@ -365,7 +483,7 @@ static func icon(kind: String) -> ImageTexture:
 				"..kyyk..",
 				"...kk...",
 				"..kyyk..",
-				".koooook".left(8),
+				".koooook",
 				"kkkkkkkk",
 			]
 		"career":
@@ -479,6 +597,227 @@ static func icon(kind: String) -> ImageTexture:
 				"kYYYYYk",
 				"kyyyyyk",
 				".kkkkk.",
+			]
+		"screener":
+			rows = [
+				".kkkkk..",
+				"kccccck.",
+				"kcwwwck.",
+				"kcwwwck.",
+				"kccccck.",
+				".kkkkkyk",
+				".....kyk",
+				"......kk",
+			]
+		"etf":
+			rows = [
+				"kkkkkkkk",
+				"krrkgggk",
+				"krrkgggk",
+				"kkkkkkkk",
+				"kbbkyyyk",
+				"kbbkyyyk",
+				"kkkkkkkk",
+				"........",
+			]
+		"options":
+			rows = [
+				"..kkkk..",
+				".kYYYYk.",
+				"kyykkkyk",
+				".kyyyyk.",
+				"...kyk..",
+				"...kyyk.",
+				"...kyk..",
+				"...kyyk.",
+			]
+		"futures":
+			rows = [
+				"...kkkk.",
+				"..kYYYYk",
+				".kyyyk..",
+				"kyyyyyk.",
+				"..kkyyk.",
+				".kyyyk..",
+				"kyyk....",
+				"kk......",
+			]
+		"multiasset":
+			rows = [
+				"..kkkk..",
+				".kYYYYk.",
+				"kyyyyyyk",
+				"kkkkkkkk",
+				"kcccccck",
+				"kcbbbbck",
+				"kcccccck",
+				".kkkkkk.",
+			]
+		"news":
+			rows = [
+				"kkkkkkkk",
+				"kwwwwwwk",
+				"kwrrwwwk",
+				"kwrrddwk",
+				"kwwwwwwk",
+				"kwddddwk",
+				"kssssssk",
+				"kkkkkkkk",
+			]
+		"earnings":
+			rows = [
+				"....kkk.",
+				"..kkyYYk",
+				"kkyyyyyk",
+				"krrryyyk",
+				"krrryyyk",
+				"kkyyyyyk",
+				".kkooyYk",
+				"..kk.kk.",
+			]
+		"macro":
+			rows = [
+				"..kkkk..",
+				".kbbbbk.",
+				"kbGbbGbk",
+				"kGGbbGGk",
+				"kbbbbbbk",
+				"kbGbbGbk",
+				".kbbbbk.",
+				"..kkkk..",
+			]
+		"statements":
+			rows = [
+				".kkkkkk.",
+				"kwwwwwwk",
+				"kwggggwk",
+				"kwwwwwwk",
+				"kwyyyywk",
+				"kwwwwwwk",
+				"kwbbbbwk",
+				".kkkkkk.",
+			]
+		"history":
+			rows = [
+				"..kkkk..",
+				".kwwwwk.",
+				"kwddkkwk",
+				"kwddkwwk",
+				"kwwwkkwk",
+				"kwwwwwwk",
+				".kssssk.",
+				"..kkkk..",
+			]
+		"replay":
+			rows = [
+				".kkkkkk.",
+				"kddddddk",
+				"kdGkGGdk",
+				"kdgkggdk",
+				"kdGkGGdk",
+				"kddddddk",
+				".kkkkkk.",
+				"........",
+			]
+		"tax":
+			rows = [
+				".kkkkkk.",
+				"kyyyyyyk",
+				"kywyywyk",
+				"kyyywyyk",
+				"kyywyyyk",
+				"kywyywyk",
+				"kooooook",
+				".kkkkkk.",
+			]
+		"sandbox":
+			rows = [
+				"..kkkk..",
+				"...kk...",
+				"..kwwk..",
+				".kwppwk.",
+				"kwppppwk",
+				"kppppppk",
+				"kcccccck",
+				".kkkkkk.",
+			]
+		"glossary":
+			rows = [
+				"kkkkkkkk",
+				"kwwkwwwk",
+				"kwdkwdwk",
+				"kwwkwwwk",
+				"kwdkwdwk",
+				"kwwkrwwk",
+				"kkkkkkkk",
+				"....kk..",
+			]
+		"boundaries":
+			rows = [
+				".kkkkkk.",
+				"kcccccck",
+				"kcbbbbck",
+				"kcbYYbck",
+				".kcbbck.",
+				"..kcck..",
+				"...kk...",
+				"........",
+			]
+		"roadmap":
+			rows = [
+				"..kkkk..",
+				"..krrrk.",
+				"..krrrrk",
+				"..krrrk.",
+				"..kwwk..",
+				"..kwwk..",
+				".kssssk.",
+				"kkkkkkkk",
+			]
+		"opt_arrow":
+			rows = [
+				"........",
+				".kkkkkk.",
+				"kYYYYYYk",
+				".kyyyyk.",
+				"..kyyk..",
+				"...kk...",
+				"........",
+				"........",
+			]
+		"spin_updown":
+			rows = [
+				"...kk...",
+				"..kcck..",
+				".kcccck.",
+				"kkkkkkkk",
+				"........",
+				"kkkkkkkk",
+				".kyyyyk.",
+				"..kyyk..",
+				"...kk...",
+			]
+		"star_on":
+			rows = [
+				"...kk...",
+				"..kYYk..",
+				"kkYYYYkk",
+				".kyyyyk.",
+				"..kyyk..",
+				".kykkyk.",
+				"kyk..kyk",
+				"........",
+			]
+		"star_off":
+			rows = [
+				"...kk...",
+				"..kssk..",
+				"kksssskk",
+				".ksddsk.",
+				"..kssk..",
+				".kskksk.",
+				"ksk..ksk",
+				"........",
 			]
 		_:
 			rows = [

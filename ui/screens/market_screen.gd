@@ -75,9 +75,10 @@ func _build() -> void:
 	table_card.add_child(table)
 	var header_wrap := PanelContainer.new()
 	var h_style := StyleBoxFlat.new()
-	h_style.bg_color = Color("#070e1c") if SmaUiTheme.is_pixel() else SmaUiTheme.BG_DEEP
+	h_style.anti_aliasing = false
+	h_style.bg_color = Color("#e3ca9e") if SmaUiTheme.mode == "light" else Color("#091224")
 	h_style.border_color = SmaUiTheme.BORDER
-	h_style.border_width_bottom = 2 if SmaUiTheme.is_pixel() else 1
+	h_style.border_width_bottom = 2
 	h_style.set_content_margin_all(6)
 	header_wrap.add_theme_stylebox_override("panel", h_style)
 	var header := SmaKit.hbox(8)
@@ -124,7 +125,7 @@ func _build() -> void:
 	table.add_child(header_wrap)
 
 	var scroll := SmaKit.scroll()
-	_list = SmaKit.vbox(0)
+	_list = SmaKit.vbox(3)
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_list)
 	table.add_child(scroll)
@@ -141,16 +142,15 @@ func _build() -> void:
 func _create_row(ticker: String, company: Dictionary, sector: String,
 		is_etf: bool) -> void:
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.PANEL if _rows.size() % 2 == 0 else SmaUiTheme.PANEL_ALT
-	style.set_content_margin_all(7)
-	style.border_color = Color(0, 0, 0, 0)
-	panel.add_theme_stylebox_override("panel", style)
+	var even := (_rows.size() % 2 == 0)
+	var row_bg := SmaUiTheme.PANEL if even else SmaUiTheme.PANEL_ALT
+	var row_rim := Color("#c49a68") if SmaUiTheme.mode == "light" else Color("#090f1d")
+	panel.add_theme_stylebox_override("panel", SmaPixelArt.row_box(row_bg, row_rim, 8, 6))
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	panel.custom_minimum_size.y = 30
+	panel.custom_minimum_size.y = 34
 	panel.gui_input.connect(_on_row_input.bind(ticker))
-	panel.mouse_entered.connect(func(): panel.self_modulate = Color(1.25, 1.25, 1.25))
+	panel.mouse_entered.connect(func(): panel.self_modulate = Color(1.16, 1.16, 1.16))
 	panel.mouse_exited.connect(func(): panel.self_modulate = Color.WHITE)
 	var row := SmaKit.hbox(8)
 	panel.add_child(row)
@@ -158,7 +158,8 @@ func _create_row(ticker: String, company: Dictionary, sector: String,
 	watch_cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	watch_cell.size_flags_stretch_ratio = 0.35
 	var watch_button := Button.new()
-	watch_button.text = "☆"
+	watch_button.text = ""
+	watch_button.icon = SmaPixelArt.icon("star_off")
 	watch_button.flat = true
 	watch_button.focus_mode = Control.FOCUS_NONE
 	watch_button.custom_minimum_size = Vector2(26, 26)
@@ -412,11 +413,9 @@ func _update_rows() -> void:
 		var panel: PanelContainer = entry["panel"]
 		var watch_button: Button = entry["watch"]
 		var watched: bool = game.is_watched(String(ticker))
-		var watch_text := "★" if watched else "☆"
-		if watch_button.text != watch_text:
-			watch_button.text = watch_text
-			watch_button.add_theme_color_override("font_color",
-				SmaUiTheme.ACCENT if watched else SmaUiTheme.MUTED)
+		var target_star := SmaPixelArt.icon("star_on" if watched else "star_off")
+		if watch_button.icon != target_star:
+			watch_button.icon = target_star
 			watch_button.tooltip_text = I18n.t(
 				"market.watchRemove" if watched else "market.watchAdd",
 				{"ticker": ticker})

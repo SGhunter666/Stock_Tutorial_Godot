@@ -130,13 +130,70 @@ class SmaCrtScanlines extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		z_index = 90
 	func _draw() -> void:
-		if not SmaUiTheme.is_pixel():
-			return
-		var line_col := Color(0.0, 0.0, 0.0, 0.085)
+		var line_col := Color(0.0, 0.0, 0.0, 0.045 if SmaUiTheme.mode == "light" else 0.075)
 		var y := 0.0
 		while y < size.y:
 			draw_rect(Rect2(0.0, y, size.x, 1.0), line_col)
 			y += 3.0
+
+
+class SmaPixelWorkspaceBg extends Control:
+	const PX := 4
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		if size.x <= 4.0 or size.y <= 4.0:
+			return
+		var mode := SmaUiTheme.mode
+		if mode == "light":
+			# Kairosoft Warm Cream Tatami / Parchment Pixel Weave (Style B)
+			draw_rect(Rect2(Vector2.ZERO, size), Color("#e8d3ab"))
+			var dot := Color("#dcc090")
+			var y := 0.0
+			var row_idx := 0
+			while y < size.y:
+				var x := 0.0 if (row_idx % 2 == 0) else 8.0
+				while x < size.x:
+					draw_rect(Rect2(x, y, 4.0, 2.0), dot)
+					x += 16.0
+				y += 8.0
+				row_idx += 1
+			return
+		if mode == "dark":
+			# PC-98 Midnight Cyber-Indigo Pixel Matrix (Style A)
+			draw_rect(Rect2(Vector2.ZERO, size), Color("#080d1a"))
+			var grid_dot := Color("#152442")
+			var y := 0.0
+			while y < size.y:
+				var x := 0.0
+				while x < size.x:
+					draw_rect(Rect2(x, y, 2.0, 2.0), grid_dot)
+					x += 20.0
+				y += 20.0
+			return
+		# Default "pixel" (Style A+B Hybrid): Warm 16-bit Oak-Wood Trader Desk Planks!
+		var base := Color("#54331d")
+		var hi := Color("#6b4227")
+		var grain := Color("#5e3a22")
+		var seam_sh := Color("#361f10")
+		var ink := Color("#1c0f08")
+		draw_rect(Rect2(Vector2.ZERO, size), base)
+		var plank_h := 28.0
+		var py := 0.0
+		var row := 0
+		while py < size.y:
+			draw_rect(Rect2(0.0, py, size.x, 4.0), hi)
+			draw_rect(Rect2(0.0, py + 12.0, size.x, 2.0), grain)
+			draw_rect(Rect2(0.0, py + plank_h - 6.0, size.x, 4.0), seam_sh)
+			draw_rect(Rect2(0.0, py + plank_h - 2.0, size.x, 2.0), ink)
+			var offset := float((row * 76) % 164)
+			var jx := offset + 48.0
+			while jx < size.x:
+				draw_rect(Rect2(jx, py, 2.0, plank_h - 2.0), ink)
+				draw_rect(Rect2(jx + 2.0, py + 4.0, 2.0, plank_h - 10.0), hi)
+				jx += 164.0
+			py += plank_h
+			row += 1
 
 
 class SmaPixelStartBackdrop extends Control:
@@ -294,10 +351,8 @@ func _build_ui() -> void:
 	_step_buttons.clear()
 	_top_metrics.clear()
 	SmaKit.clear_children(self)
-	var background := ColorRect.new()
+	var background := SmaPixelWorkspaceBg.new()
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	background.color = SmaUiTheme.BG
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 
 	var root := VBoxContainer.new()
@@ -361,10 +416,12 @@ func _build_ui() -> void:
 
 func _build_topbar() -> Control:
 	var bar := PanelContainer.new()
+	var light_mode := SmaUiTheme.mode == "light"
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#08101f") if SmaUiTheme.is_pixel() else SmaUiTheme.BG_DEEP
-	style.border_color = SmaUiTheme.BORDER
-	style.border_width_bottom = 2 if SmaUiTheme.is_pixel() else 1
+	style.anti_aliasing = false
+	style.bg_color = Color("#f3dfc0") if light_mode else Color("#0b1324")
+	style.border_color = Color("#1c0f08")
+	style.border_width_bottom = 3
 	style.set_content_margin_all(0)
 	bar.add_theme_stylebox_override("panel", style)
 
@@ -514,20 +571,20 @@ func _sync_compact_layout() -> void:
 	if _office_banner != null:
 		var want_office := bool(Game.settings.get("showPixelOffice", true))
 		var tall_enough := size.y >= COMPACT_HEIGHT or size.y <= 10.0
-		var hide_for_screen := _current_screen in ["settings", "boundaries", "roadmap", "glossary"]
-		_office_banner.visible = Game.started and want_office and tall_enough \
-			and not in_scenario and not hide_for_screen
+		_office_banner.visible = Game.started and want_office and tall_enough and not in_scenario
 
 
 func _build_sidebar() -> Control:
 	var panel := PanelContainer.new()
+	var light_mode := SmaUiTheme.mode == "light"
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#060b16") if SmaUiTheme.is_pixel() else SmaUiTheme.BG_DEEP
-	style.border_color = SmaUiTheme.BORDER
-	style.border_width_right = 2 if SmaUiTheme.is_pixel() else 1
+	style.anti_aliasing = false
+	style.bg_color = Color("#ebd3ac") if light_mode else Color("#0c1528")
+	style.border_color = Color("#1c0f08")
+	style.border_width_right = 3
 	style.set_content_margin_all(10)
 	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size.x = 208
+	panel.custom_minimum_size.x = 212
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -1081,10 +1138,15 @@ func _show_start_overlay() -> void:
 	footer.add_child(SmaKit.caption(I18n.t("app.version", {
 		"version": String(ProjectSettings.get_setting("application/config/version", "beta-08")),
 	})))
-	var next_mode := "dark" if SmaUiTheme.is_pixel() else "pixel"
-	var theme_btn := SmaKit.button(
-		I18n.t("settings.themeDark" if SmaUiTheme.is_pixel() else "settings.themePixel"),
-		func(): Game.set_theme(next_mode))
+	var modes := ["pixel", "light", "dark"]
+	var cur_idx := maxi(0, modes.find(SmaUiTheme.mode))
+	var next_mode: String = modes[(cur_idx + 1) % modes.size()]
+	var mode_label_key := "settings.themePixel"
+	if SmaUiTheme.mode == "light":
+		mode_label_key = "settings.themeLight"
+	elif SmaUiTheme.mode == "dark":
+		mode_label_key = "settings.themeDark"
+	var theme_btn := SmaKit.button(I18n.t(mode_label_key), func(): Game.set_theme(next_mode))
 	footer.add_child(theme_btn)
 	footer.add_child(SmaKit.button(I18n.t("start.language"), _toggle_language))
 	box.add_child(footer)

@@ -25,12 +25,16 @@ static func muted(text: String, size: int = 12) -> Label:
 
 
 static func title(text: String, size: int = 20) -> Label:
-	var col := Color("#fef3c7") if SmaUiTheme.is_pixel() else SmaUiTheme.TEXT
-	var node := label(text, size, col)
-	if SmaUiTheme.is_pixel():
-		node.add_theme_color_override("font_shadow_color", Color("#04070e"))
-		node.add_theme_constant_override("shadow_offset_x", 2)
-		node.add_theme_constant_override("shadow_offset_y", 2)
+	var light_mode := SmaUiTheme.mode == "light"
+	var col := Color("#7c2d12") if light_mode else Color("#fef3c7")
+	var decorated := text
+	if text != "" and not (text.begins_with("◆") or text.begins_with("★") or text.begins_with("▶")):
+		decorated = "◆ " + text
+	var node := label(decorated, size, col)
+	node.add_theme_color_override("font_shadow_color",
+		Color(1.0, 0.98, 0.92, 0.85) if light_mode else Color("#04070e"))
+	node.add_theme_constant_override("shadow_offset_x", 1 if light_mode else 2)
+	node.add_theme_constant_override("shadow_offset_y", 1 if light_mode else 2)
 	return node
 
 
@@ -51,8 +55,8 @@ static func card(margin: int = 12) -> PanelContainer:
 static func modal_card(margin: int = 20) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var pad := maxi(8, int(round(float(margin) * SmaUiTheme.density)))
-	var bg := Color("#0d1729") if SmaUiTheme.is_pixel() else SmaUiTheme.PANEL
-	var hi := SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT
+	var bg := Color("#fffaf0") if SmaUiTheme.mode == "light" else Color("#0f1b30")
+	var hi := SmaUiTheme.GOLD
 	panel.add_theme_stylebox_override("panel", SmaUiTheme.panel_style(bg, hi, pad, true))
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return panel
@@ -189,9 +193,12 @@ static func data_row(values: Array, ratios: Array, colors: Array = [], aligns: A
 static func separator() -> HSeparator:
 	var line := HSeparator.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.BORDER
-	style.content_margin_top = 1
-	style.content_margin_bottom = 1
+	style.anti_aliasing = false
+	style.bg_color = Color("#04070e") if SmaUiTheme.mode != "light" else Color("#b58450")
+	style.border_color = SmaUiTheme.BORDER
+	style.border_width_bottom = 2
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
 	line.add_theme_stylebox_override("separator", style)
 	return line
 

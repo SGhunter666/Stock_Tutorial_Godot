@@ -35,7 +35,10 @@ func _ready() -> void:
 		Game.submit_order({"ticker": "APLA", "side": "sell", "type": "market", "qty": 20})
 		_dismiss_story()
 		Game.career["rank"] = 3
-		Game.career["certificates"] = ["core_foundations", "risk_execution"]
+		Game.career["certificates"] = [
+			{"id": "core_foundations", "day": 0},
+			{"id": "risk_execution", "day": 0},
+		]
 		if not Game.academy["achievements"].has("first_trade"):
 			Game.academy["achievements"].append("first_trade")
 		Game.academy["xp"] = 260
@@ -658,6 +661,53 @@ func _capture_beta10_showcase() -> void:
 		main._on_office_hotspot("coffee", {"pos": Vector2(440, 130), "quip": q_txt})
 	await get_tree().process_frame
 	await _shot("beta10_coffee_easter")
+
+	main.navigate("dashboard")
+	await _settle(5)
+	await _shot("beta11_dashboard_desk")
+
+	Game.exchange.state["account"]["equityHistory"] = [
+		{"day": 0, "equity": 100000.0},
+		{"day": 1, "equity": 100640.0},
+		{"day": 2, "equity": 100280.0},
+		{"day": 3, "equity": 101420.0},
+		{"day": 4, "equity": 101950.0},
+		{"day": 5, "equity": 103180.0},
+		{"day": 6, "equity": 102890.0},
+		{"day": 7, "equity": 104560.0},
+	]
+	main.navigate("portfolio")
+	main._screens["portfolio"]._last_rebuild = 0
+	main._screens["portfolio"].refresh("force")
+	await _settle(5)
+	await _shot("beta11_portfolio_crt")
+
+	main.navigate("academy")
+	await _settle(4)
+	main._screens["academy"]._open_demo("optionPayoff")
+	await _settle(5)
+	await _shot("beta11_demo_payoff")
+	for child in main.get_children():
+		if child is SmaDemoDialog:
+			child._close()
+	await _settle(3)
+
+	Game.set_theme("light")
+	await _settle(6)
+	_dismiss_story()
+	main.navigate("trade")
+	var ts_light: SmaTradeScreen = main._screens["trade"]
+	ts_light._on_timeframe("1D")
+	ts_light._boll_toggle.button_pressed = true
+	ts_light._sync_chart_overlays()
+	ts_light.refresh()
+	await _settle(5)
+	await _shot("beta11_kairosoft_light")
+	main.navigate("market")
+	await _settle(5)
+	await _shot("beta11_kairosoft_market")
+	Game.set_theme("pixel")
+	await _settle(5)
 
 
 func _dismiss_story() -> void:

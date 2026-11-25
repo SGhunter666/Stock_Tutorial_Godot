@@ -50,19 +50,8 @@ func _build() -> void:
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(900 if SmaUiTheme.is_pixel() else 820, 0)
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	if SmaUiTheme.is_pixel():
-		_panel.add_theme_stylebox_override("panel",
-			SmaPixelArt.card_box(Color("#0d1729"), SmaUiTheme.ACCENT, Color("#040812"), 20, true))
-	else:
-		var style := StyleBoxFlat.new()
-		style.bg_color = SmaUiTheme.PANEL
-		style.border_color = SmaUiTheme.ACCENT_DARK
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(14)
-		style.set_content_margin_all(22)
-		style.shadow_color = Color(0, 0, 0, 0.45)
-		style.shadow_size = 18
-		_panel.add_theme_stylebox_override("panel", style)
+	_panel.add_theme_stylebox_override("panel",
+		SmaUiTheme.panel_style(SmaUiTheme.PANEL, SmaUiTheme.ACCENT, 20, true))
 	center.add_child(_panel)
 
 	var root := SmaKit.vbox(12)

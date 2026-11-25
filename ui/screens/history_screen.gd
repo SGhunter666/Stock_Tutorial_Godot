@@ -417,10 +417,9 @@ func _build_ticker_list() -> void:
 				else SmaKit.sector_label(group)
 			_pack_filter.add_item(label)
 		var panel := PanelContainer.new()
-		var style := StyleBoxFlat.new()
-		style.bg_color = SmaUiTheme.PANEL if _ticker_rows.size() % 2 == 0 else SmaUiTheme.PANEL_ALT
-		style.set_content_margin_all(5)
-		panel.add_theme_stylebox_override("panel", style)
+		var r_bg := SmaUiTheme.PANEL if _ticker_rows.size() % 2 == 0 else SmaUiTheme.PANEL_ALT
+		var r_rim := Color("#c49a68") if SmaUiTheme.mode == "light" else Color("#090f1d")
+		panel.add_theme_stylebox_override("panel", SmaPixelArt.row_box(r_bg, r_rim, 6, 4))
 		panel.mouse_filter = Control.MOUSE_FILTER_STOP
 		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		panel.gui_input.connect(_on_ticker_input.bind(symbol))

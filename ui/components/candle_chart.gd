@@ -197,16 +197,17 @@ func _compute_bollinger() -> void:
 
 
 func _draw() -> void:
-	_font = SmaUiTheme.pixel_font_10() if SmaUiTheme.is_pixel() else get_theme_default_font()
-	var title_font := SmaUiTheme.pixel_font_12() if SmaUiTheme.is_pixel() else _font
+	_font = SmaUiTheme.pixel_font_10()
+	var title_font := SmaUiTheme.pixel_font_12()
 	_font_size = 10
-	draw_rect(Rect2(Vector2.ZERO, size), SmaUiTheme.BG_DEEP)
+	draw_rect(Rect2(Vector2.ZERO, size), Color("#04070e"))
+	draw_rect(Rect2(2, 2, maxf(0.0, size.x - 4.0), maxf(0.0, size.y - 4.0)), SmaUiTheme.CRT_BG)
 	if title_text != "":
 		draw_string(title_font, Vector2(12, 20), title_text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, SmaUiTheme.MUTED)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#b8d0eb"))
 	if candles.is_empty():
 		draw_string(title_font, Vector2(12, size.y * 0.5), I18n.t("chart.no_data"),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, SmaUiTheme.DIM)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#88a8cc"))
 		return
 	_ensure_series_cache()
 	var count := mini(visible_count, candles.size())
@@ -299,8 +300,10 @@ func _moving_average(period: int, field: String) -> Array:
 
 func _draw_grid() -> void:
 	var pixel := SmaUiTheme.is_pixel()
-	var h_col := Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.52)
-	var v_col := Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.34)
+	var crt_border := Color("#3d608c")
+	var crt_dim := Color("#88a8cc")
+	var h_col := Color(crt_border.r, crt_border.g, crt_border.b, 0.58)
+	var v_col := Color(crt_border.r, crt_border.g, crt_border.b, 0.38)
 	for step in 5:
 		var ratio := float(step) / 4.0
 		var y := roundf(lerpf(_top, _price_bottom, ratio)) if pixel else lerpf(_top, _price_bottom, ratio)
@@ -313,7 +316,7 @@ func _draw_grid() -> void:
 			draw_line(Vector2(_left, y), Vector2(_right, y), h_col, 1.0)
 		var price := lerpf(_high, _low, ratio)
 		draw_string(_font, Vector2(_right + 6, y + 3), SmaFormat.num(price, 2),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, _font_size, SmaUiTheme.DIM)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, _font_size, crt_dim)
 	for step in 4:
 		var ratio := float(step) / 3.0
 		var x := roundf(lerpf(_left, _right, ratio)) if pixel else lerpf(_left, _right, ratio)
@@ -326,7 +329,7 @@ func _draw_grid() -> void:
 			draw_line(Vector2(x, _top), Vector2(x, _volume_bottom), v_col, 1.0)
 	if pixel:
 		draw_rect(Rect2(_left - 2.0, _top - 2.0, (_right - _left) + 4.0,
-			(_volume_bottom - _top) + 4.0), SmaUiTheme.BORDER, false, 1.0)
+			(_volume_bottom - _top) + 4.0), crt_border, false, 2.0)
 
 
 func _draw_volume(max_volume: float, body_width: float) -> void:
@@ -614,11 +617,13 @@ func _draw_legend(start: int) -> void:
 	var abs_index := start + active_vis
 	var x := _left
 	var y := 34.0
-	x = _draw_metric(x, y, "O ", SmaFormat.num(float(bar["o"]), 2), SmaUiTheme.TEXT)
-	x = _draw_metric(x, y, "H ", SmaFormat.num(float(bar["h"]), 2), SmaUiTheme.TEXT)
-	x = _draw_metric(x, y, "L ", SmaFormat.num(float(bar["l"]), 2), SmaUiTheme.TEXT)
-	x = _draw_metric(x, y, "C ", SmaFormat.num(float(bar["c"]), 2), SmaUiTheme.TEXT)
-	x = _draw_metric(x, y, "V ", SmaFormat.compact(float(bar.get("v", 0))), SmaUiTheme.MUTED)
+	var crt_text := Color("#f4f8fc")
+	var crt_muted := Color("#b8d0eb")
+	x = _draw_metric(x, y, "O ", SmaFormat.num(float(bar["o"]), 2), crt_text)
+	x = _draw_metric(x, y, "H ", SmaFormat.num(float(bar["h"]), 2), crt_text)
+	x = _draw_metric(x, y, "L ", SmaFormat.num(float(bar["l"]), 2), crt_text)
+	x = _draw_metric(x, y, "C ", SmaFormat.num(float(bar["c"]), 2), crt_text)
+	x = _draw_metric(x, y, "V ", SmaFormat.compact(float(bar.get("v", 0))), crt_muted)
 	var open_price := float(bar["o"])
 	var change := (float(bar["c"]) / open_price - 1.0) * 100.0 if open_price > 0.0 else 0.0
 	x = _draw_metric(x, y, "", SmaFormat.pct(change, 2), SmaKit.value_color(change))
@@ -659,7 +664,7 @@ func _draw_metric(x: float, y: float, label: String, value: String, color: Color
 	var px := 10 if SmaUiTheme.is_pixel() else font_px
 	if label != "":
 		draw_string(_font, Vector2(x, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1,
-			px, SmaUiTheme.DIM)
+			px, Color("#88a8cc"))
 		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
 	draw_string(_font, Vector2(x, y), value, HORIZONTAL_ALIGNMENT_LEFT, -1,
 		px, color)
@@ -669,6 +674,7 @@ func _draw_metric(x: float, y: float, label: String, value: String, color: Color
 
 func _draw_time_axis() -> void:
 	var labels := mini(4, _visible.size())
+	var crt_dim := Color("#88a8cc")
 	for step in labels:
 		var ratio := float(step) / float(maxi(1, labels - 1))
 		var index := int(round(ratio * float(_visible.size() - 1)))
@@ -677,13 +683,13 @@ func _draw_time_axis() -> void:
 		var x := _left + _slot * (float(index) + 0.5)
 		if step == 0:
 			draw_string(_font, Vector2(_left, size.y - 6), label,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 10, SmaUiTheme.DIM)
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 10, crt_dim)
 		elif step == labels - 1:
 			draw_string(_font, Vector2(_left, size.y - 6), label,
-				HORIZONTAL_ALIGNMENT_RIGHT, _right - _left, 10, SmaUiTheme.DIM)
+				HORIZONTAL_ALIGNMENT_RIGHT, _right - _left, 10, crt_dim)
 		else:
 			draw_string(_font, Vector2(x - 32, size.y - 6), label,
-				HORIZONTAL_ALIGNMENT_CENTER, 64, 10, SmaUiTheme.DIM)
+				HORIZONTAL_ALIGNMENT_CENTER, 64, 10, crt_dim)
 
 
 func _draw_crosshair() -> void:
@@ -731,8 +737,8 @@ func _draw_axis_tag(position: Vector2, text: String, color: Color,
 	if SmaUiTheme.is_pixel():
 		box.position = Vector2(roundf(box.position.x), roundf(box.position.y))
 		box.size = Vector2(roundf(box.size.x), roundf(box.size.y))
-	draw_rect(box, SmaUiTheme.PANEL_ALT)
-	draw_rect(box, color, false, 2.0 if SmaUiTheme.is_pixel() else 1.0)
+	draw_rect(box, Color("#0d1a2d"))
+	draw_rect(box, color, false, 2.0)
 	draw_string(_font, Vector2(box.position.x + 4.0, box.position.y + text_size.y - 2.0),
 		text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
@@ -761,11 +767,10 @@ func _draw_tooltip(bar: Dictionary) -> void:
 	if SmaUiTheme.is_pixel():
 		box.position = Vector2(roundf(box.position.x), roundf(box.position.y))
 		box.size = Vector2(roundf(box.size.x), roundf(box.size.y))
-	draw_rect(box, Color(SmaUiTheme.PANEL.r, SmaUiTheme.PANEL.g, SmaUiTheme.PANEL.b, 0.96))
-	draw_rect(box, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.BORDER,
-		false, 2.0 if SmaUiTheme.is_pixel() else 1.0)
+	draw_rect(box, Color(0.05, 0.10, 0.18, 0.96))
+	draw_rect(box, Color("#fbbf24"), false, 2.0)
 	for index in lines.size():
-		var color := SmaUiTheme.MUTED if index == 0 else SmaUiTheme.TEXT
+		var color := Color("#9cb8d8") if index == 0 else Color("#f4f8fc")
 		draw_string(_font, Vector2(box.position.x + 8.0,
 			box.position.y + 14.0 + float(index) * 14.0), lines[index],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, color)

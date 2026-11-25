@@ -247,14 +247,12 @@ func _day_start_equity() -> float:
 
 func _clickable_row(inner: Control, callback: Callable) -> PanelContainer:
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0, 0, 0, 0)
-	style.set_content_margin_all(4)
-	panel.add_theme_stylebox_override("panel", style)
+	var row_rim := Color("#c49a68") if SmaUiTheme.mode == "light" else Color("#090f1d")
+	panel.add_theme_stylebox_override("panel", SmaPixelArt.row_box(SmaUiTheme.PANEL_ALT, row_rim, 6, 4))
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	panel.mouse_entered.connect(func(): style.bg_color = SmaUiTheme.PANEL_ALT)
-	panel.mouse_exited.connect(func(): style.bg_color = Color(0, 0, 0, 0))
+	panel.mouse_entered.connect(func(): panel.self_modulate = Color(1.16, 1.16, 1.16))
+	panel.mouse_exited.connect(func(): panel.self_modulate = Color.WHITE)
 	panel.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			callback.call())

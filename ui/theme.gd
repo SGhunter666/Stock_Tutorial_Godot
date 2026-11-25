@@ -1,21 +1,26 @@
-## Central visual language. Every screen pulls colors, spacing, pixel fonts and
-## 9-slice tactile pixel styles from here so the UI switches cleanly between the
-## signature A+B Retro Pixel Hybrid ("pixel"), modern dark ("dark"), and light ("light").
+## Central 16-bit pixel visual language. Every mode in the game is 100% pixel art
+## (Fusion Pixel bitmap fonts on exact integer multiples, nearest-neighbor 9-slice
+## notched pixel frames with hard 4px drop shadows, pixel icons & arcade controls),
+## offering three distinct pixel palettes:
+##   - "pixel": Kairosoft Oak Desk × CRT Terminal Hybrid (Style A+B default)
+##   - "light": Kairosoft Warm Parchment Studio (Style B warm cream)
+##   - "dark":  PC-98 Midnight Neon Terminal (Style A cyber CRT)
 class_name SmaUiTheme
 extends RefCounted
 
-const CARD_RADIUS := 10
+const CARD_RADIUS := 0
 const GAP := 10
 
-static var BG := Color("#070c17")
-static var BG_DEEP := Color("#04070f")
-static var PANEL := Color("#111b2e")
-static var PANEL_ALT := Color("#1a2945")
-static var PANEL_HOVER := Color("#283e66")
-static var BORDER := Color("#567da8")
+static var BG := Color("#4a2d1b")
+static var BG_DEEP := Color("#060c17")
+static var CRT_BG := Color("#060d18")
+static var PANEL := Color("#152238")
+static var PANEL_ALT := Color("#1f3252")
+static var PANEL_HOVER := Color("#2c4670")
+static var BORDER := Color("#7db0e0")
 static var TEXT := Color("#f4f8fc")
-static var MUTED := Color("#b3cae0")
-static var DIM := Color("#85a3bf")
+static var MUTED := Color("#bfd4ea")
+static var DIM := Color("#8caac9")
 static var ACCENT := Color("#5eead4")
 static var ACCENT_DARK := Color("#0f766e")
 static var GOLD := Color("#fbbf24")
@@ -34,11 +39,11 @@ static var _pixel_font_12: Font
 
 
 static func is_pixel() -> bool:
-	return mode == "pixel"
+	return true
 
 
 static func card_radius() -> int:
-	return 0 if is_pixel() else CARD_RADIUS
+	return 0
 
 
 static func set_density(value: float) -> void:
@@ -47,46 +52,50 @@ static func set_density(value: float) -> void:
 
 static func set_theme_mode(value: String) -> void:
 	mode = value if ["pixel", "dark", "light"].has(value) else "dark"
+	CRT_BG = Color("#060d18")
 	if mode == "light":
-		BG = Color("#f2f6fa")
-		BG_DEEP = Color("#ffffff")
-		PANEL = Color("#ffffff")
-		PANEL_ALT = Color("#eef3f8")
-		PANEL_HOVER = Color("#e2eaf2")
-		BORDER = Color("#cfdae5")
-		TEXT = Color("#16202c")
-		MUTED = Color("#4d6073")
-		DIM = Color("#5b7085")
+		# Style B: Kairosoft Warm Cream Parchment Pixel Palette
+		BG = Color("#e8d3ab")
+		BG_DEEP = Color("#fffaf0")
+		PANEL = Color("#fcf4e1")
+		PANEL_ALT = Color("#f2e2be")
+		PANEL_HOVER = Color("#e6cfa0")
+		BORDER = Color("#b58450")
+		TEXT = Color("#21160e")
+		MUTED = Color("#573e2c")
+		DIM = Color("#785a43")
 		ACCENT = Color("#0d9488")
 		ACCENT_DARK = Color("#0f766e")
 		GOLD = Color("#b45309")
 		WARNING = Color("#b45309")
 		INFO = Color("#1d4ed8")
 	elif mode == "pixel":
-		BG = Color("#070c17")
-		BG_DEEP = Color("#04070f")
-		PANEL = Color("#111b2e")
-		PANEL_ALT = Color("#1a2945")
-		PANEL_HOVER = Color("#283e66")
-		BORDER = Color("#567da8")
+		# Style A+B Hybrid: Warm Kairosoft Oak Desk + Crisp Steel-Indigo Pixel Windows
+		BG = Color("#4a2d1b")
+		BG_DEEP = Color("#060c17")
+		PANEL = Color("#152238")
+		PANEL_ALT = Color("#1f3252")
+		PANEL_HOVER = Color("#2c4670")
+		BORDER = Color("#7db0e0")
 		TEXT = Color("#f4f8fc")
-		MUTED = Color("#b3cae0")
-		DIM = Color("#85a3bf")
+		MUTED = Color("#bfd4ea")
+		DIM = Color("#8caac9")
 		ACCENT = Color("#5eead4")
 		ACCENT_DARK = Color("#0f766e")
 		GOLD = Color("#fbbf24")
 		WARNING = Color("#fbbf24")
 		INFO = Color("#60a5fa")
 	else:
-		BG = Color("#0a1220")
-		BG_DEEP = Color("#070d18")
-		PANEL = Color("#111d2e")
-		PANEL_ALT = Color("#16263a")
-		PANEL_HOVER = Color("#1b3049")
-		BORDER = Color("#22384f")
-		TEXT = Color("#e7f1f8")
-		MUTED = Color("#9bb3c9")
-		DIM = Color("#8aa3b8")
+		# Style A: PC-98 Midnight Cyber-Indigo Pixel Terminal
+		BG = Color("#080d1a")
+		BG_DEEP = Color("#050811")
+		PANEL = Color("#10192e")
+		PANEL_ALT = Color("#192847")
+		PANEL_HOVER = Color("#253b66")
+		BORDER = Color("#5c87bd")
+		TEXT = Color("#f2f7fd")
+		MUTED = Color("#b0c8e2")
+		DIM = Color("#82a0bf")
 		ACCENT = Color("#5eead4")
 		ACCENT_DARK = Color("#0f766e")
 		GOLD = Color("#fbbf24")
@@ -164,15 +173,21 @@ static func pixel_font_12() -> Font:
 
 
 ## Maps any UI font size to an exact integer multiple (1x, 2x, 3x) of our 10px
-## and 12px bitmap pixel fonts so strokes never suffer fractional distortion.
+## and 12px bitmap pixel fonts so strokes never suffer fractional distortion:
+##   10px (1x of 10), 12px (1x of 12), 20px (2x of 10), 24px (2x of 12),
+##   30px (3x of 10), 36px (3x of 12).
 static func pixel_snap_font(raw_size: int) -> Dictionary:
 	_ensure_pixel_fonts()
 	if raw_size <= 10:
 		return {"font": _pixel_font_10, "size": 10}
-	if raw_size <= 17:
+	if raw_size <= 14:
 		return {"font": _pixel_font_12, "size": 12}
-	if raw_size <= 30:
+	if raw_size <= 17:
+		return {"font": _pixel_font_10, "size": 20}
+	if raw_size <= 27:
 		return {"font": _pixel_font_12, "size": 24}
+	if raw_size <= 32:
+		return {"font": _pixel_font_10, "size": 30}
 	return {"font": _pixel_font_12, "size": 36}
 
 
@@ -201,20 +216,17 @@ static func panel_style(bg: Color = Color(0, 0, 0, 0), border_hi: Color = Color(
 		margin: int = 10, rivets: bool = true) -> StyleBox:
 	var fill := PANEL if bg.a <= 0.0 else bg
 	var hi := BORDER if border_hi.a <= 0.0 else border_hi
-	if is_pixel():
-		return SmaPixelArt.card_box(fill, hi, fill.darkened(0.45), margin, rivets)
-	return _box(fill, hi, CARD_RADIUS, margin)
+	var sh := fill.darkened(0.24 if mode == "light" else 0.45)
+	if mode == "light" and border_hi.a <= 0.0:
+		hi = Color("#fffdf7")
+		sh = Color("#cfb484")
+	return SmaPixelArt.card_box(fill, hi, sh, margin, rivets)
 
 
 static func readout_style(margin_h: int = 10, margin_v: int = 5,
 		rim: Color = Color(0, 0, 0, 0)) -> StyleBox:
 	var r := BORDER if rim.a <= 0.0 else rim
-	if is_pixel():
-		return SmaPixelArt.readout_box(BG_DEEP, r, margin_h, margin_v)
-	var flat := _box(BG_DEEP, r, 8, margin_v)
-	flat.content_margin_left = margin_h
-	flat.content_margin_right = margin_h
-	return flat
+	return SmaPixelArt.readout_box(BG_DEEP, r, margin_h, margin_v)
 
 
 static func beveled_button_box(bg: Color, border: Color, margin: int = 9,
@@ -317,90 +329,72 @@ static func apply_arcade_button(node: Button, kind: String = "primary", margin: 
 
 static func build() -> Theme:
 	var theme := Theme.new()
-	if is_pixel():
-		_ensure_pixel_fonts()
-		theme.default_font = _pixel_font_12
-		theme.default_font_size = 12
-	else:
-		var fallback := SystemFont.new()
-		fallback.font_names = PackedStringArray([
-			"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-			"Noto Sans CJK SC", "Source Han Sans SC", "Arial Unicode MS", "sans-serif",
-		])
-		fallback.allow_system_fallback = true
-		fallback.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-		var font: Font = fallback
-		if OS.get_name() == "macOS":
-			for candidate in ["/System/Library/Fonts/STHeiti Medium.ttc",
-					"/System/Library/Fonts/STHeiti Light.ttc",
-					"/System/Library/Fonts/Supplemental/Songti.ttc"]:
-				var file := FontFile.new()
-				var err := file.load_dynamic_font(candidate)
-				if err == OK and file.get_font_name() != "" and file.has_char(0x8FDC):
-					file.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
-					file.fallbacks.append(fallback)
-					font = file
-					break
-		theme.default_font = font
-		theme.default_font_size = 13
+	_ensure_pixel_fonts()
+	theme.default_font = _pixel_font_12
+	theme.default_font_size = 12
+	var light_mode := mode == "light"
 
 	theme.set_color("font_color", "Label", TEXT)
-	if is_pixel():
-		theme.set_color("font_shadow_color", "Label", Color(0.01, 0.02, 0.05, 0.92))
+	if light_mode:
+		theme.set_color("font_shadow_color", "Label", Color(1.0, 0.99, 0.95, 0.75))
 		theme.set_constant("shadow_offset_x", "Label", 1)
 		theme.set_constant("shadow_offset_y", "Label", 1)
 	else:
-		theme.set_color("font_shadow_color", "Label", Color(0, 0, 0, 0))
+		theme.set_color("font_shadow_color", "Label", Color(0.01, 0.02, 0.05, 0.92))
+		theme.set_constant("shadow_offset_x", "Label", 1)
+		theme.set_constant("shadow_offset_y", "Label", 1)
 
 	theme.set_stylebox("panel", "PanelContainer", panel_style(PANEL, BORDER, 10, true))
 	theme.set_stylebox("panel", "Panel", panel_style(PANEL, BORDER, 10, true))
 
-	if is_pixel():
-		var btn_norm := SmaPixelArt.button_box(Color("#233654"), Color("#6d93be"), Color("#0c1526"), 7, false)
-		var btn_hov := SmaPixelArt.button_box(Color("#304970"), Color("#93c5fd"), Color("#122038"), 7, false)
-		var btn_press := SmaPixelArt.button_box(Color("#0f766e"), Color("#5eead4"), Color("#053330"), 7, true)
-		var btn_dis := SmaPixelArt.button_box(Color("#131d2f"), Color("#2c3e58"), Color("#080e19"), 7, false)
-		theme.set_stylebox("normal", "Button", btn_norm)
-		theme.set_stylebox("hover", "Button", btn_hov)
-		theme.set_stylebox("pressed", "Button", btn_press)
-		theme.set_stylebox("hover_pressed", "Button", btn_press)
-		theme.set_stylebox("disabled", "Button", btn_dis)
-		theme.set_stylebox("normal", "OptionButton", btn_norm)
-		theme.set_stylebox("hover", "OptionButton", btn_hov)
-		theme.set_stylebox("pressed", "OptionButton", btn_press)
-		theme.set_stylebox("normal", "MenuButton", btn_norm)
-		theme.set_stylebox("hover", "MenuButton", btn_hov)
-		theme.set_stylebox("pressed", "MenuButton", btn_press)
+	var btn_norm: StyleBoxTexture
+	var btn_hov: StyleBoxTexture
+	var btn_press: StyleBoxTexture
+	var btn_dis: StyleBoxTexture
+	if light_mode:
+		btn_norm = SmaPixelArt.button_box(Color("#ebd6af"), Color("#fffdf7"), Color("#9c6f44"), 7, false)
+		btn_hov = SmaPixelArt.button_box(Color("#f7e7c6"), Color("#ffffff"), Color("#855a32"), 7, false)
+		btn_press = SmaPixelArt.button_box(Color("#0f766e"), Color("#5eead4"), Color("#053330"), 7, true)
+		btn_dis = SmaPixelArt.button_box(Color("#dfd0b4"), Color("#efe4cf"), Color("#b09a78"), 7, false)
+	else:
+		btn_norm = SmaPixelArt.button_box(Color("#243858"), Color("#7db0e0"), Color("#0c1526"), 7, false)
+		btn_hov = SmaPixelArt.button_box(Color("#324d78"), Color("#bae6fd"), Color("#122038"), 7, false)
+		btn_press = SmaPixelArt.button_box(Color("#0f766e"), Color("#5eead4"), Color("#053330"), 7, true)
+		btn_dis = SmaPixelArt.button_box(Color("#131d2f"), Color("#2c3e58"), Color("#080e19"), 7, false)
+
+	theme.set_stylebox("normal", "Button", btn_norm)
+	theme.set_stylebox("hover", "Button", btn_hov)
+	theme.set_stylebox("pressed", "Button", btn_press)
+	theme.set_stylebox("hover_pressed", "Button", btn_press)
+	theme.set_stylebox("disabled", "Button", btn_dis)
+	theme.set_stylebox("normal", "OptionButton", btn_norm)
+	theme.set_stylebox("hover", "OptionButton", btn_hov)
+	theme.set_stylebox("pressed", "OptionButton", btn_press)
+	theme.set_stylebox("normal", "MenuButton", btn_norm)
+	theme.set_stylebox("hover", "MenuButton", btn_hov)
+	theme.set_stylebox("pressed", "MenuButton", btn_press)
+	theme.set_icon("arrow", "OptionButton", SmaPixelArt.icon("opt_arrow"))
+	theme.set_constant("arrow_margin", "OptionButton", 6)
+	theme.set_icon("updown", "SpinBox", SmaPixelArt.icon("spin_updown"))
+
+	if not light_mode:
 		theme.set_color("font_outline_color", "Button", Color("#04070e"))
 		theme.set_constant("outline_size", "Button", 2)
-		theme.set_font_size("font_size", "Button", 12)
-		theme.set_font_size("font_size", "OptionButton", 12)
-		theme.set_font_size("font_size", "LineEdit", 12)
-		theme.set_font_size("font_size", "PopupMenu", 12)
-		theme.set_font_size("font_size", "CheckBox", 12)
-	else:
-		theme.set_stylebox("normal", "Button", beveled_button_box(PANEL_ALT, BORDER, 8, false))
-		theme.set_stylebox("hover", "Button", beveled_button_box(PANEL_HOVER, ACCENT, 8, false))
-		theme.set_stylebox("pressed", "Button", beveled_button_box(ACCENT_DARK, ACCENT, 8, true))
-		theme.set_stylebox("disabled", "Button", _box(PANEL, DIM, 8, 8))
-		theme.set_stylebox("normal", "OptionButton", beveled_button_box(PANEL_ALT, BORDER, 8, false))
-		theme.set_stylebox("hover", "OptionButton", beveled_button_box(PANEL_HOVER, ACCENT, 8, false))
-		theme.set_stylebox("pressed", "OptionButton", beveled_button_box(ACCENT_DARK, ACCENT, 8, true))
-		theme.set_font_size("font_size", "Button", 13)
-		theme.set_font_size("font_size", "OptionButton", 13)
-		theme.set_font_size("font_size", "LineEdit", 13)
-		theme.set_font_size("font_size", "PopupMenu", 13)
-		theme.set_font_size("font_size", "CheckBox", 13)
+	theme.set_font_size("font_size", "Button", 12)
+	theme.set_font_size("font_size", "OptionButton", 12)
+	theme.set_font_size("font_size", "LineEdit", 12)
+	theme.set_font_size("font_size", "PopupMenu", 12)
+	theme.set_font_size("font_size", "CheckBox", 12)
 
-	var focus := _box(Color.TRANSPARENT, ACCENT, 8, 0)
+	var focus := _box(Color.TRANSPARENT, ACCENT, 0, 0)
 	focus.draw_center = false
 	focus.set_border_width_all(2)
 	theme.set_stylebox("focus", "Button", focus)
 	theme.set_stylebox("focus", "OptionButton", focus)
 	theme.set_color("font_color", "Button", TEXT)
-	theme.set_color("font_hover_color", "Button", Color.WHITE)
-	theme.set_color("font_pressed_color", "Button", GOLD if is_pixel() else Color.WHITE)
-	theme.set_color("font_hover_pressed_color", "Button", GOLD if is_pixel() else Color.WHITE)
+	theme.set_color("font_hover_color", "Button", TEXT if light_mode else Color.WHITE)
+	theme.set_color("font_pressed_color", "Button", Color("#fef08a"))
+	theme.set_color("font_hover_pressed_color", "Button", Color("#fef08a"))
 	theme.set_color("font_disabled_color", "Button", DIM)
 
 	theme.set_stylebox("normal", "LineEdit", readout_style(8, 6, BORDER))
@@ -409,36 +403,38 @@ static func build() -> Theme:
 	theme.set_color("font_placeholder_color", "LineEdit", DIM)
 
 	theme.set_color("font_color", "OptionButton", TEXT)
+	theme.set_color("font_hover_color", "OptionButton", TEXT if light_mode else Color.WHITE)
 
-	theme.set_stylebox("panel", "PopupMenu", panel_style(PANEL_ALT, ACCENT if is_pixel() else BORDER, 6, false))
+	theme.set_stylebox("panel", "PopupMenu", panel_style(PANEL_ALT, ACCENT, 6, false))
 	theme.set_color("font_color", "PopupMenu", TEXT)
-	theme.set_color("font_hover_color", "PopupMenu", GOLD if is_pixel() else Color.WHITE)
+	theme.set_color("font_hover_color", "PopupMenu", GOLD)
 
-	theme.set_stylebox("scroll", "VScrollBar", _box(BG_DEEP, BORDER, 6, 0))
-	theme.set_stylebox("grabber", "VScrollBar", _box(PANEL_HOVER, BORDER, 6, 0))
-	theme.set_stylebox("grabber_highlight", "VScrollBar", _box(ACCENT_DARK, ACCENT, 6, 0))
-	theme.set_stylebox("grabber_pressed", "VScrollBar", _box(ACCENT, ACCENT, 6, 0))
+	var scr_track := SmaPixelArt.scroll_box(BG_DEEP, BORDER, true)
+	var scr_grab := SmaPixelArt.scroll_box(PANEL_HOVER, BORDER, false)
+	var scr_hi := SmaPixelArt.scroll_box(ACCENT_DARK, ACCENT, false)
+	for bar_cls in ["VScrollBar", "HScrollBar"]:
+		theme.set_stylebox("scroll", bar_cls, scr_track)
+		theme.set_stylebox("grabber", bar_cls, scr_grab)
+		theme.set_stylebox("grabber_highlight", bar_cls, scr_hi)
+		theme.set_stylebox("grabber_pressed", bar_cls, scr_hi)
 
 	theme.set_stylebox("normal", "SpinBox", readout_style(6, 5, BORDER))
 	theme.set_color("font_color", "SpinBox", TEXT)
 
-	var pb_bg := _box(BG_DEEP, BORDER, 4, 0)
-	var pb_fill := _box(POSITIVE if is_pixel() else ACCENT_DARK, ACCENT, 4, 0)
-	theme.set_stylebox("background", "ProgressBar", pb_bg)
-	theme.set_stylebox("fill", "ProgressBar", pb_fill)
+	theme.set_stylebox("background", "ProgressBar", SmaPixelArt.progress_bg_box(BG_DEEP, BORDER))
+	theme.set_stylebox("fill", "ProgressBar", SmaPixelArt.progress_fill_box(POSITIVE))
 
 	theme.set_color("font_color", "CheckBox", TEXT)
 	theme.set_color("font_pressed_color", "CheckBox", ACCENT)
-	if is_pixel():
-		theme.set_icon("checked", "CheckBox", SmaPixelArt.icon("cb_checked"))
-		theme.set_icon("unchecked", "CheckBox", SmaPixelArt.icon("cb_unchecked"))
-		theme.set_icon("radio_checked", "CheckBox", SmaPixelArt.icon("radio_checked"))
-		theme.set_icon("radio_unchecked", "CheckBox", SmaPixelArt.icon("radio_unchecked"))
-		theme.set_icon("grabber", "HSlider", SmaPixelArt.icon("slider_grabber"))
-		theme.set_icon("grabber_highlight", "HSlider", SmaPixelArt.icon("slider_grabber_hi"))
-		theme.set_icon("grabber_disabled", "HSlider", SmaPixelArt.icon("cb_unchecked"))
-		theme.set_stylebox("slider", "HSlider", _box(BG_DEEP, BORDER, 0, 4))
-		theme.set_stylebox("grabber_area", "HSlider", _box(ACCENT_DARK, ACCENT, 0, 4))
-		theme.set_stylebox("grabber_area_highlight", "HSlider", _box(POSITIVE.darkened(0.2), ACCENT, 0, 4))
+	theme.set_icon("checked", "CheckBox", SmaPixelArt.icon("cb_checked"))
+	theme.set_icon("unchecked", "CheckBox", SmaPixelArt.icon("cb_unchecked"))
+	theme.set_icon("radio_checked", "CheckBox", SmaPixelArt.icon("radio_checked"))
+	theme.set_icon("radio_unchecked", "CheckBox", SmaPixelArt.icon("radio_unchecked"))
+	theme.set_icon("grabber", "HSlider", SmaPixelArt.icon("slider_grabber"))
+	theme.set_icon("grabber_highlight", "HSlider", SmaPixelArt.icon("slider_grabber_hi"))
+	theme.set_icon("grabber_disabled", "HSlider", SmaPixelArt.icon("cb_unchecked"))
+	theme.set_stylebox("slider", "HSlider", SmaPixelArt.progress_bg_box(BG_DEEP, BORDER))
+	theme.set_stylebox("grabber_area", "HSlider", SmaPixelArt.progress_fill_box(ACCENT))
+	theme.set_stylebox("grabber_area_highlight", "HSlider", SmaPixelArt.progress_fill_box(POSITIVE))
 
 	return theme
