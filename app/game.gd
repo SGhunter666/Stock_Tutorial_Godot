@@ -54,6 +54,7 @@ var speed := 1
 var selected_ticker := "APLA"
 var settings := {"locale": "zh_CN", "speed": 1, "layout": "beginner",
 	"theme": "pixel", "pixelMigrated": true, "showPixelOffice": true,
+	"chartPixelStepped": true,
 	"colorScheme": "intl", "playerName": "", "displayMode": "windowed",
 	"windowPreset": "auto", "uiScale": "auto",
 	"masterVolume": 0.8, "musicVolume": 0.22, "sfxVolume": 0.75, "muted": false}

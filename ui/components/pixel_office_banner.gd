@@ -5,6 +5,8 @@
 class_name SmaPixelOfficeBanner
 extends Control
 
+signal hotspot_clicked(kind: String, payload: Dictionary)
+
 const PX := 2
 const INK := Color("#090d16")
 const BAYER4 := [
@@ -106,13 +108,25 @@ var _frame := 0
 var _tape_scroll := 0.0
 var _tape_items: Array[Dictionary] = []
 var _portrait_cache: Dictionary = {}
+var _hover_zone := ""
+var _hover_ticker := ""
+var _quip_text := ""
+var _quip_timer := 0.0
+var _quip_index := 0
 
 
 func _init() -> void:
 	custom_minimum_size = Vector2(280, 118)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	clip_contents = true
+	mouse_exited.connect(func():
+		if _hover_zone != "":
+			_hover_zone = ""
+			_hover_ticker = ""
+			mouse_default_cursor_shape = Control.CURSOR_ARROW
+			tooltip_text = ""
+			queue_redraw())
 
 
 func setup(game_ref: Node) -> void:
@@ -129,6 +143,11 @@ func set_screen(screen_id: String) -> void:
 
 
 func _process(delta: float) -> void:
+	if _quip_timer > 0.0:
+		_quip_timer = maxf(0.0, _quip_timer - delta)
+		if _quip_timer <= 0.0:
+			_quip_text = ""
+			queue_redraw()
 	if not is_visible_in_tree() or DisplayServer.get_name() == "headless":
 		return
 	if game != null and bool(game.settings.get("reducedMotion", false)):
@@ -141,6 +160,90 @@ func _process(delta: float) -> void:
 		if _frame % 8 == 0:
 			_refresh_tape()
 		queue_redraw()
+
+
+func _win_x_grid() -> int:
+	var w := int(floor(size.x / float(PX)))
+	return mini(168, maxi(124, int(w * 0.27)))
+
+
+func _hit_test(pos: Vector2) -> Dictionary:
+	var win_x := _win_x_grid()
+	var w := int(floor(size.x / float(PX)))
+	var win_total_w := maxi(60, w - win_x - 3)
+	# 1. Right-corner Mentor Avatar + Speech Bubble
+	if size.x >= 840.0:
+		var m_rect := Rect2(size.x - 266.0, size.y - 68.0, 258.0, 56.0)
+		if m_rect.has_point(pos):
+			var info := _mentor_tip_info(_is_alert_state())
+			return {"zone": "mentor", "mentor": String(info["char"]), "rect": m_rect}
+	# 2. Top LED Stock Ticker Strip
+	var led_left := float((win_x + 2) * PX)
+	var led_right := float((win_x + win_total_w - 2) * PX)
+	var led_rect := Rect2(led_left, float(3 * PX), maxf(20.0, led_right - led_left), float(10 * PX))
+	if led_rect.has_point(pos) and not _tape_items.is_empty():
+		var item_stride := 138.0
+		var cycle_w := maxf(led_rect.size.x, float(_tape_items.size()) * item_stride)
+		var base_shift := fmod(_tape_scroll, cycle_w)
+		var picked := String(_tape_items[0]["sym"])
+		for copy_idx in 2:
+			for idx in _tape_items.size():
+				var dx := led_left + float(idx) * item_stride + float(copy_idx) * cycle_w - base_shift
+				if pos.x >= dx - 4.0 and pos.x <= dx + 132.0:
+					picked = String(_tape_items[idx]["sym"])
+					break
+		return {"zone": "ticker", "ticker": picked, "rect": led_rect}
+	# 3. Left Honors Zone (Bookshelf / Award Plaque / Hanging Banner)
+	var honors_rect := Rect2(float(4 * PX), float(4 * PX), float((maxi(32, win_x - 76)) * PX), size.y - 20.0)
+	if honors_rect.has_point(pos):
+		return {"zone": "honors", "rect": honors_rect}
+	# 4. Trader Desk & Coffee Mug Zone
+	var left_desk_x := maxi(26, win_x - 74)
+	var coffee_rect := Rect2(float(left_desk_x * PX), float(22 * PX), float(58 * PX), size.y - float(26 * PX))
+	if coffee_rect.has_point(pos):
+		return {"zone": "coffee", "rect": coffee_rect}
+	return {"zone": ""}
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var hit := _hit_test(event.position)
+		var z := String(hit.get("zone", ""))
+		var sym := String(hit.get("ticker", ""))
+		if z != _hover_zone or sym != _hover_ticker:
+			_hover_zone = z
+			_hover_ticker = sym
+			mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if z != "" else Control.CURSOR_ARROW
+			match z:
+				"mentor":
+					tooltip_text = I18n.t("pixelOffice.hoverMentor")
+				"honors":
+					tooltip_text = I18n.t("pixelOffice.hoverHonors")
+				"coffee":
+					tooltip_text = I18n.t("pixelOffice.hoverCoffee")
+				"ticker":
+					tooltip_text = I18n.t("pixelOffice.hoverTicker", {"ticker": sym})
+				_:
+					tooltip_text = ""
+			queue_redraw()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var hit := _hit_test(event.position)
+		var z := String(hit.get("zone", ""))
+		if z == "":
+			return
+		accept_event()
+		if z == "coffee":
+			_quip_index = (_quip_index + 1) % 6
+			_quip_text = I18n.t("pixelOffice.quip.%d" % (_quip_index + 1))
+			_quip_timer = 4.6
+			queue_redraw()
+			hotspot_clicked.emit("coffee", {"pos": get_global_transform_with_canvas() * event.position, "quip": _quip_text})
+		elif z == "mentor":
+			hotspot_clicked.emit("mentor", {"mentor": String(hit.get("mentor", "lin_lan"))})
+		elif z == "honors":
+			hotspot_clicked.emit("honors", {})
+		elif z == "ticker":
+			hotspot_clicked.emit("ticker", {"ticker": String(hit.get("ticker", "APLA"))})
 
 
 func refresh_state() -> void:
@@ -649,7 +752,7 @@ func _draw_text_and_mentor_overlay(tier: int, win_x: int, win_total_w: int, aler
 	# 3. Mentor Pixel Tip Bubble + Chibi Portrait Avatar in bottom-right corner (Reference B!)
 	if size.x >= 840.0:
 		var info := _mentor_tip_info(alert)
-		var tip_text := String(info["tip"])
+		var tip_text := _quip_text if _quip_text != "" else String(info["tip"])
 		var tex := _load_portrait(String(info["char"]))
 		var avatar_size := 48.0
 		var avatar_x := size.x - avatar_size - 12.0
@@ -660,7 +763,9 @@ func _draw_text_and_mentor_overlay(tier: int, win_x: int, win_total_w: int, aler
 		var bubble_y := avatar_y + 4.0
 
 		# Cream speech bubble with crisp 2px pixel outline
-		draw_rect(Rect2(bubble_x - 2, bubble_y - 2, bubble_w + 4, bubble_h + 4), INK)
+		var mentor_hovered := _hover_zone == "mentor"
+		draw_rect(Rect2(bubble_x - 2, bubble_y - 2, bubble_w + 4, bubble_h + 4),
+			SmaUiTheme.ACCENT if mentor_hovered else INK)
 		draw_rect(Rect2(bubble_x, bubble_y, bubble_w, bubble_h),
 			Color("#fef3c7") if not alert else Color("#fee2e2"))
 		draw_rect(Rect2(bubble_x, bubble_y, bubble_w, 2), Color("#fffbeb"))
@@ -678,10 +783,17 @@ func _draw_text_and_mentor_overlay(tier: int, win_x: int, win_total_w: int, aler
 		draw_rect(Rect2(avatar_x - 2, avatar_y - 2, avatar_size + 4, avatar_size + 4), INK)
 		draw_rect(Rect2(avatar_x, avatar_y, avatar_size, avatar_size), Color("#1e293b"))
 		if tex != null:
-			# Crop upper bust of pixel portrait cleanly inside square avatar box
 			var src_w := float(tex.get_width())
 			var src_h := minf(float(tex.get_height()), src_w)
 			draw_texture_rect_region(tex,
 				Rect2(avatar_x + 2, avatar_y + 2, avatar_size - 4, avatar_size - 4),
 				Rect2(0, 0, src_w, src_h))
-		draw_rect(Rect2(avatar_x, avatar_y, avatar_size, avatar_size), SmaUiTheme.GOLD, false, 2.0)
+		draw_rect(Rect2(avatar_x, avatar_y, avatar_size, avatar_size),
+			SmaUiTheme.ACCENT if mentor_hovered else SmaUiTheme.GOLD, false, 2.0)
+
+	# Subtle pixel hover indicator ring on hovered interactive floor zones
+	if _hover_zone in ["honors", "coffee", "ticker"]:
+		var h_info := _hit_test(get_local_mouse_position())
+		if h_info.has("rect"):
+			var r: Rect2 = h_info["rect"]
+			draw_rect(r.grow(-1.0), Color(0.37, 0.92, 0.83, 0.65), false, 2.0)

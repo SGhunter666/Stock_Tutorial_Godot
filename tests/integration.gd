@@ -1109,6 +1109,7 @@ func _ready() -> void:
 		I18n.set_locale(original_locale)
 
 	_check_live_trade_clock(main, failures)
+	await _check_pixel_beta10(main, failures)
 
 	if failures.is_empty():
 		print("INTEGRATION OK equity=%.2f day=%d stories=%d" % [
@@ -1122,6 +1123,52 @@ func _ready() -> void:
 		SmaSaveService.clear(Game.save_path)
 		Game.save_path = SmaSaveService.SAVE_PATH
 		get_tree().quit(1)
+
+
+func _check_pixel_beta10(main: SmaMain, failures: Array[String]) -> void:
+	Game.set_theme("pixel")
+	for frame in 2:
+		await get_tree().process_frame
+	if main._office_banner == null or main._pixel_fx == null:
+		failures.append("pixel theme did not mount SmaPixelOfficeBanner and SmaPixelFx")
+		return
+	main.navigate("trade")
+	var trade_scr: SmaTradeScreen = main._screens["trade"]
+	if trade_scr._px_step_toggle == null or not trade_scr._px_step_toggle.visible:
+		failures.append("trade screen missing visible StepPX toggle in pixel mode")
+	else:
+		trade_scr._px_step_toggle.button_pressed = false
+		if trade_scr._chart.pixel_stepped or bool(Game.settings.get("chartPixelStepped", true)):
+			failures.append("StepPX toggle did not disable chart.pixel_stepped")
+		trade_scr._px_step_toggle.button_pressed = true
+		if not trade_scr._chart.pixel_stepped or not bool(Game.settings.get("chartPixelStepped", false)):
+			failures.append("StepPX toggle did not restore chart.pixel_stepped")
+
+	var banner := main._office_banner
+	banner.size = Vector2(1180, 118)
+	if String(banner._hit_test(Vector2(1180 - 40, 118 - 32)).get("zone", "")) != "mentor":
+		failures.append("office banner right avatar did not hit mentor hotspot")
+	if String(banner._hit_test(Vector2(30, 60)).get("zone", "")) != "honors":
+		failures.append("office banner left plaque did not hit honors hotspot")
+	var ticker_hit := banner._hit_test(Vector2(520, 12))
+	if String(ticker_hit.get("zone", "")) != "ticker" or String(ticker_hit.get("ticker", "")) == "":
+		failures.append("office banner LED strip did not hit ticker hotspot")
+	if String(banner._hit_test(Vector2(210, 80)).get("zone", "")) != "coffee":
+		failures.append("office banner player desk did not hit coffee hotspot")
+
+	for mode in ["mentor", "honors"]:
+		main._on_office_hotspot(mode, {"mentor": "lin_lan"})
+		await get_tree().process_frame
+		var found_popup: SmaOfficePopupDialog = null
+		for child in main.get_children():
+			if child is SmaOfficePopupDialog:
+				found_popup = child
+				break
+		if found_popup == null:
+			failures.append("office hotspot '%s' did not open SmaOfficePopupDialog" % mode)
+		else:
+			found_popup._close()
+			await get_tree().process_frame
 
 
 func _check_live_trade_clock(main: SmaMain, failures: Array[String]) -> void:

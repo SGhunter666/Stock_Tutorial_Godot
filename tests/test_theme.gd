@@ -61,3 +61,16 @@ func run() -> void:
 	eq(int(snap24["size"]), 24, "18px snaps to exact 2x 24px 12x12 bitmap grid")
 	check(SmaPixelArt.icon("logo") != null, "pixel logo icon generated")
 	check(SmaPixelArt.ticker_badge("MSFY", "technology", false) != null, "pixel ticker badge generated")
+
+	describe("pixel-beta10-enhancements")
+	var audio_script: GDScript = load("res://app/audio.gd")
+	eq(String(audio_script.resolve_mood(false, true, false, false, "trade")), "ambient",
+		"non-pixel theme resolves ambient BGM")
+	eq(String(audio_script.resolve_mood(true, false, true, false, "market")), "pixel_calm",
+		"pixel start/paused resolves calm FM lounge BGM")
+	eq(String(audio_script.resolve_mood(true, true, false, false, "trade")), "pixel_session",
+		"active pixel trading resolves upbeat session BGM")
+	eq(String(audio_script.resolve_mood(true, true, false, false, "academy")), "pixel_calm",
+		"pixel academy resolves calm study BGM")
+	eq(String(audio_script.resolve_mood(true, true, false, true, "trade")), "pixel_crisis",
+		"crisis overrides pixel BGM to urgent ostinato")

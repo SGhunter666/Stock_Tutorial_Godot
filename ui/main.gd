@@ -107,6 +107,8 @@ var _ff_percent: Label
 var _toast_panel: PanelContainer
 var _toast_label: Label
 var _toast_tween: Tween
+var _pixel_fx: SmaPixelFx
+var _last_xp := -1
 var _help_dialog: AcceptDialog
 
 var _cash_label: Label
@@ -232,12 +234,22 @@ func _ready() -> void:
 	I18n.locale_changed.connect(_on_locale_changed)
 	Game.layout_changed.connect(_on_layout_changed)
 	Game.theme_changed.connect(_on_theme_changed)
-	Game.trade_filled.connect(func(_trade): _play_sound("fill"))
+	Game.trade_filled.connect(func(trade: Dictionary):
+		_play_sound("fill")
+		if _pixel_fx != null:
+			_pixel_fx.spawn_trade_fill(trade))
 	Game.order_rejected.connect(func(_error): _play_sound("reject"))
 	Game.day_closed.connect(func(_day): _play_sound("day_close"))
-	Game.achievement_unlocked.connect(func(_ids): _play_sound("achievement"))
+	Game.achievement_unlocked.connect(func(ids: Array):
+		_play_sound("achievement")
+		if _pixel_fx != null and not ids.is_empty():
+			_pixel_fx.spawn_honor(I18n.t("achievement.%s.title" % String(ids[0]))))
 	Game.margin_call_triggered.connect(func(): _play_sound("margin_call"))
-	Game.career_promoted.connect(func(_rank): _play_sound("promotion"))
+	Game.career_promoted.connect(func(rank: int):
+		_play_sound("promotion")
+		if _pixel_fx != null:
+			var rdef: Dictionary = SmaCareer.rank_def(rank)
+			_pixel_fx.spawn_honor("Rank %d · %s" % [rank, I18n.t(String(rdef.get("titleKey", "career.rank.retail.title")))]))
 	Game.challenge_finished.connect(func(status, _id):
 		_play_sound("achievement" if status == "completed" else "reject"))
 	Game.price_alert_triggered.connect(func(_count): _play_sound("alert"))
@@ -272,6 +284,7 @@ func _build_ui() -> void:
 	_toast_panel = null
 	_toast_label = null
 	_toast_tween = null
+	_pixel_fx = null
 	_help_dialog = null
 	_nav_buttons.clear()
 	_group_boxes.clear()
@@ -311,6 +324,7 @@ func _build_ui() -> void:
 		_office_banner = SmaPixelOfficeBanner.new()
 		_office_banner.custom_minimum_size = Vector2(280, 114)
 		_office_banner.setup(Game)
+		_office_banner.hotspot_clicked.connect(_on_office_hotspot)
 		right_col.add_child(_office_banner)
 
 	var content_margin := MarginContainer.new()
@@ -332,6 +346,9 @@ func _build_ui() -> void:
 	add_child(_dialogue)
 	_build_fast_forward_overlay()
 	_build_toast()
+	_pixel_fx = SmaPixelFx.new()
+	_pixel_fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_pixel_fx)
 	if SmaUiTheme.is_pixel() and not bool(Game.settings.get("reducedMotion", false)):
 		var crt := SmaCrtScanlines.new()
 		crt.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -339,6 +356,7 @@ func _build_ui() -> void:
 	_sync_compact_layout()
 	_update_topbar()
 	_refresh_nav()
+	_sync_music_mood()
 
 
 func _build_topbar() -> Control:
@@ -676,6 +694,7 @@ func navigate(screen_id: String, force: bool = false) -> void:
 		_office_banner.set_screen(screen_id)
 		_office_banner.refresh_state()
 	_sync_compact_layout()
+	_sync_music_mood()
 
 
 func open_ticker(ticker: String, screen_id: String = "trade") -> void:
@@ -717,12 +736,21 @@ func _on_story_changed() -> void:
 		_screens[_current_screen].refresh("story")
 
 
+func _current_xp() -> int:
+	return int(SmaAcademy.level_info(Game.academy).get("xp", 0)) if Game.started else -1
+
+
 func _on_academy_changed() -> void:
+	var now_xp := _current_xp()
+	if _last_xp >= 0 and now_xp > _last_xp and _pixel_fx != null:
+		_pixel_fx.spawn_xp_gain(now_xp - _last_xp)
+	_last_xp = now_xp
 	if _screens.has("academy"):
 		_screens["academy"].refresh("academy")
 
 
 func _on_game_started() -> void:
+	_last_xp = _current_xp()
 	if _start_overlay != null:
 		_start_overlay.visible = false
 	_sync_compact_layout()
@@ -730,11 +758,37 @@ func _on_game_started() -> void:
 
 
 func _on_game_loaded() -> void:
+	_last_xp = _current_xp()
 	if _start_overlay != null:
 		_start_overlay.visible = false
 	# A save carries its own theme and layout, so rebuild before showing it.
 	_build_ui()
 	navigate("dashboard" if Game.has_intro_task() or Game.opening_gap_unlocked() else "market")
+
+
+func _on_office_hotspot(kind: String, payload: Dictionary) -> void:
+	match kind:
+		"mentor":
+			_play_sound("story")
+			var dlg := SmaOfficePopupDialog.new()
+			add_child(dlg)
+			dlg.navigate_requested.connect(func(dest: String): navigate(dest))
+			dlg.setup(Game, "mentor", String(payload.get("mentor", "lin_lan")))
+		"honors":
+			_play_sound("achievement")
+			var dlg := SmaOfficePopupDialog.new()
+			add_child(dlg)
+			dlg.navigate_requested.connect(func(dest: String): navigate(dest))
+			dlg.setup(Game, "honors")
+		"coffee":
+			_play_sound("pixel_coffee")
+			if _pixel_fx != null:
+				_pixel_fx.spawn_burst(payload.get("pos", size * 0.5), SmaUiTheme.GOLD, 8)
+			show_toast("♦ " + String(payload.get("quip", "")))
+		"ticker":
+			_play_sound("pixel_click")
+			var sym := String(payload.get("ticker", "APLA"))
+			open_ticker(sym, "etf" if SmaEtfs.is_etf(sym) else "trade")
 
 
 func _build_fast_forward_overlay() -> void:
@@ -797,6 +851,7 @@ func _update_topbar() -> void:
 		_cash_label.text = "—"
 		_equity_label.text = "—"
 		_pnl_label.text = "—"
+		_sync_music_mood()
 		return
 	var day := int(Game.exchange.state["dayIndex"])
 	_day_label.text = "DAY %02d · %s" % [day + 1, SmaCalendar.format_date(day, I18n.locale)]
@@ -822,6 +877,7 @@ func _update_topbar() -> void:
 	_speed_picker.disabled = fast_forwarding
 	for button in _step_buttons:
 		button.disabled = Game.is_story_paused() or fast_forwarding
+	_sync_music_mood()
 
 
 func _day_start_equity() -> float:
@@ -1144,6 +1200,18 @@ func _toggle_shortcuts() -> void:
 	add_child(dialog)
 	_help_dialog = dialog
 	dialog.popup_centered()
+
+
+func _sync_music_mood() -> void:
+	var audio := get_node_or_null("/root/Sfx")
+	if audio == null or not audio.has_method("set_music_mood"):
+		return
+	var crisis: bool = Game.black_friday_active or Game.opening_gap_active
+	if not crisis and Game.started and Game.exchange != null:
+		crisis = Game.exchange.state["account"]["margin"].get("call", null) != null
+	var mood := String(audio.resolve_mood(
+		SmaUiTheme.is_pixel(), Game.started, Game.paused, crisis, _current_screen))
+	audio.set_music_mood(mood)
 
 
 func _play_sound(sound: String) -> void:

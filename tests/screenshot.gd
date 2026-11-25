@@ -20,6 +20,30 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA10_ONLY") == "1":
+		Game.new_game("screenshot-seed")
+		await _settle(4)
+		_dismiss_story()
+		Game.academy_mark_section_read("u4", "s1")
+		Game.academy_mark_section_read("u4", "s3")
+		Game.academy_mark_section_read("u19", "s1")
+		Game.academy_mark_section_read("u20", "s1")
+		Game.submit_order({"ticker": "APLA", "side": "buy", "type": "market", "qty": 60})
+		_dismiss_story()
+		for i in 12:
+			Game.step_minute()
+		Game.submit_order({"ticker": "APLA", "side": "sell", "type": "market", "qty": 20})
+		_dismiss_story()
+		Game.career["rank"] = 3
+		Game.career["certificates"] = ["core_foundations", "risk_execution"]
+		if not Game.academy["achievements"].has("first_trade"):
+			Game.academy["achievements"].append("first_trade")
+		Game.academy["xp"] = 260
+		await _capture_beta10_showcase()
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	await _shot("start")
 
 	Game.new_game("screenshot-seed")
@@ -576,10 +600,64 @@ func _ready() -> void:
 	I18n.set_locale("zh_CN")
 	Game.settings["locale"] = "zh_CN"
 	await _settle(10)
+	await _capture_beta10_showcase()
 
 	SmaSaveService.clear(Game.save_path)
 	Game.save_path = SmaSaveService.SAVE_PATH
 	get_tree().quit(0)
+
+
+func _capture_beta10_showcase() -> void:
+	_dismiss_story()
+	main.navigate("trade")
+	var ts: SmaTradeScreen = main._screens["trade"]
+	ts._on_timeframe("1D")
+	ts._boll_toggle.button_pressed = true
+	ts._px_step_toggle.button_pressed = true
+	ts._sync_chart_overlays()
+	ts.refresh()
+	await _settle(6)
+	if main._pixel_fx != null:
+		main._pixel_fx._popups.clear()
+		main._pixel_fx._sparks.clear()
+		main._pixel_fx.spawn_trade_fill({
+			"ticker": "APLA", "qty": 40, "price": 182.40,
+			"action": "openLong", "side": "buy", "realized": 148.60,
+		})
+		main._pixel_fx.spawn_xp_gain(45)
+	await get_tree().process_frame
+	await _shot("beta10_trade_stepped")
+	if main._pixel_fx != null:
+		main._pixel_fx._popups.clear()
+		main._pixel_fx._sparks.clear()
+		main._pixel_fx.queue_redraw()
+
+	main._on_office_hotspot("mentor", {"mentor": "lin_lan"})
+	await _settle(4)
+	await _shot("beta10_mentor_diag")
+	for child in main.get_children():
+		if child is SmaOfficePopupDialog:
+			child._close()
+	await _settle(3)
+
+	main._on_office_hotspot("honors", {})
+	await _settle(4)
+	await _shot("beta10_honors_case")
+	for child in main.get_children():
+		if child is SmaOfficePopupDialog:
+			child._close()
+	await _settle(3)
+
+	main.navigate("market")
+	await _settle(4)
+	if main._office_banner != null:
+		var q_txt := I18n.t("pixelOffice.quip.1")
+		main._office_banner._quip_text = q_txt
+		main._office_banner._quip_timer = 5.0
+		main._office_banner.queue_redraw()
+		main._on_office_hotspot("coffee", {"pos": Vector2(440, 130), "quip": q_txt})
+	await get_tree().process_frame
+	await _shot("beta10_coffee_easter")
 
 
 func _dismiss_story() -> void:

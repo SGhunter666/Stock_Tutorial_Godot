@@ -22,6 +22,7 @@ var visible_count := DEFAULT_VISIBLE
 var pan_offset := 0
 var show_ma := true
 var show_boll := false
+var pixel_stepped := true
 var trade_markers: Array = []
 var price_lines: Array = []
 var long_cost := 0.0
@@ -92,6 +93,13 @@ func set_indicators(ma_enabled: bool, boll_enabled: bool) -> void:
 		return
 	show_ma = ma_enabled
 	show_boll = boll_enabled
+	queue_redraw()
+
+
+func set_pixel_stepped(enabled: bool) -> void:
+	if pixel_stepped == enabled:
+		return
+	pixel_stepped = enabled
 	queue_redraw()
 
 
@@ -322,6 +330,7 @@ func _draw_grid() -> void:
 
 
 func _draw_volume(max_volume: float, body_width: float) -> void:
+	var pixel := SmaUiTheme.is_pixel()
 	for index in _visible.size():
 		var bar: Dictionary = _visible[index]
 		var color := SmaUiTheme.POSITIVE if float(bar["c"]) >= float(bar["o"]) \
@@ -329,10 +338,20 @@ func _draw_volume(max_volume: float, body_width: float) -> void:
 		var volume := float(bar.get("v", 0))
 		var height := (volume / max_volume) * maxf(2.0, _volume_bottom - _volume_top)
 		var x := _left + _slot * (float(index) + 0.5)
-		draw_rect(Rect2(x - body_width * 0.5, _volume_bottom - height,
-			body_width, height), Color(color.r, color.g, color.b, 0.38))
-	draw_line(Vector2(_left, _volume_top), Vector2(_right, _volume_top),
-		Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.45), 1.0)
+		if pixel:
+			var w := maxf(2.0, roundf(body_width))
+			var h := maxf(2.0, roundf(height / 2.0) * 2.0) if volume > 0.0 else 0.0
+			if h > 0.0:
+				draw_rect(Rect2(roundf(x - w * 0.5), roundf(_volume_bottom) - h, w, h),
+					Color(color.r, color.g, color.b, 0.46))
+		else:
+			draw_rect(Rect2(x - body_width * 0.5, _volume_bottom - height,
+				body_width, height), Color(color.r, color.g, color.b, 0.38))
+	var sep_col := Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.45)
+	if pixel:
+		draw_rect(Rect2(_left, roundf(_volume_top), _right - _left, 1.0), sep_col)
+	else:
+		draw_line(Vector2(_left, _volume_top), Vector2(_right, _volume_top), sep_col, 1.0)
 
 
 func _draw_candles(body_width: float) -> void:
@@ -370,6 +389,25 @@ func _draw_candles(body_width: float) -> void:
 			draw_rect(Rect2(x - body_width * 0.5, body_top, body_width, body_height), color)
 
 
+func _draw_series(points: PackedVector2Array, col: Color, width: float = 1.2) -> void:
+	if points.size() < 2:
+		return
+	if not (SmaUiTheme.is_pixel() and pixel_stepped):
+		draw_polyline(points, col, width, true)
+		return
+	for i in range(points.size() - 1):
+		var x0 := roundf(points[i].x / 2.0) * 2.0
+		var y0 := roundf(points[i].y / 2.0) * 2.0
+		var x1 := roundf(points[i + 1].x / 2.0) * 2.0
+		var y1 := roundf(points[i + 1].y / 2.0) * 2.0
+		var mid_x := roundf(((x0 + x1) * 0.5) / 2.0) * 2.0
+		if mid_x > x0:
+			draw_rect(Rect2(x0, y0 - 1.0, mid_x - x0, 2.0), col)
+		draw_rect(Rect2(mid_x, minf(y0, y1) - 1.0, 2.0, absf(y1 - y0) + 2.0), col)
+		if x1 > mid_x + 2.0:
+			draw_rect(Rect2(mid_x + 2.0, y1 - 1.0, x1 - (mid_x + 2.0), 2.0), col)
+
+
 func _draw_bollinger(start: int) -> void:
 	var band_color := Color(SmaUiTheme.INFO.r, SmaUiTheme.INFO.g, SmaUiTheme.INFO.b, 0.65)
 	for series in [_boll_upper, _boll_lower]:
@@ -380,12 +418,12 @@ func _draw_bollinger(start: int) -> void:
 			var value := float(series[start + index])
 			if is_nan(value):
 				if points.size() > 1:
-					draw_polyline(points, band_color, 1.0, true)
+					_draw_series(points, band_color, 1.0)
 				points = PackedVector2Array()
 				continue
 			points.append(Vector2(_left + _slot * (float(index) + 0.5), _price_y(value)))
 		if points.size() > 1:
-			draw_polyline(points, band_color, 1.0, true)
+			_draw_series(points, band_color, 1.0)
 
 
 func _draw_ma_lines(start: int) -> void:
@@ -400,32 +438,31 @@ func _draw_ma_lines(start: int) -> void:
 			var value := float(series[start + index])
 			if is_nan(value):
 				if points.size() > 1:
-					draw_polyline(points, colors[period_index], 1.2, true)
+					_draw_series(points, colors[period_index], 1.2)
 				points = PackedVector2Array()
 				continue
 			points.append(Vector2(_left + _slot * (float(index) + 0.5), _price_y(value)))
 		if points.size() > 1:
-			draw_polyline(points, colors[period_index], 1.2, true)
+			_draw_series(points, colors[period_index], 1.2)
 
 
 func _draw_vma(start: int, max_volume: float) -> void:
 	if _vma_cache.is_empty():
 		return
+	var vma_col := Color(SmaUiTheme.INFO.r, SmaUiTheme.INFO.g, SmaUiTheme.INFO.b, 0.9)
 	var points := PackedVector2Array()
 	for index in _visible.size():
 		var value := float(_vma_cache[start + index])
 		if is_nan(value):
 			if points.size() > 1:
-				draw_polyline(points, Color(SmaUiTheme.INFO.r, SmaUiTheme.INFO.g,
-					SmaUiTheme.INFO.b, 0.9), 1.1, true)
+				_draw_series(points, vma_col, 1.1)
 			points = PackedVector2Array()
 			continue
 		var ratio := clampf(value / max_volume, 0.0, 1.0)
 		points.append(Vector2(_left + _slot * (float(index) + 0.5),
 			lerpf(_volume_bottom, _volume_top, ratio)))
 	if points.size() > 1:
-		draw_polyline(points, Color(SmaUiTheme.INFO.r, SmaUiTheme.INFO.g,
-			SmaUiTheme.INFO.b, 0.9), 1.1, true)
+		_draw_series(points, vma_col, 1.1)
 
 
 func _draw_cost_lines() -> void:
@@ -449,23 +486,32 @@ func _draw_dashed_line(price: float, color: Color, label: String, left_label: bo
 	var y := _price_y(price)
 	if y < _top or y > _price_bottom:
 		return
+	var pixel := SmaUiTheme.is_pixel()
+	if pixel:
+		y = roundf(y)
 	var x := _left
 	while x < _right:
-		draw_line(Vector2(x, y), Vector2(minf(x + 6.0, _right), y), color, 1.0)
+		if pixel:
+			draw_rect(Rect2(roundf(x), y, minf(6.0, _right - x), 2.0), color)
+		else:
+			draw_line(Vector2(x, y), Vector2(minf(x + 6.0, _right), y), color, 1.0)
 		x += 10.0
+	var f_px := 10 if pixel else 9
 	var text := "%s %s" % [label, SmaFormat.num(price, 2)]
 	if left_label:
 		draw_string(_font, Vector2(_left + 6, y - 4), text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, color)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, f_px, color)
 	else:
-		var text_w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+		var text_w := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, f_px).x
 		draw_string(_font, Vector2(maxf(_left + 6.0, _right - text_w - 6.0), y - 4), text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, color)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, f_px, color)
 
 
 func _draw_trade_markers(start: int) -> void:
 	if trade_markers.is_empty():
 		return
+	var pixel := SmaUiTheme.is_pixel()
+	var ink := Color("#04070e")
 	var limit := mini(trade_markers.size(), 80)
 	var from := trade_markers.size() - limit
 	for trade_index in range(from, trade_markers.size()):
@@ -482,7 +528,25 @@ func _draw_trade_markers(start: int) -> void:
 		var bar: Dictionary = _visible[index]
 		var x := _left + _slot * (float(index) + 0.5)
 		var color := SmaUiTheme.POSITIVE if is_buy else SmaUiTheme.NEGATIVE
-		if is_buy:
+		if pixel:
+			var cx := roundf(x / 2.0) * 2.0
+			if is_buy:
+				var ty := roundf((_price_y(float(bar["l"])) + 3.0) / 2.0) * 2.0
+				draw_rect(Rect2(cx - 2.0, ty - 2.0, 4.0, 2.0), ink)
+				draw_rect(Rect2(cx - 4.0, ty, 8.0, 2.0), ink)
+				draw_rect(Rect2(cx - 6.0, ty + 2.0, 12.0, 6.0), ink)
+				draw_rect(Rect2(cx - 1.0, ty, 2.0, 2.0), color)
+				draw_rect(Rect2(cx - 3.0, ty + 2.0, 6.0, 2.0), color)
+				draw_rect(Rect2(cx - 5.0, ty + 4.0, 10.0, 2.0), color)
+			else:
+				var ty := roundf((_price_y(float(bar["h"])) - 3.0) / 2.0) * 2.0
+				draw_rect(Rect2(cx - 6.0, ty - 8.0, 12.0, 6.0), ink)
+				draw_rect(Rect2(cx - 4.0, ty - 2.0, 8.0, 2.0), ink)
+				draw_rect(Rect2(cx - 2.0, ty, 4.0, 2.0), ink)
+				draw_rect(Rect2(cx - 5.0, ty - 6.0, 10.0, 2.0), color)
+				draw_rect(Rect2(cx - 3.0, ty - 4.0, 6.0, 2.0), color)
+				draw_rect(Rect2(cx - 1.0, ty - 2.0, 2.0, 2.0), color)
+		elif is_buy:
 			var y := _price_y(float(bar["l"])) + 7.0
 			draw_colored_polygon(PackedVector2Array([
 				Vector2(x, y - 7.0), Vector2(x - 4.0, y), Vector2(x + 4.0, y)]), color)
@@ -530,9 +594,17 @@ func _draw_last_price() -> void:
 	var last_price := float(candles[-1]["c"])
 	var y := _price_y(last_price)
 	if y >= _top and y <= _price_bottom:
-		draw_line(Vector2(_left, y), Vector2(_right, y),
-			Color(SmaUiTheme.ACCENT.r, SmaUiTheme.ACCENT.g, SmaUiTheme.ACCENT.b, 0.6), 1.0)
-		_draw_axis_tag(Vector2(_right + 2, y), SmaFormat.num(last_price, 2), SmaUiTheme.ACCENT)
+		var line_col := Color(SmaUiTheme.ACCENT.r, SmaUiTheme.ACCENT.g, SmaUiTheme.ACCENT.b, 0.65)
+		if SmaUiTheme.is_pixel():
+			var py := roundf(y)
+			var x := _left
+			while x < _right:
+				draw_rect(Rect2(roundf(x), py, minf(4.0, _right - x), 1.0), line_col)
+				x += 7.0
+			_draw_axis_tag(Vector2(_right + 2, py), SmaFormat.num(last_price, 2), SmaUiTheme.ACCENT)
+		else:
+			draw_line(Vector2(_left, y), Vector2(_right, y), line_col, 1.0)
+			_draw_axis_tag(Vector2(_right + 2, y), SmaFormat.num(last_price, 2), SmaUiTheme.ACCENT)
 
 
 func _draw_legend(start: int) -> void:
@@ -617,11 +689,25 @@ func _draw_time_axis() -> void:
 func _draw_crosshair() -> void:
 	var bar: Dictionary = _visible[_hover_index]
 	var x := _left + _slot * (float(_hover_index) + 0.5)
-	draw_line(Vector2(x, _top), Vector2(x, _volume_bottom),
-		Color(SmaUiTheme.ACCENT.r, SmaUiTheme.ACCENT.g, SmaUiTheme.ACCENT.b, 0.55), 1.0)
+	var cross_col := Color(SmaUiTheme.ACCENT.r, SmaUiTheme.ACCENT.g, SmaUiTheme.ACCENT.b, 0.62)
+	var pixel := SmaUiTheme.is_pixel()
+	if pixel:
+		var px := roundf(x)
+		var y_cur := _top
+		while y_cur < _volume_bottom:
+			draw_rect(Rect2(px, roundf(y_cur), 1.0, minf(3.0, _volume_bottom - y_cur)), cross_col)
+			y_cur += 6.0
+	else:
+		draw_line(Vector2(x, _top), Vector2(x, _volume_bottom), cross_col, 1.0)
 	if _hover_pos.y >= _top and _hover_pos.y <= _price_bottom:
-		draw_line(Vector2(_left, _hover_pos.y), Vector2(_right, _hover_pos.y),
-			Color(SmaUiTheme.ACCENT.r, SmaUiTheme.ACCENT.g, SmaUiTheme.ACCENT.b, 0.55), 1.0)
+		if pixel:
+			var py := roundf(_hover_pos.y)
+			var x_cur := _left
+			while x_cur < _right:
+				draw_rect(Rect2(roundf(x_cur), py, minf(3.0, _right - x_cur), 1.0), cross_col)
+				x_cur += 6.0
+		else:
+			draw_line(Vector2(_left, _hover_pos.y), Vector2(_right, _hover_pos.y), cross_col, 1.0)
 		var price := _price_from_y(_hover_pos.y)
 		_draw_axis_tag(Vector2(_right + 2, _hover_pos.y), SmaFormat.num(price, 2),
 			SmaUiTheme.ACCENT)
@@ -642,8 +728,11 @@ func _draw_axis_tag(position: Vector2, text: String, color: Color,
 		box.position.x = size.x - box.size.x - 2.0
 	if box.position.x < 2.0:
 		box.position.x = 2.0
+	if SmaUiTheme.is_pixel():
+		box.position = Vector2(roundf(box.position.x), roundf(box.position.y))
+		box.size = Vector2(roundf(box.size.x), roundf(box.size.y))
 	draw_rect(box, SmaUiTheme.PANEL_ALT)
-	draw_rect(box, color, false, 1.0)
+	draw_rect(box, color, false, 2.0 if SmaUiTheme.is_pixel() else 1.0)
 	draw_string(_font, Vector2(box.position.x + 4.0, box.position.y + text_size.y - 2.0),
 		text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
@@ -669,8 +758,12 @@ func _draw_tooltip(bar: Dictionary) -> void:
 		box.position.y = _hover_pos.y - box.size.y - 14.0
 	box.position.x = clampf(box.position.x, _left + 2.0, _right - box.size.x - 2.0)
 	box.position.y = clampf(box.position.y, _top + 2.0, _price_bottom - box.size.y - 2.0)
+	if SmaUiTheme.is_pixel():
+		box.position = Vector2(roundf(box.position.x), roundf(box.position.y))
+		box.size = Vector2(roundf(box.size.x), roundf(box.size.y))
 	draw_rect(box, Color(SmaUiTheme.PANEL.r, SmaUiTheme.PANEL.g, SmaUiTheme.PANEL.b, 0.96))
-	draw_rect(box, SmaUiTheme.BORDER, false, 1.0)
+	draw_rect(box, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.BORDER,
+		false, 2.0 if SmaUiTheme.is_pixel() else 1.0)
 	for index in lines.size():
 		var color := SmaUiTheme.MUTED if index == 0 else SmaUiTheme.TEXT
 		draw_string(_font, Vector2(box.position.x + 8.0,

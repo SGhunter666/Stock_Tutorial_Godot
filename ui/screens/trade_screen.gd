@@ -41,6 +41,7 @@ var _chart: SmaCandleChart
 var _start_chart: Button
 var _ma_toggle: Button
 var _boll_toggle: Button
+var _px_step_toggle: Button
 var _reset_pan_button: Button
 var _book_rows: Array = []
 var _book_meta: Label
@@ -74,6 +75,37 @@ var _orders_box: VBoxContainer
 var _orders_key := ""
 var _order_buttons: Dictionary = {}
 var _right_scroll: ScrollContainer
+
+
+class SmaPixelDepthBar extends Control:
+	var accent: Color
+	func _init(accent_col: Color = Color.WHITE) -> void:
+		accent = accent_col
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+	func _draw() -> void:
+		if size.x <= 1.0 or size.y <= 1.0:
+			return
+		if not SmaUiTheme.is_pixel():
+			draw_rect(Rect2(Vector2.ZERO, size), Color(accent.r, accent.g, accent.b, 0.24))
+			return
+		var seg_w := 6.0
+		var gap := 2.0
+		var body_col := Color(accent.r, accent.g, accent.b, 0.48)
+		var hi_col := Color(accent.r, accent.g, accent.b, 0.92)
+		var h := maxf(4.0, roundf(size.y / 2.0) * 2.0)
+		var y := roundf((size.y - h) * 0.5)
+		var x := 0.0
+		var last_seg_x := 0.0
+		var last_seg_w := 0.0
+		while x < size.x - 0.5:
+			var w := minf(seg_w, maxf(2.0, roundf(size.x - x)))
+			draw_rect(Rect2(x, y, w, h), body_col)
+			last_seg_x = x
+			last_seg_w = w
+			x += seg_w + gap
+		if last_seg_w > 0.0:
+			draw_rect(Rect2(last_seg_x, y, last_seg_w, h), hi_col)
 
 
 func _build() -> void:
@@ -198,6 +230,17 @@ func _build() -> void:
 	SmaKit.set_small_font(_boll_toggle, 11)
 	_boll_toggle.toggled.connect(func(_v): _sync_chart_overlays())
 	range_row.add_child(_boll_toggle)
+	_px_step_toggle = SmaKit.toggle(I18n.t("chart.pixelStep"))
+	_px_step_toggle.button_pressed = bool(game.settings.get("chartPixelStepped", true)) \
+		if game != null else true
+	_px_step_toggle.tooltip_text = I18n.t("chart.pixelStepHint")
+	SmaKit.set_small_font(_px_step_toggle, 11)
+	_px_step_toggle.visible = SmaUiTheme.is_pixel()
+	_px_step_toggle.toggled.connect(func(on: bool):
+		if game != null:
+			game.settings["chartPixelStepped"] = on
+		_sync_chart_overlays())
+	range_row.add_child(_px_step_toggle)
 	_reset_pan_button = SmaKit.button(I18n.t("chart.latest"), _reset_chart_pan)
 	SmaKit.set_small_font(_reset_pan_button, 11)
 	_reset_pan_button.visible = false
@@ -214,6 +257,7 @@ func _build() -> void:
 		if _reset_pan_button != null:
 			_reset_pan_button.visible = panned)
 	chart_box.add_child(_chart)
+	_sync_chart_overlays()
 	left.add_child(chart_card)
 
 	_indicators_card = SmaKit.card(10)
@@ -462,13 +506,11 @@ func _create_book_row(accent: Color) -> Dictionary:
 	bar_host.size_flags_stretch_ratio = 1.6
 	bar_host.custom_minimum_size.y = 16
 	bar_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var bar := ColorRect.new()
-	bar.color = Color(accent.r, accent.g, accent.b, 0.56 if SmaUiTheme.is_pixel() else 0.24)
+	var bar := SmaPixelDepthBar.new(accent)
 	bar.anchor_top = 0.1
 	bar.anchor_bottom = 0.9
 	bar.anchor_left = 0.0
 	bar.anchor_right = 0.0
-	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_host.add_child(bar)
 	row.add_child(bar_host)
 	var price := _book_cell("—", accent)
@@ -504,6 +546,8 @@ func _sync_chart_overlays() -> void:
 	_chart.set_indicators(
 		_ma_toggle.button_pressed if _ma_toggle != null else true,
 		_boll_toggle.button_pressed if _boll_toggle != null else false)
+	if _px_step_toggle != null:
+		_chart.set_pixel_stepped(_px_step_toggle.button_pressed)
 
 
 func _reset_chart_pan() -> void:
