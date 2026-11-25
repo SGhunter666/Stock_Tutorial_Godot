@@ -6536,8 +6536,15 @@
   "story.reportExported": "Graduation report card exported as JSON.",
   "settings.themePixel": "Retro Pixel (A+B Hybrid)",
   "market.trend": "20D Trend",
-  "pixelOffice.tier1": "Starter Desk · Home CRT",
-  "pixelOffice.tier2": "Farview Academy · Quant Studio",
-  "pixelOffice.tier3": "Farview Fund I · Trading Floor",
-  "pixelOffice.alert": "⚠ Risk / Margin Alert"
+  "pixelOffice.tier1": "FARVIEW ACADEMY",
+  "pixelOffice.tier2": "QUANT STUDIO",
+  "pixelOffice.tier3": "FARVIEW FUND I",
+  "pixelOffice.alert": "⚠ Risk / Margin Alert",
+  "pixelOffice.toggle": "Floor",
+  "pixelOffice.mentorWelcome": "Mentor · Lin Lan",
+  "pixelOffice.tipDefault": "Watch the SMA trend!",
+  "pixelOffice.tipIntro": "Plan your APLA trade!",
+  "pixelOffice.tipFund": "Guard fund drawdown!",
+  "pixelOffice.tipBull": "Strong tape — stay sharp!",
+  "pixelOffice.tipBear": "Weak tape — hold cash!"
 }

@@ -1,6 +1,6 @@
-## Application shell: top bar, navigation, feature screens, start overlay,
-## dialogue overlay and toast layer. Screens are rebuilt on locale changes and
-## only receive state through Game's public interface.
+## Application shell: top bar, global collapsible pixel trading floor banner,
+## navigation sidebar, feature screens, start overlay, dialogue overlay and toast.
+## Screens are rebuilt on locale/theme changes and only mutate state via Game.
 class_name SmaMain
 extends Control
 
@@ -79,6 +79,7 @@ const NAV_GROUPS := [
 const CORE_NAV := ["dashboard", "market", "watchlist", "trade", "portfolio", "academy",
 	"story", "settings"]
 const COMPACT_WIDTH := 1360.0
+const COMPACT_HEIGHT := 740.0
 
 var _screens: Dictionary = {}
 var _nav_buttons: Dictionary = {}
@@ -91,6 +92,8 @@ var _group_headers: Dictionary = {}
 var _screen_group: Dictionary = {}
 var _current_screen := "market"
 var _screen_host: Control
+var _office_banner: SmaPixelOfficeBanner
+var _office_toggle: Button
 var _topbar: Control
 var _sidebar: Control
 var _nav_menu: MenuButton
@@ -110,6 +113,7 @@ var _cash_label: Label
 var _equity_label: Label
 var _pnl_label: Label
 var _day_label: Label
+var _clock_dot: Label
 var _clock_label: Label
 var _story_badge: Label
 var _pause_button: Button
@@ -126,11 +130,91 @@ class SmaCrtScanlines extends Control:
 	func _draw() -> void:
 		if not SmaUiTheme.is_pixel():
 			return
-		var line_col := Color(0.0, 0.0, 0.0, 0.075)
+		var line_col := Color(0.0, 0.0, 0.0, 0.085)
 		var y := 0.0
 		while y < size.y:
 			draw_rect(Rect2(0.0, y, size.x, 1.0), line_col)
 			y += 3.0
+
+
+class SmaPixelStartBackdrop extends Control:
+	const PX := 4
+	const BAYER := [
+		[0, 8, 2, 10],
+		[12, 4, 14, 6],
+		[3, 11, 1, 9],
+		[15, 7, 13, 5],
+	]
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		var gw := int(ceil(size.x / float(PX)))
+		var gh := int(ceil(size.y / float(PX)))
+		if gw <= 4 or gh <= 4:
+			return
+		var bands := [
+			Color("#050814"),
+			Color("#0c1631"),
+			Color("#1b2654"),
+			Color("#36265e"),
+			Color("#6e3562"),
+			Color("#b85d48"),
+		]
+		var nb := bands.size() - 1
+		for gy in gh:
+			var t := float(gy) / float(maxi(1, gh - 1)) * float(nb)
+			var bi := mini(nb - 1, int(floor(t)))
+			var frac := t - float(bi)
+			var ca: Color = bands[bi]
+			var cb: Color = bands[bi + 1]
+			var brow: Array = BAYER[gy % 4]
+			var thresh := int(frac * 16.0)
+			var run_col := cb if int(brow[0]) < thresh else ca
+			var run_start := 0
+			for gx in gw:
+				var c := cb if int(brow[gx % 4]) < thresh else ca
+				if c != run_col:
+					draw_rect(Rect2(run_start * PX, gy * PX, (gx - run_start) * PX, PX), run_col)
+					run_col = c
+					run_start = gx
+			draw_rect(Rect2(run_start * PX, gy * PX, (gw - run_start) * PX, PX), run_col)
+
+		# Pixel stars in upper sky
+		for si in 42:
+			var sx := ((si * 73 + 19) % maxi(10, gw - 4)) + 2
+			var sy := ((si * 37 + 7) % maxi(6, int(gh * 0.48))) + 2
+			var scol := Color("#fef08a") if (si % 5 == 0) else Color("#93c5fd")
+			draw_rect(Rect2(sx * PX, sy * PX, PX, PX), scol)
+
+		# Panoramic 16-bit financial district skyline silhouettes
+		var back_x := 0
+		var bi_idx := 0
+		while back_x < gw:
+			var bw := 10 + (bi_idx * 7) % 12
+			var bh := int(gh * 0.22) + (bi_idx * 13) % maxi(8, int(gh * 0.24))
+			draw_rect(Rect2(back_x * PX, (gh - bh) * PX, bw * PX, bh * PX), Color("#111730"))
+			back_x += bw + 1
+			bi_idx += 1
+
+		var fx := 2
+		var fi := 0
+		while fx < gw:
+			var fw := 12 + (fi * 9) % 14
+			var fh := int(gh * 0.16) + (fi * 17 + 5) % maxi(10, int(gh * 0.28))
+			var fy := gh - fh
+			draw_rect(Rect2(fx * PX, fy * PX, fw * PX, fh * PX), Color("#080d1d"))
+			draw_rect(Rect2(fx * PX, fy * PX, 2 * PX, fh * PX), Color("#1e2d4d"))
+			if fi % 2 == 0 and fy > 6:
+				draw_rect(Rect2((fx + int(fw / 2)) * PX, (fy - 5) * PX, PX, 5 * PX), Color("#38bdf8"))
+			for wy in range(fy + 3, gh - 3, 4):
+				for wx in range(fx + 3, fx + fw - 2, 3):
+					if ((wx * 3 + wy + fi) % 4) == 0:
+						var lit := Color("#fbbf24") if ((wx + fi) % 3 != 0) else Color("#5eead4")
+						draw_rect(Rect2(wx * PX, wy * PX, PX, 2 * PX), lit)
+			fx += fw + 4
+			fi += 1
+		# Subtle vignette overlay so center Start Card pops cleanly
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.04, 0.09, 0.42))
 
 
 func _ready() -> void:
@@ -175,14 +259,16 @@ func _notification(what: int) -> void:
 # ---------------------------------------------------------------------------
 
 func _build_ui() -> void:
-	# The Control theme holds button and input styleboxes captured at build time,
-	# so it must be rebuilt whenever the palette or density changes.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if SmaUiTheme.is_pixel() \
+		else CanvasItem.TEXTURE_FILTER_LINEAR
 	theme = SmaUiTheme.build()
 	_start_overlay = null
 	_ff_overlay = null
 	_ff_bar = null
 	_ff_percent = null
 	_dialogue = null
+	_office_banner = null
+	_office_toggle = null
 	_toast_panel = null
 	_toast_label = null
 	_toast_tween = null
@@ -215,12 +301,26 @@ func _build_ui() -> void:
 	_sidebar = _build_sidebar()
 	body.add_child(_sidebar)
 
+	var right_col := VBoxContainer.new()
+	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_col.add_theme_constant_override("separation", 0)
+	body.add_child(right_col)
+
+	if SmaUiTheme.is_pixel():
+		_office_banner = SmaPixelOfficeBanner.new()
+		_office_banner.custom_minimum_size = Vector2(280, 114)
+		_office_banner.setup(Game)
+		right_col.add_child(_office_banner)
+
 	var content_margin := MarginContainer.new()
 	content_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	for side in ["left", "right", "top", "bottom"]:
-		content_margin.add_theme_constant_override("margin_%s" % side, 16)
-	body.add_child(content_margin)
+	for side in ["left", "right"]:
+		content_margin.add_theme_constant_override("margin_%s" % side, 14)
+	for side in ["top", "bottom"]:
+		content_margin.add_theme_constant_override("margin_%s" % side, 12)
+	right_col.add_child(content_margin)
 	_screen_host = Control.new()
 	_screen_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_screen_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -244,21 +344,21 @@ func _build_ui() -> void:
 func _build_topbar() -> Control:
 	var bar := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.BG_DEEP
+	style.bg_color = Color("#08101f") if SmaUiTheme.is_pixel() else SmaUiTheme.BG_DEEP
 	style.border_color = SmaUiTheme.BORDER
-	style.border_width_bottom = 1
+	style.border_width_bottom = 2 if SmaUiTheme.is_pixel() else 1
 	style.set_content_margin_all(0)
 	bar.add_theme_stylebox_override("panel", style)
 
 	var margin := MarginContainer.new()
 	for side in ["left", "right"]:
-		margin.add_theme_constant_override("margin_%s" % side, 16)
+		margin.add_theme_constant_override("margin_%s" % side, 14)
 	for side in ["top", "bottom"]:
-		margin.add_theme_constant_override("margin_%s" % side, 10)
+		margin.add_theme_constant_override("margin_%s" % side, 8)
 	bar.add_child(margin)
-	var toolbar := SmaKit.flow(14)
+	var toolbar := SmaKit.flow(12)
 	margin.add_child(toolbar)
-	var row := SmaKit.hbox(12)
+	var row := SmaKit.hbox(10)
 	toolbar.add_child(row)
 
 	_nav_menu = MenuButton.new()
@@ -270,37 +370,70 @@ func _build_topbar() -> Control:
 	navigation.id_pressed.connect(func(id): navigate(String(NAV_ITEMS[id][0])))
 	row.add_child(_nav_menu)
 
+	if SmaUiTheme.is_pixel():
+		var logo := SmaKit.icon_rect("logo", Vector2(26, 26))
+		logo.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(logo)
+
 	var brand := VBoxContainer.new()
-	brand.add_theme_constant_override("separation", 0)
-	var brand_main := SmaKit.label("SMA", 18, SmaUiTheme.ACCENT)
-	brand_main.add_theme_color_override("font_outline_color", SmaUiTheme.BG_DEEP)
+	brand.add_theme_constant_override("separation", 1)
+	var brand_main := SmaKit.label(
+		"%s [SMA]" % I18n.t("app.title") if SmaUiTheme.is_pixel() else "SMA",
+		18, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT)
 	brand.add_child(brand_main)
-	brand.add_child(SmaKit.caption(I18n.t("app.title")))
+	if not SmaUiTheme.is_pixel():
+		brand.add_child(SmaKit.caption(I18n.t("app.title")))
 	row.add_child(brand)
 	row.add_child(_vertical_divider())
 
+	var clock_pill := PanelContainer.new()
+	clock_pill.add_theme_stylebox_override("panel", SmaUiTheme.readout_style(8, 4))
+	var clock_row := SmaKit.hbox(6)
+	clock_pill.add_child(clock_row)
+	if SmaUiTheme.is_pixel():
+		var cal_icon := SmaKit.icon_rect("calendar", Vector2(18, 18))
+		cal_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		clock_row.add_child(cal_icon)
 	var clock_box := VBoxContainer.new()
 	clock_box.add_theme_constant_override("separation", 0)
-	_day_label = SmaKit.label("—", 12, SmaUiTheme.MUTED)
-	_clock_label = SmaKit.label("09:30:00", 17)
+	_day_label = SmaKit.label("—", 11, SmaUiTheme.MUTED)
+	var time_row := SmaKit.hbox(4)
+	_clock_dot = SmaKit.label("●", 11, SmaUiTheme.POSITIVE)
+	_clock_label = SmaKit.label("09:30:00", 14, SmaUiTheme.ACCENT if SmaUiTheme.is_pixel() else SmaUiTheme.TEXT)
+	time_row.add_child(_clock_dot)
+	time_row.add_child(_clock_label)
 	clock_box.add_child(_day_label)
-	clock_box.add_child(_clock_label)
-	row.add_child(clock_box)
-	row.add_child(_vertical_divider())
+	clock_box.add_child(time_row)
+	clock_row.add_child(clock_box)
+	row.add_child(clock_pill)
 
-	for spec in [["cash", "header.cash"], ["equity", "header.equity"], ["pnl", "header.day_pnl"]]:
+	for spec in [
+		["cash", "header.cash", "cash", Vector2(22, 16)],
+		["equity", "header.equity", "equity", Vector2(18, 18)],
+		["pnl", "header.day_pnl", "pnl", Vector2(16, 16)],
+	]:
+		var metric_pill := PanelContainer.new()
+		metric_pill.add_theme_stylebox_override("panel", SmaUiTheme.readout_style(8, 4))
+		var m_row := SmaKit.hbox(6)
+		metric_pill.add_child(m_row)
+		if SmaUiTheme.is_pixel():
+			var m_icon := SmaKit.icon_rect(String(spec[2]), spec[3])
+			m_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			m_row.add_child(m_icon)
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 0)
 		box.add_child(SmaKit.caption(I18n.t(String(spec[1]))))
-		var value := SmaKit.label("—", 15)
+		var val_col := SmaUiTheme.POSITIVE if (SmaUiTheme.is_pixel() and String(spec[0]) == "cash") else SmaUiTheme.TEXT
+		var value := SmaKit.label("—", 14, val_col)
 		box.add_child(value)
 		_top_metrics[String(spec[0])] = value
-		row.add_child(box)
+		m_row.add_child(box)
+		row.add_child(metric_pill)
 	_cash_label = _top_metrics["cash"]
 	_equity_label = _top_metrics["equity"]
 	_pnl_label = _top_metrics["pnl"]
 
-	var actions := SmaKit.hbox(8)
+	var actions := SmaKit.hbox(6)
 	toolbar.add_child(actions)
 	_speed_box = HBoxContainer.new()
 	_speed_box.add_theme_constant_override("separation", 3)
@@ -308,7 +441,6 @@ func _build_topbar() -> Control:
 	for value in Game.SPEEDS:
 		var button := SmaKit.toggle("%d×" % value, group)
 		button.custom_minimum_size.x = 38
-		button.add_theme_font_size_override("font_size", 11)
 		button.pressed.connect(_on_speed.bind(int(value)))
 		_speed_buttons[int(value)] = button
 		_speed_box.add_child(button)
@@ -320,28 +452,33 @@ func _build_topbar() -> Control:
 	_speed_picker.item_selected.connect(func(index): _on_speed(int(Game.SPEEDS[index])))
 	actions.add_child(_speed_picker)
 
-	_pause_button = SmaKit.button(I18n.t("header.pause"), _toggle_pause)
+	_pause_button = SmaKit.arcade_button(I18n.t("header.pause"), "amber", _toggle_pause)
 	_pause_button.custom_minimum_size.x = 64
 	actions.add_child(_pause_button)
 
 	var minute_button := SmaKit.button(I18n.t("header.step_minute"), _step_minute)
-	minute_button.add_theme_font_size_override("font_size", 10)
 	minute_button.tooltip_text = I18n.t("header.step_minute")
 	_step_buttons.append(minute_button)
 	actions.add_child(minute_button)
 
 	var day_button := SmaKit.button(I18n.t("header.step_day"), _step_day)
-	day_button.add_theme_font_size_override("font_size", 10)
 	day_button.tooltip_text = I18n.t("header.step_day")
 	_step_buttons.append(day_button)
 	actions.add_child(day_button)
 
+	if SmaUiTheme.is_pixel():
+		_office_toggle = SmaKit.toggle(I18n.t("pixelOffice.toggle"))
+		_office_toggle.icon = SmaPixelArt.icon("office")
+		_office_toggle.button_pressed = bool(Game.settings.get("showPixelOffice", true))
+		_office_toggle.toggled.connect(func(on: bool):
+			Game.settings["showPixelOffice"] = on
+			_sync_compact_layout())
+		actions.add_child(_office_toggle)
+
 	var save_button := SmaKit.button(I18n.t("header.save"), func(): Game.save_game(true))
-	save_button.add_theme_font_size_override("font_size", 11)
 	actions.add_child(save_button)
 
 	var language := SmaKit.button("中 / EN", _toggle_language)
-	language.add_theme_font_size_override("font_size", 11)
 	actions.add_child(language)
 	return bar
 
@@ -356,17 +493,23 @@ func _sync_compact_layout() -> void:
 	_nav_menu.visible = compact
 	_speed_box.visible = not compact
 	_speed_picker.visible = compact
+	if _office_banner != null:
+		var want_office := bool(Game.settings.get("showPixelOffice", true))
+		var tall_enough := size.y >= COMPACT_HEIGHT or size.y <= 10.0
+		var hide_for_screen := _current_screen in ["settings", "boundaries", "roadmap", "glossary"]
+		_office_banner.visible = Game.started and want_office and tall_enough \
+			and not in_scenario and not hide_for_screen
 
 
 func _build_sidebar() -> Control:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.BG_DEEP
+	style.bg_color = Color("#060b16") if SmaUiTheme.is_pixel() else SmaUiTheme.BG_DEEP
 	style.border_color = SmaUiTheme.BORDER
-	style.border_width_right = 1
-	style.set_content_margin_all(12)
+	style.border_width_right = 2 if SmaUiTheme.is_pixel() else 1
+	style.set_content_margin_all(10)
 	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size.x = 204
+	panel.custom_minimum_size.x = 208
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -381,6 +524,7 @@ func _build_sidebar() -> Control:
 	nav_scroll.add_child(nav_box)
 	var group := ButtonGroup.new()
 	var advanced_nav: bool = String(Game.settings.get("layout", "beginner")) == "advanced"
+	var header_col := SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.DIM
 	for section in NAV_GROUPS:
 		var gid := String(section["id"])
 		var expanded := true if advanced_nav else bool(_group_open.get(gid, true))
@@ -388,8 +532,12 @@ func _build_sidebar() -> Control:
 		var header := Button.new()
 		header.flat = true
 		header.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		header.add_theme_font_size_override("font_size", 11)
-		header.add_theme_color_override("font_color", SmaUiTheme.DIM)
+		if SmaUiTheme.is_pixel():
+			header.add_theme_font_override("font", SmaUiTheme.pixel_font_12())
+			header.add_theme_font_size_override("font_size", 12)
+		else:
+			header.add_theme_font_size_override("font_size", 11)
+		header.add_theme_color_override("font_color", header_col)
 		header.text = "%s %s" % ["▾" if expanded else "▸", I18n.t(String(section["titleKey"]))]
 		var items_box := SmaKit.vbox(3)
 		items_box.visible = expanded
@@ -407,7 +555,9 @@ func _build_sidebar() -> Control:
 			_screen_group[screen_id] = gid
 			var button := SmaKit.toggle(I18n.t(String(entry[1])), group)
 			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			button.custom_minimum_size.y = 30
+			button.custom_minimum_size.y = 32
+			if SmaUiTheme.is_pixel():
+				button.icon = SmaPixelArt.icon(screen_id)
 			button.pressed.connect(func(): navigate(screen_id))
 			_nav_buttons[screen_id] = button
 			items_box.add_child(button)
@@ -422,7 +572,7 @@ func _build_sidebar() -> Control:
 func _vertical_divider() -> Control:
 	var line := ColorRect.new()
 	line.color = SmaUiTheme.BORDER
-	line.custom_minimum_size.x = 1
+	line.custom_minimum_size.x = 2 if SmaUiTheme.is_pixel() else 1
 	line.custom_minimum_size.y = 34
 	return line
 
@@ -470,15 +620,8 @@ func _build_screens() -> void:
 
 func _build_toast() -> void:
 	_toast_panel = PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.PANEL_ALT
-	style.border_color = SmaUiTheme.ACCENT_DARK
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(10)
-	style.shadow_color = Color(0, 0, 0, 0.35)
-	style.shadow_size = 10
-	_toast_panel.add_theme_stylebox_override("panel", style)
+	_toast_panel.add_theme_stylebox_override("panel",
+		SmaUiTheme.panel_style(SmaUiTheme.PANEL_ALT, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT_DARK, 10, false))
 	_toast_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_toast_panel.position = Vector2(size.x * 0.5, size.y - 70)
 	_toast_panel.visible = false
@@ -529,6 +672,8 @@ func navigate(screen_id: String, force: bool = false) -> void:
 		screen.setup(Game)
 	else:
 		screen.refresh("nav")
+	if _office_banner != null:
+		_office_banner.refresh_state()
 	_sync_compact_layout()
 
 
@@ -548,6 +693,8 @@ func _refresh_nav() -> void:
 func _on_state_changed(reason: String) -> void:
 	_update_topbar()
 	_refresh_nav()
+	if _office_banner != null:
+		_office_banner.refresh_state()
 	if _screens.has(_current_screen):
 		_screens[_current_screen].refresh(reason)
 
@@ -576,6 +723,7 @@ func _on_academy_changed() -> void:
 func _on_game_started() -> void:
 	if _start_overlay != null:
 		_start_overlay.visible = false
+	_sync_compact_layout()
 	navigate("dashboard" if Game.has_intro_task() else "market")
 
 
@@ -596,7 +744,7 @@ func _build_fast_forward_overlay() -> void:
 	add_child(_ff_overlay)
 	var dim := ColorRect.new()
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0.02, 0.04, 0.07, 0.62)
+	dim.color = Color(0.02, 0.04, 0.07, 0.72)
 	_ff_overlay.add_child(dim)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -606,7 +754,7 @@ func _build_fast_forward_overlay() -> void:
 	center.add_child(panel)
 	var box := SmaKit.vbox(10)
 	panel.add_child(box)
-	box.add_child(SmaKit.label(I18n.t("fast_forward.title"), 18))
+	box.add_child(SmaKit.title(I18n.t("fast_forward.title"), 20))
 	box.add_child(SmaKit.muted(I18n.t("fast_forward.hint")))
 	_ff_bar = ProgressBar.new()
 	_ff_bar.min_value = 0
@@ -614,18 +762,6 @@ func _build_fast_forward_overlay() -> void:
 	_ff_bar.value = 0
 	_ff_bar.show_percentage = false
 	_ff_bar.custom_minimum_size = Vector2(420, 14)
-	var background := StyleBoxFlat.new()
-	background.bg_color = SmaUiTheme.BG_DEEP
-	background.border_color = SmaUiTheme.BORDER
-	background.set_border_width_all(1)
-	background.set_corner_radius_all(7)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = SmaUiTheme.ACCENT_DARK
-	fill.border_color = SmaUiTheme.ACCENT
-	fill.set_border_width_all(1)
-	fill.set_corner_radius_all(7)
-	_ff_bar.add_theme_stylebox_override("background", background)
-	_ff_bar.add_theme_stylebox_override("fill", fill)
 	box.add_child(_ff_bar)
 	_ff_percent = SmaKit.caption("0%")
 	box.add_child(_ff_percent)
@@ -661,7 +797,11 @@ func _update_topbar() -> void:
 		_pnl_label.text = "—"
 		return
 	var day := int(Game.exchange.state["dayIndex"])
-	_day_label.text = "T%d · %s" % [day, SmaCalendar.format_date(day, I18n.locale)]
+	_day_label.text = "DAY %02d · %s" % [day + 1, SmaCalendar.format_date(day, I18n.locale)]
+	if _clock_dot != null:
+		_clock_dot.text = "⏸" if Game.paused else "●"
+		_clock_dot.add_theme_color_override("font_color",
+			SmaUiTheme.WARNING if Game.paused else SmaUiTheme.POSITIVE)
 	_clock_label.text = SmaCalendar.session_clock(int(Game.exchange.state["second"]))
 	var cash := float(Game.exchange.state["account"]["cash"])
 	var equity := Game.exchange.equity()
@@ -763,21 +903,56 @@ func _show_start_overlay() -> void:
 	_start_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_start_overlay.z_index = 40
 	add_child(_start_overlay)
-	var dim := ColorRect.new()
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0.02, 0.04, 0.07, 0.9)
-	_start_overlay.add_child(dim)
+	if SmaUiTheme.is_pixel():
+		var px_bg := SmaPixelStartBackdrop.new()
+		px_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_start_overlay.add_child(px_bg)
+	else:
+		var dim := ColorRect.new()
+		dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		dim.color = Color(0.02, 0.04, 0.07, 0.9)
+		_start_overlay.add_child(dim)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_start_overlay.add_child(center)
-	var panel := SmaKit.card(28)
-	panel.custom_minimum_size = Vector2(620, 0)
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", SmaUiTheme.panel_style(
+		SmaUiTheme.PANEL, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.BORDER, 24, true))
+	panel.custom_minimum_size = Vector2(760 if SmaUiTheme.is_pixel() else 620, 0)
 	center.add_child(panel)
-	var box := SmaKit.vbox(14)
-	panel.add_child(box)
-	box.add_child(SmaKit.label("SMA", 15, SmaUiTheme.ACCENT))
-	box.add_child(SmaKit.label(I18n.t("start.title"), 34))
-	box.add_child(SmaKit.muted(I18n.t("start.subtitle"), 14))
+
+	var outer := SmaKit.hbox(20)
+	panel.add_child(outer)
+
+	if SmaUiTheme.is_pixel() and ResourceLoader.exists("res://assets/portraits/pixel/lin_lan.png"):
+		var left_col := SmaKit.vbox(8)
+		left_col.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		var p_frame := PanelContainer.new()
+		p_frame.add_theme_stylebox_override("panel",
+			SmaPixelArt.card_box(Color("#091322"), SmaUiTheme.ACCENT, Color("#040811"), 4, false))
+		var p_rect := TextureRect.new()
+		p_rect.texture = load("res://assets/portraits/pixel/lin_lan.png") as Texture2D
+		p_rect.custom_minimum_size = Vector2(148, 198)
+		p_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		p_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		p_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		p_frame.add_child(p_rect)
+		left_col.add_child(p_frame)
+		var welcome_badge := SmaKit.label(I18n.t("pixelOffice.mentorWelcome"), 12, SmaUiTheme.ACCENT)
+		welcome_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		left_col.add_child(welcome_badge)
+		outer.add_child(left_col)
+
+	var box := SmaKit.vbox(12)
+	outer.add_child(box)
+	var brand_row := SmaKit.hbox(8)
+	if SmaUiTheme.is_pixel():
+		brand_row.add_child(SmaKit.icon_rect("logo", Vector2(22, 22)))
+	brand_row.add_child(SmaKit.label("FARVIEW TRADING ACADEMY · [SMA]", 13,
+		SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT))
+	box.add_child(brand_row)
+	box.add_child(SmaKit.title(I18n.t("start.title"), 34))
+	box.add_child(SmaKit.muted(I18n.t("start.subtitle"), 13))
 	box.add_child(SmaKit.caption(I18n.t("app.tagline")))
 	box.add_child(SmaKit.separator())
 	var name_row := SmaKit.hbox(8)
@@ -825,23 +1000,34 @@ func _show_start_overlay() -> void:
 	slot_box.add_child(slot_row)
 	slot_box.add_child(slot_info)
 	box.add_child(slot_box)
-	var new_game := SmaKit.button(I18n.t("start.new_game"), _start_new_game, true)
+
+	var cta_row := SmaKit.hbox(10)
+	var new_game := SmaKit.arcade_button("▶ " + I18n.t("start.new_game"), "buy", _start_new_game, 20)
 	new_game.custom_minimum_size.y = 46
-	box.add_child(new_game)
-	_start_continue = SmaKit.button(I18n.t("start.continue"), _continue_game)
-	_start_continue.custom_minimum_size.y = 42
+	new_game.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cta_row.add_child(new_game)
+	_start_continue = SmaKit.arcade_button("⏵ " + I18n.t("start.continue"), "amber", _continue_game, 20)
+	_start_continue.custom_minimum_size.y = 46
+	_start_continue.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_start_continue.disabled = not Game.has_save()
-	box.add_child(_start_continue)
+	cta_row.add_child(_start_continue)
+	box.add_child(cta_row)
+
 	refresh_slot_ui.call()
 	if not Game.has_save():
 		box.add_child(SmaKit.caption(I18n.t("start.no_save")))
 	box.add_child(SmaKit.separator())
-	var footer := SmaKit.hbox(10)
+	var footer := SmaKit.hbox(8)
 	footer.add_child(SmaKit.caption(I18n.t("start.footer")))
 	footer.add_child(SmaKit.hspacer())
 	footer.add_child(SmaKit.caption(I18n.t("app.version", {
-		"version": String(ProjectSettings.get_setting("application/config/version", "beta-04")),
+		"version": String(ProjectSettings.get_setting("application/config/version", "beta-08")),
 	})))
+	var next_mode := "dark" if SmaUiTheme.is_pixel() else "pixel"
+	var theme_btn := SmaKit.button(
+		I18n.t("settings.themeDark" if SmaUiTheme.is_pixel() else "settings.themePixel"),
+		func(): Game.set_theme(next_mode))
+	footer.add_child(theme_btn)
 	footer.add_child(SmaKit.button(I18n.t("start.language"), _toggle_language))
 	box.add_child(footer)
 	var disclaimer := SmaKit.caption(I18n.t("app.disclaimer"))
@@ -924,7 +1110,6 @@ func _shortcuts_blocked() -> bool:
 		return true
 	if Game.is_fast_forwarding():
 		return true
-	# Text fields, dropdowns and other focusable controls own their keyboard.
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit or focus is BaseButton or focus is HSlider:
 		return true

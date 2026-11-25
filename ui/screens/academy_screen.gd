@@ -137,13 +137,9 @@ func _unit_row(entry: Dictionary) -> Control:
 	var progress := SmaAcademy.progress_rows(game.academy, entry)
 	var unlocked := SmaAcademy.is_unit_unlocked(game.academy, unit_id)
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.PANEL_ALT if unit_id == _selected_unit else SmaUiTheme.PANEL
-	style.border_color = SmaUiTheme.ACCENT if unit_id == _selected_unit else SmaUiTheme.BORDER
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(8)
-	style.set_content_margin_all(8)
-	panel.add_theme_stylebox_override("panel", style)
+	var hi_col := SmaUiTheme.ACCENT if unit_id == _selected_unit else SmaUiTheme.BORDER
+	var bg_col := SmaUiTheme.PANEL_ALT if unit_id == _selected_unit else SmaUiTheme.PANEL
+	panel.add_theme_stylebox_override("panel", SmaUiTheme.panel_style(bg_col, hi_col, 8, false))
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP if unlocked else Control.MOUSE_FILTER_IGNORE
 	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if unlocked else Control.CURSOR_ARROW
 	if unlocked:
@@ -350,13 +346,8 @@ func _render_block(box: VBoxContainer, block: Dictionary) -> void:
 			elif variant == "pro" or variant == "info":
 				color = SmaUiTheme.INFO
 			var panel := SmaKit.card(10)
-			var style := StyleBoxFlat.new()
-			style.bg_color = Color(color.r, color.g, color.b, 0.08)
-			style.border_color = color
-			style.set_border_width_all(1)
-			style.set_corner_radius_all(8)
-			style.set_content_margin_all(10)
-			panel.add_theme_stylebox_override("panel", style)
+			panel.add_theme_stylebox_override("panel", SmaUiTheme.panel_style(
+				SmaUiTheme.PANEL.lerp(color, 0.14), color, 10, false))
 			var inner := SmaKit.vbox(4)
 			panel.add_child(inner)
 			inner.add_child(SmaKit.label(I18n.t(String(block["titleKey"])), 12, color))
@@ -641,13 +632,10 @@ func _progress_bar(value: float) -> ProgressBar:
 	bar.max_value = 100
 	bar.value = clampf(value, 0.0, 100.0)
 	bar.show_percentage = false
-	bar.custom_minimum_size.y = 6
-	var background := StyleBoxFlat.new()
-	background.bg_color = SmaUiTheme.BG_DEEP
-	background.set_corner_radius_all(3)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = SmaUiTheme.ACCENT_DARK
-	fill.set_corner_radius_all(3)
+	bar.custom_minimum_size.y = 8 if SmaUiTheme.is_pixel() else 6
+	var background := SmaUiTheme._box(SmaUiTheme.BG_DEEP, SmaUiTheme.BORDER, 3, 0)
+	var fill := SmaUiTheme._box(SmaUiTheme.POSITIVE if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT_DARK,
+		SmaUiTheme.ACCENT, 3, 0)
 	bar.add_theme_stylebox_override("background", background)
 	bar.add_theme_stylebox_override("fill", fill)
 	return bar

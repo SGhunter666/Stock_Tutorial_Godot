@@ -26,6 +26,7 @@ var _trail_pct: SpinBox
 
 var _name_label: Label
 var _ticker_label: Label
+var _ticker_badge: TextureRect
 var _meta_label: Label
 var _profile_label: Label
 var _sensitivity_label: Label
@@ -85,11 +86,21 @@ func _build() -> void:
 	var quote_card := SmaKit.card(12)
 	var quote_head := SmaKit.flow(14)
 	var identity := SmaKit.vbox(2)
-	_ticker_label = SmaKit.label("—", 24, SmaUiTheme.ACCENT)
+	var id_head := SmaKit.hbox(8)
+	if SmaUiTheme.is_pixel():
+		_ticker_badge = TextureRect.new()
+		_ticker_badge.custom_minimum_size = Vector2(28, 28)
+		_ticker_badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_ticker_badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_ticker_badge.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_ticker_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		id_head.add_child(_ticker_badge)
+	_ticker_label = SmaKit.label("—", 24, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT)
+	id_head.add_child(_ticker_label)
 	_name_label = SmaKit.label("—", 14, SmaUiTheme.MUTED)
 	_meta_label = SmaKit.caption("")
 	_profile_label = SmaKit.caption("")
-	identity.add_child(_ticker_label)
+	identity.add_child(id_head)
 	identity.add_child(_name_label)
 	identity.add_child(_meta_label)
 	identity.add_child(_profile_label)
@@ -273,10 +284,17 @@ func _build() -> void:
 	ticket.add_child(SmaKit.label(I18n.t("trade.title"), 14))
 	var side_row := SmaKit.hbox(4)
 	for entry in [["buy", "trade.buy"], ["sell", "trade.sell"], ["short", "trade.short"], ["cover", "trade.cover"]]:
+		var side_id := String(entry[0])
 		var button := SmaKit.toggle(I18n.t(String(entry[1])), _side_group)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.pressed.connect(_on_side.bind(String(entry[0])))
-		_side_buttons[String(entry[0])] = button
+		button.custom_minimum_size.y = 34 if SmaUiTheme.is_pixel() else 30
+		if SmaUiTheme.is_pixel():
+			if side_id == "buy":
+				SmaUiTheme.apply_arcade_button(button, "buy", 6)
+			elif side_id == "sell":
+				SmaUiTheme.apply_arcade_button(button, "sell", 6)
+		button.pressed.connect(_on_side.bind(side_id))
+		_side_buttons[side_id] = button
 		side_row.add_child(button)
 	ticket.add_child(side_row)
 	var type_row := SmaKit.hbox(4)
@@ -373,8 +391,8 @@ func _build() -> void:
 	_available_label = SmaKit.caption("")
 	_available_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ticket.add_child(_available_label)
-	_submit_button = SmaKit.button(I18n.t("trade.submit"), _submit, true)
-	_submit_button.custom_minimum_size.y = 38
+	_submit_button = SmaKit.arcade_button(I18n.t("trade.submit"), "buy", _submit, 20 if SmaUiTheme.is_pixel() else 13)
+	_submit_button.custom_minimum_size.y = 44 if SmaUiTheme.is_pixel() else 38
 	ticket.add_child(_submit_button)
 	_feedback = SmaKit.muted("")
 	_feedback.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -445,7 +463,7 @@ func _create_book_row(accent: Color) -> Dictionary:
 	bar_host.custom_minimum_size.y = 16
 	bar_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var bar := ColorRect.new()
-	bar.color = Color(accent.r, accent.g, accent.b, 0.24)
+	bar.color = Color(accent.r, accent.g, accent.b, 0.56 if SmaUiTheme.is_pixel() else 0.24)
 	bar.anchor_top = 0.1
 	bar.anchor_bottom = 0.9
 	bar.anchor_left = 0.0
@@ -633,6 +651,8 @@ func refresh(reason: String = "") -> void:
 	var quote: Dictionary = game.exchange.quote(ticker)
 	var last := float(quote.get("last", 0.0))
 	_ticker_label.text = ticker
+	if _ticker_badge != null:
+		_ticker_badge.texture = SmaPixelArt.ticker_badge(ticker, String(company.get("sector", "")), locked)
 	_name_label.text = String(company.get("name", ticker))
 	if _watch_button != null:
 		var watched: bool = game.is_watched(ticker)
@@ -1247,6 +1267,9 @@ func _on_side(side: String) -> void:
 	if game != null and side in ["short", "cover"] and not game.academy_is_tool_unlocked("trade.short"):
 		return
 	_side = side
+	if _submit_button != null:
+		SmaUiTheme.apply_arcade_button(_submit_button,
+			"buy" if _side in ["buy", "cover"] else "sell", 8)
 	_feedback.text = ""
 	if _order_type == "stop":
 		_reset_stop_price()

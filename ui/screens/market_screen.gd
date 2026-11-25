@@ -69,30 +69,39 @@ func _build() -> void:
 	root.add_child(filters)
 	root.add_child(_build_heatmap())
 
-	var table_card := SmaKit.card(0)
+	var table_card := SmaKit.card(4 if SmaUiTheme.is_pixel() else 0)
 	table_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var table := SmaKit.vbox(0)
 	table_card.add_child(table)
+	var header_wrap := PanelContainer.new()
+	var h_style := StyleBoxFlat.new()
+	h_style.bg_color = Color("#070e1c") if SmaUiTheme.is_pixel() else SmaUiTheme.BG_DEEP
+	h_style.border_color = SmaUiTheme.BORDER
+	h_style.border_width_bottom = 2 if SmaUiTheme.is_pixel() else 1
+	h_style.set_content_margin_all(6)
+	header_wrap.add_theme_stylebox_override("panel", h_style)
 	var header := SmaKit.hbox(8)
-	header.custom_minimum_size.y = 30
+	header.custom_minimum_size.y = 26
+	header_wrap.add_child(header)
 	_sort_buttons.clear()
 	var col_specs := [
 		["market.watch", 0.35, HORIZONTAL_ALIGNMENT_CENTER, ""],
-		["market.ticker", 0.7, HORIZONTAL_ALIGNMENT_LEFT, "ticker"],
-		["market.company", 2.1, HORIZONTAL_ALIGNMENT_LEFT, "name"],
+		["market.ticker", 0.85, HORIZONTAL_ALIGNMENT_LEFT, "ticker"],
+		["market.company", 2.0, HORIZONTAL_ALIGNMENT_LEFT, "name"],
 		["market.sector", 1.0, HORIZONTAL_ALIGNMENT_LEFT, ""],
 		["market.last", 0.9, HORIZONTAL_ALIGNMENT_RIGHT, "last"],
-		["market.change", 0.9, HORIZONTAL_ALIGNMENT_RIGHT, "change"],
+		["market.change", 0.95, HORIZONTAL_ALIGNMENT_RIGHT, "change"],
 		["market.trend", 0.75, HORIZONTAL_ALIGNMENT_CENTER, ""],
 		["market.bid", 0.8, HORIZONTAL_ALIGNMENT_RIGHT, ""],
 		["market.ask", 0.8, HORIZONTAL_ALIGNMENT_RIGHT, ""],
 		["market.volume", 1.0, HORIZONTAL_ALIGNMENT_RIGHT, "volume"],
 	]
+	var head_col := SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.DIM
 	for spec in col_specs:
 		var sort_id := String(spec[3])
 		if sort_id == "":
 			header.add_child(SmaKit.cell(I18n.t(String(spec[0])), float(spec[1]),
-				spec[2], SmaUiTheme.DIM, 11))
+				spec[2], head_col, 11))
 		else:
 			var btn := Button.new()
 			btn.flat = true
@@ -101,14 +110,18 @@ func _build() -> void:
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			btn.size_flags_stretch_ratio = float(spec[1])
 			btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-			btn.add_theme_font_size_override("font_size", 11)
-			btn.add_theme_color_override("font_color", SmaUiTheme.DIM)
+			if SmaUiTheme.is_pixel():
+				btn.add_theme_font_override("font", SmaUiTheme.pixel_font_12())
+				btn.add_theme_font_size_override("font_size", 12)
+			else:
+				btn.add_theme_font_size_override("font_size", 11)
+			btn.add_theme_color_override("font_color", head_col)
 			btn.add_theme_color_override("font_hover_color", SmaUiTheme.ACCENT)
 			btn.pressed.connect(_toggle_sort.bind(sort_id))
 			_sort_buttons[sort_id] = {"button": btn, "labelKey": String(spec[0])}
 			header.add_child(btn)
 	_sync_sort_labels()
-	table.add_child(header)
+	table.add_child(header_wrap)
 
 	var scroll := SmaKit.scroll()
 	_list = SmaKit.vbox(0)
@@ -163,24 +176,43 @@ func _create_row(ticker: String, company: Dictionary, sector: String,
 	spark.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	spark_wrap.add_child(spark)
+	var ticker_wrap := SmaKit.hbox(6)
+	ticker_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ticker_wrap.size_flags_stretch_ratio = 0.85
+	ticker_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var badge_rect: TextureRect = null
+	if SmaUiTheme.is_pixel():
+		badge_rect = TextureRect.new()
+		badge_rect.texture = SmaPixelArt.ticker_badge(ticker, sector, false)
+		badge_rect.custom_minimum_size = Vector2(20, 20)
+		badge_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		badge_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		badge_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		badge_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		badge_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ticker_wrap.add_child(badge_rect)
+	var ticker_lbl := SmaKit.cell(ticker, 1.0, HORIZONTAL_ALIGNMENT_LEFT,
+		SmaUiTheme.ACCENT if SmaUiTheme.is_pixel() else SmaUiTheme.TEXT)
+	ticker_wrap.add_child(ticker_lbl)
 	var cells := {
-		"ticker": SmaKit.cell(ticker, 0.7),
-		"name": SmaKit.cell(String(company.get("name", ticker)), 2.1),
+		"ticker": ticker_lbl,
+		"name": SmaKit.cell(String(company.get("name", ticker)), 2.0),
 		"sector": SmaKit.cell(SmaKit.sector_label(String(company.get("sector", ""))), 1.0, HORIZONTAL_ALIGNMENT_LEFT, SmaUiTheme.MUTED),
 		"last": SmaKit.cell("—", 0.9, HORIZONTAL_ALIGNMENT_RIGHT),
-		"change": SmaKit.cell("—", 0.9, HORIZONTAL_ALIGNMENT_RIGHT),
+		"change": SmaKit.cell("—", 0.95, HORIZONTAL_ALIGNMENT_RIGHT),
 		"bid": SmaKit.cell("—", 0.8, HORIZONTAL_ALIGNMENT_RIGHT),
 		"ask": SmaKit.cell("—", 0.8, HORIZONTAL_ALIGNMENT_RIGHT),
 		"volume": SmaKit.cell("—", 1.0, HORIZONTAL_ALIGNMENT_RIGHT, SmaUiTheme.MUTED),
 	}
-	for key in ["ticker", "name", "sector", "last", "change"]:
+	row.add_child(ticker_wrap)
+	for key in ["name", "sector", "last", "change"]:
 		row.add_child(cells[key])
 	row.add_child(spark_wrap)
 	for key in ["bid", "ask", "volume"]:
 		row.add_child(cells[key])
 	_list.add_child(panel)
-	_rows[ticker] = {"panel": panel, "cells": cells, "spark": spark, "sector": sector,
-		"name": String(company.get("name", ticker)),
+	_rows[ticker] = {"panel": panel, "cells": cells, "spark": spark, "badge": badge_rect,
+		"sector": sector, "name": String(company.get("name", ticker)),
 		"is_etf": is_etf, "locked": false, "watch": watch_button}
 
 
@@ -317,10 +349,17 @@ func _apply_heat_style(button: Button, average: float) -> void:
 	var tint := SmaUiTheme.PANEL_ALT
 	if average > 0.01:
 		tint = SmaUiTheme.PANEL.lerp(SmaUiTheme.POSITIVE,
-			clampf(average / 4.0, 0.08, 0.45))
+			clampf(average / 4.0, 0.14, 0.48))
 	elif average < -0.01:
 		tint = SmaUiTheme.PANEL.lerp(SmaUiTheme.NEGATIVE,
-			clampf(-average / 4.0, 0.08, 0.45))
+			clampf(-average / 4.0, 0.14, 0.48))
+	if SmaUiTheme.is_pixel():
+		var hi := tint.lightened(0.28)
+		var ledge := tint.darkened(0.45)
+		button.add_theme_stylebox_override("normal", SmaPixelArt.button_box(tint, hi, ledge, 5, false))
+		button.add_theme_stylebox_override("hover", SmaPixelArt.button_box(tint.lightened(0.1), Color.WHITE, ledge, 5, false))
+		button.add_theme_stylebox_override("pressed", SmaPixelArt.button_box(tint, hi, ledge, 5, true))
+		return
 	var style := StyleBoxFlat.new()
 	style.bg_color = tint
 	style.border_color = SmaUiTheme.BORDER
@@ -398,8 +437,11 @@ func _update_rows() -> void:
 		var change := float(quote.get("changePct", 0.0))
 		var last := float(quote.get("last", 0.0))
 		var spark: SmaSparkline = entry.get("spark", null)
+		var badge_rect: TextureRect = entry.get("badge", null)
+		if badge_rect != null:
+			badge_rect.texture = SmaPixelArt.ticker_badge(String(ticker), String(entry["sector"]), locked)
 		if locked:
-			cells["ticker"].text = "🔒 %s" % ticker
+			cells["ticker"].text = ticker if badge_rect != null else ("🔒 %s" % ticker)
 			cells["last"].text = "—"
 			cells["change"].text = I18n.t("market.locked")
 			cells["change"].add_theme_color_override("font_color", SmaUiTheme.DIM)
@@ -420,7 +462,8 @@ func _update_rows() -> void:
 			spark.set_values(closes, change >= 0.0)
 		cells["ticker"].text = ticker
 		cells["last"].text = SmaFormat.num(last, 2)
-		cells["change"].text = SmaFormat.pct(change, 2)
+		var arrow := ("▲ " if change > 0.0 else ("▼ " if change < 0.0 else "")) if SmaUiTheme.is_pixel() else ""
+		cells["change"].text = arrow + SmaFormat.pct(change, 2)
 		cells["change"].add_theme_color_override("font_color", SmaKit.value_color(change))
 		var bid: Variant = quote.get("bid", null)
 		var ask: Variant = quote.get("ask", null)

@@ -53,7 +53,8 @@ var paused := true
 var speed := 1
 var selected_ticker := "APLA"
 var settings := {"locale": "zh_CN", "speed": 1, "layout": "beginner",
-	"theme": "pixel", "colorScheme": "intl", "playerName": "", "displayMode": "windowed",
+	"theme": "pixel", "pixelMigrated": true, "showPixelOffice": true,
+	"colorScheme": "intl", "playerName": "", "displayMode": "windowed",
 	"windowPreset": "auto", "uiScale": "auto",
 	"masterVolume": 0.8, "musicVolume": 0.22, "sfxVolume": 0.75, "muted": false}
 var sandbox_mode := false
@@ -547,6 +548,7 @@ func _apply_layout(value: String) -> void:
 func set_theme(value: String) -> void:
 	var next_theme := value if ["pixel", "dark", "light"].has(value) else "dark"
 	settings["theme"] = next_theme
+	settings["pixelMigrated"] = true
 	SmaUiTheme.set_theme_mode(next_theme)
 	theme_changed.emit()
 	save_game(false)
@@ -2751,6 +2753,9 @@ func _apply_loaded_save(loaded: Dictionary) -> void:
 	var saved_settings: Dictionary = loaded["settings"]
 	for key in saved_settings.keys():
 		settings[key] = saved_settings[key]
+	if not bool(saved_settings.get("pixelMigrated", false)):
+		settings["theme"] = "pixel"
+		settings["pixelMigrated"] = true
 	I18n.set_locale(String(settings.get("locale", "zh_CN")))
 	SmaUiTheme.set_theme_mode(String(settings.get("theme", "pixel")))
 	SmaUiTheme.set_color_scheme(String(settings.get("colorScheme", "intl")))

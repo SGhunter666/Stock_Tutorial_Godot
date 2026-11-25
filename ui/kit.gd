@@ -8,8 +8,13 @@ static func label(text: String, size: int = 13,
 		color: Color = Color(0, 0, 0, 0)) -> Label:
 	var node := Label.new()
 	node.text = text
-	node.add_theme_font_size_override("font_size",
-		maxi(9, int(round(float(size) * SmaUiTheme.density))))
+	var scaled := maxi(9, int(round(float(size) * SmaUiTheme.density)))
+	if SmaUiTheme.is_pixel():
+		var snapped := SmaUiTheme.pixel_snap_font(scaled)
+		node.add_theme_font_override("font", snapped["font"])
+		node.add_theme_font_size_override("font_size", int(snapped["size"]))
+	else:
+		node.add_theme_font_size_override("font_size", scaled)
 	node.add_theme_color_override("font_color",
 		SmaUiTheme.TEXT if color.a <= 0.0 else color)
 	return node
@@ -20,7 +25,13 @@ static func muted(text: String, size: int = 12) -> Label:
 
 
 static func title(text: String, size: int = 20) -> Label:
-	return label(text, size, SmaUiTheme.TEXT)
+	var col := Color("#fef3c7") if SmaUiTheme.is_pixel() else SmaUiTheme.TEXT
+	var node := label(text, size, col)
+	if SmaUiTheme.is_pixel():
+		node.add_theme_color_override("font_shadow_color", Color("#04070e"))
+		node.add_theme_constant_override("shadow_offset_x", 2)
+		node.add_theme_constant_override("shadow_offset_y", 2)
+	return node
 
 
 static func caption(text: String) -> Label:
@@ -31,7 +42,7 @@ static func caption(text: String) -> Label:
 static func card(margin: int = 12) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var pad := maxi(5, int(round(float(margin) * SmaUiTheme.density)))
-	var style := SmaUiTheme._box(SmaUiTheme.PANEL, SmaUiTheme.BORDER, SmaUiTheme.card_radius(), pad)
+	var style := SmaUiTheme.panel_style(SmaUiTheme.PANEL, SmaUiTheme.BORDER, pad, true)
 	panel.add_theme_stylebox_override("panel", style)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return panel
@@ -66,19 +77,32 @@ static func button(text: String, callback: Callable = Callable(), primary: bool 
 	node.text = text
 	node.focus_mode = Control.FOCUS_NONE
 	node.pressed.connect(_play_click)
-	node.add_theme_font_size_override("font_size",
-		maxi(9, int(round(12.0 * SmaUiTheme.density))))
+	if SmaUiTheme.is_pixel():
+		node.add_theme_font_override("font", SmaUiTheme.pixel_font_12())
+		node.add_theme_font_size_override("font_size", 12)
+	else:
+		node.add_theme_font_size_override("font_size",
+			maxi(9, int(round(12.0 * SmaUiTheme.density))))
 	if primary:
-		var normal := SmaUiTheme.beveled_button_box(SmaUiTheme.ACCENT_DARK, SmaUiTheme.ACCENT, 8, false)
-		node.add_theme_stylebox_override("normal", normal)
-		var hover := SmaUiTheme.beveled_button_box(SmaUiTheme.ACCENT, Color.WHITE, 8, false)
-		node.add_theme_stylebox_override("hover", hover)
-		var pressed := SmaUiTheme.beveled_button_box(SmaUiTheme.ACCENT_DARK, SmaUiTheme.ACCENT, 8, true)
-		node.add_theme_stylebox_override("pressed", pressed)
-		node.add_theme_color_override("font_color", Color.WHITE)
-		node.add_theme_color_override("font_hover_color",
-			SmaUiTheme.TEXT if SmaUiTheme.mode == "light" else SmaUiTheme.BG_DEEP)
-		node.add_theme_color_override("font_pressed_color", Color.WHITE)
+		SmaUiTheme.apply_arcade_button(node, "primary", 8)
+	if callback.is_valid():
+		node.pressed.connect(callback)
+	return node
+
+
+static func arcade_button(text: String, kind: String, callback: Callable = Callable(),
+		font_px: int = 12) -> Button:
+	var node := Button.new()
+	node.text = text
+	node.focus_mode = Control.FOCUS_NONE
+	node.pressed.connect(_play_click)
+	if SmaUiTheme.is_pixel():
+		var snapped := SmaUiTheme.pixel_snap_font(font_px)
+		node.add_theme_font_override("font", snapped["font"])
+		node.add_theme_font_size_override("font_size", int(snapped["size"]))
+	else:
+		node.add_theme_font_size_override("font_size", font_px)
+	SmaUiTheme.apply_arcade_button(node, kind, 8)
 	if callback.is_valid():
 		node.pressed.connect(callback)
 	return node
@@ -89,6 +113,17 @@ static func toggle(text: String, group: ButtonGroup = null) -> Button:
 	node.toggle_mode = true
 	node.button_group = group
 	return node
+
+
+static func icon_rect(kind: String, px_size: Vector2 = Vector2(16, 16)) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = SmaPixelArt.icon(kind)
+	rect.custom_minimum_size = px_size
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect
 
 
 static func cell(text: String, ratio: float = 1.0, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT,
@@ -106,12 +141,13 @@ static func cell(text: String, ratio: float = 1.0, align: HorizontalAlignment = 
 static func header_row(columns: Array, ratios: Array, aligns: Array = []) -> HBoxContainer:
 	var row := hbox(8)
 	row.add_theme_constant_override("separation", 8)
+	var col := SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.DIM
 	for index in columns.size():
 		var align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT
 		if index < aligns.size():
 			align = aligns[index]
 		var text := I18n.t(String(columns[index]))
-		row.add_child(cell(text, float(ratios[index]), align, SmaUiTheme.DIM, 11))
+		row.add_child(cell(text, float(ratios[index]), align, col, 11))
 	return row
 
 

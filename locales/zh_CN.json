@@ -6536,8 +6536,15 @@
   "story.reportExported": "毕业成绩单已导出为 JSON 文件。",
   "settings.themePixel": "经典像素终端（A+B 融合）",
   "market.trend": "20日走势",
-  "pixelOffice.tier1": "见习书房 · 单屏看盘台",
-  "pixelOffice.tier2": "远望学院 · 量化研究隔间",
-  "pixelOffice.tier3": "远望一期 · 基金交易大厅",
-  "pixelOffice.alert": "⚠ 风控 / 保证金警报"
+  "pixelOffice.tier1": "远望见习大厅",
+  "pixelOffice.tier2": "量化研究工作室",
+  "pixelOffice.tier3": "远望一期基金",
+  "pixelOffice.alert": "⚠ 风控 / 保证金警报",
+  "pixelOffice.toggle": "交易室",
+  "pixelOffice.mentorWelcome": "首席导师 · 林岚",
+  "pixelOffice.tipDefault": "留意均线趋势与买卖价差！",
+  "pixelOffice.tipIntro": "先给 APLA 写计划再下单！",
+  "pixelOffice.tipFund": "严控回撤，守住受托底线。",
+  "pixelOffice.tipBull": "大盘走强，切忌盲目追高！",
+  "pixelOffice.tipBear": "大盘承压，留足现金缓冲。"
 }

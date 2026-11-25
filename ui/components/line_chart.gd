@@ -63,7 +63,8 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), SmaUiTheme.BG_DEEP)
 	if values.size() < 2:
 		return
-	var font := get_theme_default_font()
+	var font := SmaUiTheme.pixel_font_10() if SmaUiTheme.is_pixel() else get_theme_default_font()
+	var axis_px := 10 if SmaUiTheme.is_pixel() else 9
 	var left := 64.0
 	var right := size.x - 14.0
 	var top := 12.0
@@ -94,12 +95,12 @@ func _draw() -> void:
 		points.append(Vector2(x, y))
 	draw_polyline(points, color, 2.0, true)
 	draw_string(font, Vector2(4, top + 4), _format_axis(high, low),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, SmaUiTheme.DIM)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, axis_px, SmaUiTheme.DIM)
 	draw_string(font, Vector2(4, bottom + 4), _format_axis(low, high),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, SmaUiTheme.DIM)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, axis_px, SmaUiTheme.DIM)
 	if start_label != "":
 		draw_string(font, Vector2(left, size.y - 6), start_label,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, SmaUiTheme.DIM)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, axis_px, SmaUiTheme.DIM)
 	if end_label != "":
 		draw_string(font, Vector2(left, size.y - 6), end_label,
-			HORIZONTAL_ALIGNMENT_RIGHT, right - left, 9, SmaUiTheme.DIM)
+			HORIZONTAL_ALIGNMENT_RIGHT, right - left, axis_px, SmaUiTheme.DIM)

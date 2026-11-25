@@ -43,10 +43,6 @@ func refresh(_reason: String = "") -> void:
 	if status != "active":
 		_render_setup(status == "closed")
 		return
-	if SmaUiTheme.is_pixel():
-		var office := SmaPixelOfficeBanner.new()
-		office.setup(game)
-		_body.add_child(office)
 	_render_metrics()
 	_render_tabs()
 	match _active_tab:

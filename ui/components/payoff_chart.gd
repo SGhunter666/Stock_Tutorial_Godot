@@ -25,7 +25,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), SmaUiTheme.BG_DEEP)
 	if values.size() < 2:
 		return
-	var font := get_theme_default_font()
+	var font := SmaUiTheme.pixel_font_10() if SmaUiTheme.is_pixel() else get_theme_default_font()
 	var left := 62.0
 	var right := size.x - 16.0
 	var top := 12.0

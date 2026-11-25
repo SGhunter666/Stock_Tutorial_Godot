@@ -48,36 +48,39 @@ func _build() -> void:
 	add_child(center)
 
 	_panel = PanelContainer.new()
-	_panel.custom_minimum_size = Vector2(820, 0)
+	_panel.custom_minimum_size = Vector2(900 if SmaUiTheme.is_pixel() else 820, 0)
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	var style := StyleBoxFlat.new()
-	style.bg_color = SmaUiTheme.PANEL
-	style.border_color = SmaUiTheme.ACCENT_DARK
-	style.anti_aliasing = not SmaUiTheme.is_pixel()
-	style.set_border_width_all(2 if SmaUiTheme.is_pixel() else 1)
-	style.set_corner_radius_all(0 if SmaUiTheme.is_pixel() else 14)
-	style.set_content_margin_all(22)
-	style.shadow_color = Color(0, 0, 0, 0.72 if SmaUiTheme.is_pixel() else 0.45)
-	style.shadow_size = 0 if SmaUiTheme.is_pixel() else 18
 	if SmaUiTheme.is_pixel():
-		style.shadow_offset = Vector2(5, 5)
-	_panel.add_theme_stylebox_override("panel", style)
+		_panel.add_theme_stylebox_override("panel",
+			SmaPixelArt.card_box(Color("#0d1729"), SmaUiTheme.ACCENT, Color("#040812"), 20, true))
+	else:
+		var style := StyleBoxFlat.new()
+		style.bg_color = SmaUiTheme.PANEL
+		style.border_color = SmaUiTheme.ACCENT_DARK
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(14)
+		style.set_content_margin_all(22)
+		style.shadow_color = Color(0, 0, 0, 0.45)
+		style.shadow_size = 18
+		_panel.add_theme_stylebox_override("panel", style)
 	center.add_child(_panel)
 
 	var root := SmaKit.vbox(12)
 	_panel.add_child(root)
 	_mood_bar = ColorRect.new()
-	_mood_bar.custom_minimum_size.y = 3
+	_mood_bar.custom_minimum_size.y = 4 if SmaUiTheme.is_pixel() else 3
 	_mood_bar.color = SmaUiTheme.ACCENT_DARK
 	root.add_child(_mood_bar)
 	var head := SmaKit.hbox(10)
-	_title = SmaKit.label("", 12, SmaUiTheme.DIM)
-	_speaker = SmaKit.label("", 16, SmaUiTheme.ACCENT)
+	_title = SmaKit.label("", 12, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.DIM)
+	var speaker_pill := PanelContainer.new()
+	speaker_pill.add_theme_stylebox_override("panel", SmaUiTheme.readout_style(10, 4, SmaUiTheme.ACCENT))
+	_speaker = SmaKit.label("", 18 if SmaUiTheme.is_pixel() else 16, SmaUiTheme.ACCENT)
+	speaker_pill.add_child(_speaker)
 	head.add_child(_title)
 	head.add_child(SmaKit.hspacer())
-	head.add_child(_speaker)
+	head.add_child(speaker_pill)
 	_backlog_btn = SmaKit.toggle(I18n.t("story.backlog"))
-	_backlog_btn.add_theme_font_size_override("font_size", 10)
 	_backlog_btn.toggled.connect(func(on: bool):
 		if _backlog_panel != null:
 			_backlog_panel.visible = on
@@ -95,19 +98,22 @@ func _build() -> void:
 	_backlog_panel.add_child(backlog_scroll)
 	root.add_child(_backlog_panel)
 
-	var body := SmaKit.hbox(16)
+	var body := SmaKit.hbox(18)
 	root.add_child(body)
 	_portrait_frame = PanelContainer.new()
-	_portrait_frame.custom_minimum_size = Vector2(168, 224)
+	_portrait_frame.custom_minimum_size = Vector2(172, 228)
 	_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_portrait_frame.visible = false
-	var portrait_style := StyleBoxFlat.new()
-	portrait_style.bg_color = Color(0.04, 0.08, 0.13, 1.0)
-	portrait_style.anti_aliasing = not SmaUiTheme.is_pixel()
-	portrait_style.set_border_width_all(2)
-	portrait_style.set_corner_radius_all(0 if SmaUiTheme.is_pixel() else 10)
-	portrait_style.set_content_margin_all(2)
-	_portrait_frame.add_theme_stylebox_override("panel", portrait_style)
+	if SmaUiTheme.is_pixel():
+		_portrait_frame.add_theme_stylebox_override("panel",
+			SmaPixelArt.card_box(Color("#08111f"), SmaUiTheme.ACCENT, Color("#040811"), 4, false))
+	else:
+		var portrait_style := StyleBoxFlat.new()
+		portrait_style.bg_color = Color(0.04, 0.08, 0.13, 1.0)
+		portrait_style.set_border_width_all(2)
+		portrait_style.set_corner_radius_all(10)
+		portrait_style.set_content_margin_all(2)
+		_portrait_frame.add_theme_stylebox_override("panel", portrait_style)
 	_portrait = TextureRect.new()
 	_portrait.custom_minimum_size = Vector2(164, 220)
 	_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -117,9 +123,9 @@ func _build() -> void:
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_portrait_frame.add_child(_portrait)
 	body.add_child(_portrait_frame)
-	_text = SmaKit.label("", 15)
+	_text = SmaKit.label("", 18 if SmaUiTheme.is_pixel() else 15)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_text.custom_minimum_size.y = 96
+	_text.custom_minimum_size.y = 112
 	_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(_text)
 
@@ -232,9 +238,13 @@ func refresh() -> void:
 		if texture != null:
 			_portrait.texture = texture
 			_portrait_frame.visible = true
-			var portrait_style := _portrait_frame.get_theme_stylebox("panel") as StyleBoxFlat
-			if portrait_style != null:
-				portrait_style.border_color = accent
+			if SmaUiTheme.is_pixel():
+				_portrait_frame.add_theme_stylebox_override("panel",
+					SmaPixelArt.card_box(Color("#08111f"), accent, Color("#040811"), 4, false))
+			else:
+				var portrait_style := _portrait_frame.get_theme_stylebox("panel") as StyleBoxFlat
+				if portrait_style != null:
+					portrait_style.border_color = accent
 		else:
 			_portrait_frame.visible = false
 	else:
@@ -290,9 +300,11 @@ func _is_typing() -> bool:
 	return _type_tween != null and _type_tween.is_valid() and _type_tween.is_running()
 
 
-func _focus_choice(button: Button) -> void:
-	if is_instance_valid(button) and button.is_inside_tree() and button.is_visible_in_tree():
-		button.grab_focus()
+func _focus_choice(button: Variant) -> void:
+	if button != null and is_instance_valid(button):
+		var b := button as Button
+		if b != null and b.is_inside_tree() and b.is_visible_in_tree():
+			b.grab_focus()
 
 
 func _advance() -> void:

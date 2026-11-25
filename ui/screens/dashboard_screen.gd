@@ -25,10 +25,6 @@ func refresh(_reason: String = "") -> void:
 	if game == null or not game.started:
 		return
 	_render_header()
-	if SmaUiTheme.is_pixel():
-		var office := SmaPixelOfficeBanner.new()
-		office.setup(game)
-		_body.add_child(office)
 	_body.add_child(_render_objective())
 	if game.has_intro_task():
 		_body.add_child(_render_intro())

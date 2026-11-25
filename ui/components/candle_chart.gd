@@ -189,14 +189,15 @@ func _compute_bollinger() -> void:
 
 
 func _draw() -> void:
-	_font = get_theme_default_font()
+	_font = SmaUiTheme.pixel_font_10() if SmaUiTheme.is_pixel() else get_theme_default_font()
+	var title_font := SmaUiTheme.pixel_font_12() if SmaUiTheme.is_pixel() else _font
 	_font_size = 10
 	draw_rect(Rect2(Vector2.ZERO, size), SmaUiTheme.BG_DEEP)
 	if title_text != "":
-		draw_string(_font, Vector2(12, 20), title_text,
+		draw_string(title_font, Vector2(12, 20), title_text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, SmaUiTheme.MUTED)
 	if candles.is_empty():
-		draw_string(_font, Vector2(12, size.y * 0.5), I18n.t("chart.no_data"),
+		draw_string(title_font, Vector2(12, size.y * 0.5), I18n.t("chart.no_data"),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, SmaUiTheme.DIM)
 		return
 	_ensure_series_cache()
@@ -582,14 +583,15 @@ func _draw_ma_legend(abs_index: int, y: float) -> void:
 
 
 func _draw_metric(x: float, y: float, label: String, value: String, color: Color,
-		font_px: int = 11) -> float:
+		font_px: int = 10) -> float:
+	var px := 10 if SmaUiTheme.is_pixel() else font_px
 	if label != "":
 		draw_string(_font, Vector2(x, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1,
-			font_px, SmaUiTheme.DIM)
-		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_px).x
+			px, SmaUiTheme.DIM)
+		x += _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
 	draw_string(_font, Vector2(x, y), value, HORIZONTAL_ALIGNMENT_LEFT, -1,
-		font_px, color)
-	x += _font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, font_px).x
+		px, color)
+	x += _font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x
 	return x + 10.0
 
 
