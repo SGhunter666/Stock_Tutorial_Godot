@@ -231,7 +231,8 @@ func _render_display() -> void:
 		if String(game.settings.get("windowPreset", "auto")) == preset:
 			preset_select.select(preset_select.item_count - 1)
 	preset_select.custom_minimum_size.x = 160
-	preset_select.disabled = String(game.settings.get("displayMode", "windowed")) == "fullscreen"
+	preset_select.disabled = String(game.settings.get("displayMode", "windowed")) == "fullscreen" \
+		or SmaWebIo.is_web()
 	preset_select.item_selected.connect(func(index):
 		game.set_window_preset(String(preset_select.get_item_metadata(index))))
 	preset_row.add_child(preset_select)
@@ -335,6 +336,9 @@ func _save_now() -> void:
 
 
 func _export() -> void:
+	if SmaWebIo.is_web():
+		game.export_save_web()
+		return
 	if _export_dialog == null:
 		_export_dialog = FileDialog.new()
 		_export_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
@@ -347,6 +351,11 @@ func _export() -> void:
 
 
 func _import() -> void:
+	if SmaWebIo.is_web():
+		SmaWebIo.prompt_json_upload(func(raw_json: String):
+			game.import_save_json_text(raw_json)
+			refresh())
+		return
 	if _import_dialog == null:
 		_import_dialog = FileDialog.new()
 		_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE

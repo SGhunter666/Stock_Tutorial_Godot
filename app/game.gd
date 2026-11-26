@@ -635,6 +635,13 @@ func apply_display() -> void:
 	var window := get_window()
 	if window == null:
 		return
+	if OS.has_feature("web"):
+		if String(settings.get("displayMode", "windowed")) == "fullscreen":
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		_apply_ui_scale(window, DisplayServer.window_get_size())
+		return
 	window.min_size = SmaDisplay.MIN_SIZE
 	var usable := DisplayServer.screen_get_usable_rect()
 	var keep_window := OS.get_environment("SMA_KEEP_WINDOW") == "1"
@@ -2678,8 +2685,25 @@ func export_save(target_path: String) -> bool:
 	return true
 
 
+func export_save_web() -> bool:
+	if started and not sandbox_mode:
+		save_game(false)
+	var payload := SmaSaveService.read(save_path + (".bak" if _keep_save_backup else ""))
+	if payload.is_empty():
+		toast_requested.emit(I18n.t("toast.no_save"))
+		return false
+	if not SmaWebIo.download_json(payload, "Farview_Save_Slot%d.json" % active_slot):
+		return false
+	toast_requested.emit(I18n.t("toast.exported"))
+	return true
+
+
 func import_save(source_path: String) -> bool:
 	var payload := SmaSaveService.read(source_path)
+	return import_save_payload(payload)
+
+
+func import_save_payload(payload: Dictionary) -> bool:
 	var loaded := _decode_save(payload)
 	if loaded.is_empty():
 		toast_requested.emit(I18n.t("toast.importInvalid"))
@@ -2690,6 +2714,14 @@ func import_save(source_path: String) -> bool:
 	_apply_loaded_save(loaded)
 	toast_requested.emit(I18n.t("toast.importOk"))
 	return true
+
+
+func import_save_json_text(raw_json: String) -> bool:
+	var parsed: Variant = JSON.parse_string(raw_json)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		toast_requested.emit(I18n.t("toast.importInvalid"))
+		return false
+	return import_save_payload(parsed as Dictionary)
 
 
 func has_save() -> bool:
@@ -2736,6 +2768,7 @@ func _write_save(payload: Dictionary) -> bool:
 	if not SmaSaveService.write(payload, save_path, _keep_save_backup):
 		return false
 	_keep_save_backup = false
+	SmaWebIo.flush_idb()
 	return true
 
 
@@ -2989,6 +3022,9 @@ func graduation_report() -> Dictionary:
 func export_graduation_report(path: String) -> bool:
 	var report := graduation_report()
 	var ok := SmaSaveService.export_to(path, report)
+	SmaWebIo.flush_idb()
+	if ok and SmaWebIo.is_web():
+		SmaWebIo.download_json(report, "Farview_Report_Slot%d.json" % active_slot)
 	toast_requested.emit(I18n.t("story.reportExported" if ok else "toast.saveFailed"))
 	return ok
 

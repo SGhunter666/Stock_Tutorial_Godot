@@ -1,12 +1,15 @@
 # Stock Market Academy
 
+[![Build, Test & Deploy Web](https://github.com/SGhunter666/Stock_Tutorial_Godot/actions/workflows/deploy-web.yml/badge.svg)](https://github.com/SGhunter666/Stock_Tutorial_Godot/actions/workflows/deploy-web.yml)
+
 A single-player **16-bit pixel-art** financial education and trading simulation built with **Godot 4** — fusing an interactive Kairosoft-inspired pixel trading floor with a crisp PC-98 CRT terminal, procedural 16-bit FM chiptune music, stepped pixel indicator curves, and segmented LED order-book depth. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-12` (100% Full 16-Bit Pixel Edition · Pixel Desk Renovation, Animated Portraits & Daily Seed Sprint)
+- Version: `beta-13` (100% Full 16-Bit Pixel Edition · Web HTML5 Play-in-Browser)
+- **🌐 Play in Browser (No Download)**: <https://sghunter666.github.io/Stock_Tutorial_Godot/> (IndexedDB persistent saves + native browser PNG diploma poster & JSON save import/export)
 - Engine: Godot `4.7+` (tested on `4.7.2`)
-- Renderer: GL Compatibility (integer bitmap font scaling & `NEAREST` filtering)
+- Renderer: GL Compatibility (integer bitmap font scaling, `NEAREST` filtering, WebGL 2 single-threaded WASM)
 - Languages: Simplified Chinese / English
-- Platforms: Windows & macOS (export presets included), Linux from source
+- Platforms: Web (HTML5 / WASM), Windows & macOS (all 3 export presets included), Linux from source
 - Repository: <https://github.com/SGhunter666/Stock_Tutorial_Godot>
 - Original project: <https://github.com/SGhunter666/STOCK_Tutorial>
 

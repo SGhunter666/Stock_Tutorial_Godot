@@ -104,7 +104,8 @@ func _build() -> void:
 	_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status_label.clip_text = true
 	ctrl_row.add_child(_status_label)
-	ctrl_row.add_child(SmaKit.arcade_button(I18n.t("poster.saveDesktop"), "buy", _save_to_desktop))
+	var dl_key := "poster.saveBrowser" if SmaWebIo.is_web() else "poster.saveDesktop"
+	ctrl_row.add_child(SmaKit.arcade_button(I18n.t(dl_key), "buy", _save_to_desktop))
 	ctrl_row.add_child(SmaKit.button(I18n.t("common.close"), _close))
 	outer.add_child(ctrl_bar)
 
@@ -268,17 +269,12 @@ func _auto_export_initial() -> void:
 			else I18n.t("toast.saveFailed")
 
 
-func capture_to_png(target_path: String) -> bool:
-	if DisplayServer.get_name() == "headless":
-		return write_headless_png(report_data, target_path)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	await RenderingServer.frame_post_draw
+func _crop_poster_image() -> Image:
 	if _poster_card == null or not is_instance_valid(_poster_card):
-		return false
+		return null
 	var vp_img := get_viewport().get_texture().get_image()
 	if vp_img == null or vp_img.is_empty():
-		return write_headless_png(report_data, target_path)
+		return null
 	var vp_rect := get_viewport_rect().size
 	var scale_x := float(vp_img.get_width()) / maxf(1.0, vp_rect.x)
 	var scale_y := float(vp_img.get_height()) / maxf(1.0, vp_rect.y)
@@ -287,18 +283,45 @@ func capture_to_png(target_path: String) -> bool:
 	var ry := clampi(int(round(grect.position.y * scale_y)), 0, vp_img.get_height() - 2)
 	var rw := clampi(int(round(grect.size.x * scale_x)), 1, vp_img.get_width() - rx)
 	var rh := clampi(int(round(grect.size.y * scale_y)), 1, vp_img.get_height() - ry)
-	var cropped := vp_img.get_region(Rect2i(rx, ry, rw, rh))
+	return vp_img.get_region(Rect2i(rx, ry, rw, rh))
+
+
+func capture_to_png(target_path: String) -> bool:
+	if DisplayServer.get_name() == "headless":
+		return write_headless_png(report_data, target_path)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var cropped := _crop_poster_image()
+	if cropped == null:
+		return write_headless_png(report_data, target_path)
 	var global_target := ProjectSettings.globalize_path(target_path) \
 		if target_path.begins_with("user://") or target_path.begins_with("res://") else target_path
 	DirAccess.make_dir_recursive_absolute(global_target.get_base_dir())
-	return cropped.save_png(global_target) == OK
+	var ok := cropped.save_png(global_target) == OK
+	if ok:
+		SmaWebIo.flush_idb()
+	return ok
 
 
 func _save_to_desktop() -> void:
+	var tag := String(daily_data.get("code", "Slot%d" % (int(game.active_slot) if game != null else 1)))
+	if SmaWebIo.is_web():
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var cropped := _crop_poster_image()
+		var buf := cropped.save_png_to_buffer() if cropped != null else PackedByteArray()
+		var fname := "Farview_Poster_%s.png" % tag
+		var ok_web := SmaWebIo.download_bytes(buf, fname, "image/png")
+		if _status_label != null and is_instance_valid(_status_label):
+			_status_label.text = I18n.t("poster.savedBrowser", {"name": fname}) if ok_web \
+				else I18n.t("toast.saveFailed")
+		if ok_web and game != null:
+			game.toast(I18n.t("poster.savedToast"))
+		return
 	var desktop := OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP)
 	if desktop == "":
 		desktop = ProjectSettings.globalize_path("user://saves")
-	var tag := String(daily_data.get("code", "Slot%d" % (int(game.active_slot) if game != null else 1)))
 	var target := "%s/Farview_Poster_%s.png" % [desktop, tag]
 	var ok := await capture_to_png(target)
 	if _status_label != null and is_instance_valid(_status_label):

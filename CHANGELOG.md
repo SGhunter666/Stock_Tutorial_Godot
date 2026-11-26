@@ -1,5 +1,12 @@
 # Changelog
 
+## beta-13
+
+- **网页免下载即点即玩版（Web HTML5 / 单线程 WASM + GitHub Pages 自动部署）**：
+  - 在 `export_presets.cfg` 新增 `Web` 导出预设（`variant/thread_support=false` 免 `SharedArrayBuffer` 跨域头直跑、自适应全视口 `image-rendering: pixelated` 画布、16-bit 像素图标启动页与 CRT 分段绿光加载进度条），并设置 `audio/general/default_playback_type.web=0` 使程序化合成的 PC-98 FM 芯片音乐与音效在浏览器主线程流畅混音。
+  - 新增跨平台 Web I/O 桥接模块（`app/web_io.gd`）：网页端保存时主动同步 Emscripten `IndexedDB`（刷新/重开页面不丢档）；像素毕业证书/战报海报（`report_poster.gd`）与成绩单/职业存档导出在网页端自动调用 `JavaScriptBridge.download_buffer` 触发浏览器原生 PNG / JSON 文件下载；设置页「导入存档」在网页端唤起系统原生文件选择器读取本地 `.json` 并完整校验导入。
+  - 新增 `.github/workflows/deploy-web.yml` CI/CD 流水线：每次推送至 `main` 自动校验中英词条 100% 对齐、运行全部无头单元与集成测试门禁、编译导出 HTML5/WASM 制品，并一键自动发布至 GitHub Pages。
+
 ## beta-12
 
 - **开罗式「像素办公室工位养成 & 基金专员入驻」（`core/office.gd` + `pixel_office_banner.gd` + `office_popup_dialog.gd`）**：新增零实盘本金干扰的确定性装修点（`RP`）经济系统，支持购置与自由收纳 6 款像素办公家具（意式浓缩咖啡机、招财像素金猫、四联彭博盯盘矩阵、全球三地交易所挂钟、低延迟量化刀片机柜、华尔街鎏金冲锋铜牛）；已雇佣的基金专员（研究员/交易员/风控官/量化研究员等）实时以专属配色像素小人入驻全景交易大厅窗前工位。

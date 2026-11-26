@@ -1,0 +1,116 @@
+name: Build, Test & Deploy Web (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-${{ github.ref }}"
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_RELEASE: "4.7.2-stable"
+
+jobs:
+  build-web:
+    name: Headless Tests & HTML5 Export
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify zh_CN / en locale key parity
+        run: |
+          python3 - <<'PY'
+          import json
+          zh = json.load(open("locales/zh_CN.json", encoding="utf-8"))
+          en = json.load(open("locales/en.json", encoding="utf-8"))
+          diff = set(zh.keys()) ^ set(en.keys())
+          assert not diff, f"Locale key mismatch: {sorted(diff)}"
+          print(f"Locale parity OK ({len(zh)} keys)")
+          PY
+
+      - name: Cache Godot ${{ env.GODOT_RELEASE }} & Web template
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/godot
+            ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+          key: godot-web-${{ env.GODOT_RELEASE }}-v1
+
+      - name: Install Godot ${{ env.GODOT_RELEASE }} & Web single-thread template
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/bin ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable /tmp/gd
+          curl -fsSL -o /tmp/gd/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${{ env.GODOT_RELEASE }}/Godot_v${{ env.GODOT_RELEASE }}_linux.x86_64.zip"
+          unzip -q /tmp/gd/godot.zip -d /tmp/gd
+          mv "/tmp/gd/Godot_v${{ env.GODOT_RELEASE }}_linux.x86_64" ~/.local/bin/godot
+          chmod +x ~/.local/bin/godot
+
+          curl -fsSL -o /tmp/gd/templates.tpz \
+            "https://github.com/godotengine/godot-builds/releases/download/${{ env.GODOT_RELEASE }}/Godot_v${{ env.GODOT_RELEASE }}_export_templates.tpz"
+          unzip -q -j /tmp/gd/templates.tpz \
+            "templates/web_nothreads_release.zip" \
+            "templates/version.txt" \
+            -d ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/
+          rm -rf /tmp/gd
+
+      - name: Import Godot project classes & assets
+        run: |
+          ~/.local/bin/godot --headless --path . --import --quit
+
+      - name: Run headless unit test suite
+        run: |
+          ~/.local/bin/godot --headless --path . --script res://tests/run_tests.gd
+
+      - name: Run headless full-scene integration suite
+        run: |
+          ~/.local/bin/godot --headless --path . res://tests/integration.tscn
+
+      - name: Export HTML5 Web release (single-threaded WASM)
+        run: |
+          mkdir -p build/web
+          touch build/.gdignore
+          ~/.local/bin/godot --headless --path . --export-release "Web" build/web/index.html
+          touch build/web/.nojekyll
+          test -s build/web/index.html
+          test -s build/web/index.wasm
+          test -s build/web/index.pck
+          ls -lh build/web/
+
+      - name: Upload downloadable Web HTML5 ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockMarketAcademy-Web-HTML5
+          path: build/web/
+          if-no-files-found: error
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build-web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

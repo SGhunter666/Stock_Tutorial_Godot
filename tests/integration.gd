@@ -798,6 +798,11 @@ func _ready() -> void:
 	var import_path := Game.save_path.get_basename() + "-import.json"
 	if not Game.export_save(import_path) or not Game.import_save(import_path):
 		failures.append("valid career export did not import")
+	var exported_raw_json := FileAccess.get_file_as_string(import_path)
+	if not Game.import_save_json_text(exported_raw_json):
+		failures.append("import_save_json_text failed on valid exported JSON")
+	if Game.import_save_json_text("{bad json"):
+		failures.append("import_save_json_text accepted malformed JSON")
 	var valid_save := FileAccess.get_file_as_bytes(Game.save_path)
 	var bad_save := SmaSaveService.read(Game.save_path)
 	bad_save["exchange"]["account"]["positions"]["APLA"] = {"qty": 5}

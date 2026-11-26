@@ -1,12 +1,15 @@
 # Stock Market Academy / 远望交易学院
 
+[![Build, Test & Deploy Web](https://github.com/SGhunter666/Stock_Tutorial_Godot/actions/workflows/deploy-web.yml/badge.svg)](https://github.com/SGhunter666/Stock_Tutorial_Godot/actions/workflows/deploy-web.yml)
+
 一个使用 **Godot 4** 开发的 **16-Bit 经典像素风**单机金融教学与交易模拟游戏。融合「开罗式动态像素交易室」与「PC-98 复古 CRT 交易终端」，内置 16-bit FM 芯片音乐合成器、可点击互动像素大厅与阶梯像素 K 线图。玩家从个人投资者起步，在确定性的模拟市场中学习交易、风控、期权、期货、多资产、量化、基金管理和职业决策，并在一段完整的职场剧情中从学徒成长为基金掌舵人。
 
-- 当前版本：`beta-12`（100% Full 16-Bit Pixel Edition · 像素养成 / 动态立绘 / 每日同种子速通）
+- 当前版本：`beta-13`（100% Full 16-Bit Pixel Edition · 支持 Web 网页免下载即点即玩）
+- **🌐 在线即点即玩（Web HTML5 版）**：<https://sghunter666.github.io/Stock_Tutorial_Godot/>（浏览器自动通过 IndexedDB 保存进度，支持原生下载像素毕业海报 PNG 与导入/导出存档 JSON）
 - 引擎：Godot `4.7+`（已在 `4.7.2` 测试）
-- 渲染：GL Compatibility（全局整数像素倍率与 `NEAREST` 采样）
+- 渲染：GL Compatibility（全局整数像素倍率与 `NEAREST` 采样，WebGL 2 单线程 WASM 免跨域头直跑）
 - 语言：简体中文 / English
-- 平台：Windows / macOS（内置双平台导出预设）、Linux 可从源码运行
+- 平台：Web（HTML5 / WASM）、Windows、macOS（内置三平台导出预设）、Linux 可从源码运行
 - 仓库：<https://github.com/SGhunter666/Stock_Tutorial_Godot>
 - 原始项目：<https://github.com/SGhunter666/STOCK_Tutorial>
 

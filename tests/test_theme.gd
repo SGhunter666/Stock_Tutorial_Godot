@@ -125,3 +125,13 @@ func run() -> void:
 	eq(SmaPortraitAnimator.resolve_mood("black_friday", "Calm text"), "crisis", "crisis story resolves crisis mood")
 	eq(SmaPortraitAnimator.resolve_mood("opening", "恭喜你稳健通关"), "praise", "praise text resolves praise mood")
 	eq(SmaPortraitAnimator.resolve_mood("opening", "你的止损计划是什么？"), "focus", "question resolves focus mood")
+
+	describe("pixel-beta13-web-io-bridge")
+	eq(SmaWebIo.is_web(), false, "desktop/headless runtime reports is_web() == false")
+	eq(SmaWebIo.download_bytes(PackedByteArray([1, 2, 3]), "test.bin", "application/octet-stream"),
+		false, "download_bytes safely returns false outside web runtime")
+	eq(SmaWebIo.download_json({"ok": true}, "test.json"),
+		false, "download_json safely returns false outside web runtime")
+	eq(SmaWebIo.prompt_json_upload(func(_s): pass),
+		false, "prompt_json_upload safely returns false outside web runtime")
+	SmaWebIo.flush_idb()
