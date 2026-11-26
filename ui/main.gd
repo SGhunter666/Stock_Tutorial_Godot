@@ -831,6 +831,12 @@ func _on_office_hotspot(kind: String, payload: Dictionary) -> void:
 			add_child(dlg)
 			dlg.navigate_requested.connect(func(dest: String): navigate(dest))
 			dlg.setup(Game, "mentor", String(payload.get("mentor", "lin_lan")))
+		"shop":
+			_play_sound("story")
+			var dlg := SmaOfficePopupDialog.new()
+			add_child(dlg)
+			dlg.navigate_requested.connect(func(dest: String): navigate(dest))
+			dlg.setup(Game, "shop")
 		"honors":
 			_play_sound("achievement")
 			var dlg := SmaOfficePopupDialog.new()
@@ -846,6 +852,14 @@ func _on_office_hotspot(kind: String, payload: Dictionary) -> void:
 			_play_sound("pixel_click")
 			var sym := String(payload.get("ticker", "APLA"))
 			open_ticker(sym, "etf" if SmaEtfs.is_etf(sym) else "trade")
+
+
+func open_poster(daily_info: Dictionary = {}) -> SmaReportPoster:
+	_play_sound("achievement")
+	var poster := SmaReportPoster.new()
+	add_child(poster)
+	poster.setup(Game, daily_info)
+	return poster
 
 
 func _build_fast_forward_overlay() -> void:

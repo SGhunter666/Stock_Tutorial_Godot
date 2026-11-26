@@ -2,7 +2,7 @@
 
 A single-player **16-bit pixel-art** financial education and trading simulation built with **Godot 4** — fusing an interactive Kairosoft-inspired pixel trading floor with a crisp PC-98 CRT terminal, procedural 16-bit FM chiptune music, stepped pixel indicator curves, and segmented LED order-book depth. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-11` (100% Full 16-Bit Pixel Edition)
+- Version: `beta-12` (100% Full 16-Bit Pixel Edition · Pixel Desk Renovation, Animated Portraits & Daily Seed Sprint)
 - Engine: Godot `4.7+` (tested on `4.7.2`)
 - Renderer: GL Compatibility (integer bitmap font scaling & `NEAREST` filtering)
 - Languages: Simplified Chinese / English

@@ -819,6 +819,72 @@ static func icon(kind: String) -> ImageTexture:
 				"ksk..ksk",
 				"........",
 			]
+		"prop_espresso":
+			rows = [
+				".kkkkkk.",
+				"krrrrrrk",
+				"kssssssk",
+				"ksdkkdsk",
+				"ksswwssk",
+				"ksswwssk",
+				"kddddddk",
+				"kkkkkkkk",
+			]
+		"prop_cat":
+			rows = [
+				".kk..kk.",
+				"kYYkkYYk",
+				"kYkYYkYk",
+				"kYYYYYYk",
+				"krrrrrrk",
+				"kYYyyYYk",
+				"kYYyyYYk",
+				".kkkkkk.",
+			]
+		"prop_bloomberg":
+			rows = [
+				"kkkkkkkk",
+				"kddcGddk",
+				"kkkkkkkk",
+				"kddgGddk",
+				"kkkkkkkk",
+				"...kk...",
+				".kssssk.",
+				"kkkkkkkk",
+			]
+		"prop_clocks":
+			rows = [
+				".kkkkkk.",
+				"kywwwwyk",
+				"kwdkwkwk",
+				"kwwkkwwk",
+				"kwwwwwwk",
+				"kywwwwyk",
+				".kkkkkk.",
+				"........",
+			]
+		"prop_server":
+			rows = [
+				".kkkkkk.",
+				"kddddddk",
+				"kdGccddk",
+				"kddddddk",
+				"kdgyyddk",
+				"kddddddk",
+				"kdGccddk",
+				".kkkkkk.",
+			]
+		"prop_bull":
+			rows = [
+				"kY....Yk",
+				".kYYYYk.",
+				"kYYYYYYk",
+				"kyyyyyyk",
+				".kyyyyk.",
+				".kykkyk.",
+				"kkkkkkkk",
+				"kooooook",
+			]
 		_:
 			rows = [
 				".kkkkkk.",

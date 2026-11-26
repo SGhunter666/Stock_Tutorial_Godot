@@ -20,6 +20,12 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA12_ONLY") == "1":
+		await _capture_beta12_showcase()
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA10_ONLY") == "1":
 		Game.new_game("screenshot-seed")
 		await _settle(4)
@@ -722,6 +728,128 @@ func _capture_beta10_showcase() -> void:
 	await _shot("beta11_kairosoft_market")
 	Game.set_theme("pixel")
 	await _settle(5)
+
+
+func _capture_beta12_showcase() -> void:
+	var had_daily := SmaSaveService.exists(Game.DAILY_RECORDS_PATH)
+	var orig_daily := Game.daily_records.duplicate(true)
+
+	Game.new_game("beta12-showcase")
+	await _settle(4)
+	_dismiss_story()
+	Game.set_player_name("林小望")
+	Game.career["rank"] = 4
+	Game.career["certificates"] = [
+		{"id": "core_foundations", "day": 0},
+		{"id": "risk_execution", "day": 2},
+		{"id": "quant_derivatives", "day": 5},
+	]
+	Game.academy["xp"] = 2400
+	Game.academy["achievements"] = ["first_trade", "profit_1k", "diversified", "unit_master"]
+	for uid in ["u1", "u2", "u3", "u4", "u17", "u19", "u20", "u32"]:
+		if Game.academy["units"].has(uid):
+			Game.academy["units"][uid]["completed"] = true
+	Game.fund["status"] = "active"
+	Game.fund["name"] = "远望阿尔法一号"
+	Game.fund["employees"] = [
+		{"role": "research", "hiredDay": 1},
+		{"role": "trader", "hiredDay": 2},
+		{"role": "risk", "hiredDay": 3},
+		{"role": "quant", "hiredDay": 4},
+	]
+	Game.submit_order({"ticker": "APLA", "side": "buy", "type": "market", "qty": 60})
+	_dismiss_story()
+	for i in 10:
+		Game.step_minute()
+	Game.exchange.state["account"]["equityHistory"] = [
+		{"day": 0, "equity": 100000.0},
+		{"day": 1, "equity": 101280.0},
+		{"day": 2, "equity": 100850.0},
+		{"day": 3, "equity": 103420.0},
+		{"day": 4, "equity": 105190.0},
+		{"day": 5, "equity": 104760.0},
+		{"day": 6, "equity": 108640.0},
+		{"day": 7, "equity": 112480.0},
+	]
+	Game.exchange.state["account"]["cash"] = 101800.0
+
+	# Purchase 5 items and leave 1 affordable in the shop so both states show!
+	for iid in ["espresso_bar", "lucky_cat", "bloomberg_rig", "world_clocks", "bull_statue"]:
+		Game.purchase_office_item(iid)
+
+	# 1. Upgraded Kairosoft Office Banner + Trade Terminal
+	main.navigate("trade")
+	if main._office_banner != null:
+		main._office_banner.refresh_state()
+	await _settle(6)
+	await _shot("beta12_office_upgraded")
+
+	# 2. Kairosoft Renovation Workshop Modal
+	main._on_office_hotspot("shop", {})
+	await _settle(5)
+	await _shot("beta12_renovation_shop")
+	for child in main.get_children():
+		if child is SmaOfficePopupDialog:
+			child._close()
+	await _settle(3)
+
+	# 3. PC-98 Portrait Micro-Animation & Crisis Emote Badge
+	if Game.narrative != null:
+		var target_st := "black_friday" if Game.narrative.stories.has("black_friday") else "opening"
+		Game.narrative.seen.erase(target_st)
+		Game.narrative.start_story(target_st)
+		for step_i in 4:
+			if not Game.narrative.is_active():
+				break
+			var cv: Dictionary = Game.narrative.current_view()
+			if String(cv.get("portrait", "")) != "" and String(cv.get("characterId", "")) != "":
+				break
+			Game.narrative.advance()
+	await _settle(3)
+	if main._dialogue != null and main._dialogue._portrait_anim != null:
+		main._dialogue._portrait_anim.mood = "crisis"
+		main._dialogue._portrait_anim.force_mouth_open = true
+		main._dialogue._portrait_anim.queue_redraw()
+	await _settle(3)
+	await _shot("beta12_portrait_anim")
+	if main._dialogue != null and main._dialogue._portrait_anim != null:
+		main._dialogue._portrait_anim.force_mouth_open = false
+	_dismiss_story()
+	await _settle(3)
+
+	# 4. Gold-Rimmed 16-bit Pixel Diploma / Battle Poster Modal
+	var poster: SmaReportPoster = main.open_poster()
+	await _settle(6)
+	await _shot("beta12_diploma_poster")
+	if poster != null and is_instance_valid(poster):
+		if poster._saved_user_path != "":
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(poster._saved_user_path))
+		poster._close()
+	await _settle(3)
+
+	# 5. Daily Same-Seed 10-Day Sprint HUD + Leaderboard
+	Game.save_game(false)
+	Game.daily_records = SmaDailyChallenge.normalize_records([
+		{"code": "2026-11-25", "grade": "S", "score": 1542, "returnPct": 7.45, "maxDrawdownPct": 1.12, "trades": 6},
+		{"code": "2026-11-24", "grade": "A", "score": 1318, "returnPct": 4.20, "maxDrawdownPct": 0.95, "trades": 5},
+	])
+	Game.start_daily_sprint("2026-11-26")
+	Game.submit_order({"ticker": "NVDO", "side": "buy", "type": "market", "qty": 45})
+	for d in 4:
+		Game.exchange.state["dayIndex"] = d + 1
+		Game.exchange.state["account"]["equityHistory"].append({"day": d, "equity": 100000.0 + float(d + 1) * 980.0})
+	Game.exchange.state["account"]["cash"] += 3850.0
+	Game.record_daily_sprint()
+	main.navigate("challenges")
+	await _settle(6)
+	await _shot("beta12_daily_sprint")
+
+	Game.exit_sandbox()
+	Game.daily_records = orig_daily
+	if had_daily:
+		SmaSaveService.export_to(Game.DAILY_RECORDS_PATH, {"records": orig_daily})
+	else:
+		SmaSaveService.clear(Game.DAILY_RECORDS_PATH)
 
 
 func _dismiss_story() -> void:

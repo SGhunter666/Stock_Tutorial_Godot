@@ -11,7 +11,7 @@ var _sparks: Array[Dictionary] = []
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	z_index = 72
+	z_index = 35
 
 
 func _is_reduced() -> bool:

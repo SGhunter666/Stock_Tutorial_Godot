@@ -194,6 +194,10 @@ func _update_report_card() -> void:
 	_report_box.add_child(grid)
 	var export_row := SmaKit.hbox(8)
 	var export_path := "user://saves/farview_report_slot_%d.json" % int(game.active_slot)
+	export_row.add_child(SmaKit.arcade_button(I18n.t("poster.openButton"), "amber", func():
+		var m := get_tree().get_first_node_in_group("main")
+		if m != null and m.has_method("open_poster"):
+			m.open_poster()))
 	export_row.add_child(SmaKit.button(I18n.t("story.exportReport"), func():
 		game.export_graduation_report(export_path), true))
 	export_row.add_child(SmaKit.caption(export_path))

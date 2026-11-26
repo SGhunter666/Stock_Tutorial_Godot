@@ -17,6 +17,7 @@ var _backlog_btn: Button
 var _backlog_panel: PanelContainer
 var _backlog_box: VBoxContainer
 var _portrait: TextureRect
+var _portrait_anim: SmaPortraitAnimator
 var _portrait_frame: PanelContainer
 var _scene_story_id := ""
 var _scene_log: Array[Dictionary] = []
@@ -112,6 +113,9 @@ func _build() -> void:
 	_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if SmaUiTheme.is_pixel() \
 		else CanvasItem.TEXTURE_FILTER_LINEAR
 	_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_portrait_anim = SmaPortraitAnimator.new()
+	_portrait_anim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_portrait.add_child(_portrait_anim)
 	_portrait_frame.add_child(_portrait)
 	body.add_child(_portrait_frame)
 	_text = SmaKit.label("", 22 if SmaUiTheme.is_pixel() else 15)
@@ -217,8 +221,8 @@ func refresh() -> void:
 		accent = Color.html(color_text)
 	_speaker.add_theme_color_override("font_color", accent)
 	var portrait_path := String(view.get("portrait", ""))
+	var char_id := String(view.get("character", ""))
 	if portrait_path != "" and SmaUiTheme.is_pixel():
-		var char_id := String(view.get("character", ""))
 		var px_path := "res://assets/portraits/pixel/%s.png" % char_id
 		if char_id != "" and ResourceLoader.exists(px_path):
 			portrait_path = px_path
@@ -229,6 +233,10 @@ func refresh() -> void:
 		if texture != null:
 			_portrait.texture = texture
 			_portrait_frame.visible = true
+			if _portrait_anim != null:
+				_portrait_anim.configure(char_id, texture,
+					SmaPortraitAnimator.resolve_mood(story_id, body_text))
+				_portrait_anim.set_talking(_is_typing())
 			if SmaUiTheme.is_pixel():
 				_portrait_frame.add_theme_stylebox_override("panel",
 					SmaPixelArt.card_box(Color("#08111f"), accent, Color("#040811"), 4, false))
@@ -271,12 +279,19 @@ func _start_typewriter(body_text: String) -> void:
 			or bool(game.settings.get("reducedMotion", false)) \
 			or body_text.length() < 8:
 		_text.visible_characters = -1
+		if _portrait_anim != null:
+			_portrait_anim.set_talking(false)
 		return
 	_text.visible_characters = 0
+	if _portrait_anim != null:
+		_portrait_anim.set_talking(true)
 	var duration := clampf(float(body_text.length()) * 0.012, 0.25, 1.35)
 	_type_tween = create_tween()
 	_type_tween.tween_property(_text, "visible_characters", body_text.length(), duration)
-	_type_tween.tween_callback(func(): _text.visible_characters = -1)
+	_type_tween.tween_callback(func():
+		_text.visible_characters = -1
+		if _portrait_anim != null:
+			_portrait_anim.set_talking(false))
 
 
 func _finish_typewriter() -> void:
@@ -285,6 +300,8 @@ func _finish_typewriter() -> void:
 	_type_tween = null
 	if _text != null:
 		_text.visible_characters = -1
+	if _portrait_anim != null:
+		_portrait_anim.set_talking(false)
 
 
 func _is_typing() -> bool:

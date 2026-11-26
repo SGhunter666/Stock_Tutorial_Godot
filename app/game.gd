@@ -33,6 +33,7 @@ const AUTOSAVE_SECONDS := 20.0
 const MAX_STEPS_PER_FRAME := 240
 const INTRO_TICKER := "APLA"
 const INTRO_CASH_TARGET := 40.0
+const DAILY_RECORDS_PATH := "user://saves/daily_records.json"
 
 var exchange: SmaExchange = null
 var narrative: SmaStoryService = null
@@ -43,6 +44,10 @@ var career: Dictionary = SmaCareer.create_state()
 var quant: Dictionary = SmaQuant.default_config()
 var fund: Dictionary = SmaFund.create_state()
 var alerts: Dictionary = SmaAlerts.create_state()
+var office: Dictionary = SmaOffice.create_state()
+var daily_sprint_active := false
+var daily_sprint_code := ""
+var daily_records: Array = []
 var intro: Dictionary = {}
 var opening_gap: Dictionary = {}
 var opening_gap_active := false
@@ -87,6 +92,8 @@ func _ready() -> void:
 		apply_display()
 	academy = SmaAcademy.create_state()
 	history = SmaHistoryService.new()
+	var saved_daily := SmaSaveService.read(DAILY_RECORDS_PATH)
+	daily_records = SmaDailyChallenge.normalize_records(saved_daily.get("records", []))
 
 
 func _process(delta: float) -> void:
@@ -122,6 +129,8 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	if not started and SmaSaveService.exists(save_path + ".bak"):
 		_keep_save_backup = _decode_save(SmaSaveService.read(save_path)).is_empty()
 	sandbox_mode = false
+	daily_sprint_active = false
+	daily_sprint_code = ""
 	exchange = SmaExchange.new(seed_value, START_CASH)
 	academy = SmaAcademy.create_state()
 	history = SmaHistoryService.new()
@@ -130,6 +139,7 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	quant = SmaQuant.default_config()
 	fund = SmaFund.create_state()
 	alerts = SmaAlerts.create_state()
+	office = SmaOffice.create_state()
 	intro = {"plan": {}, "receipt": {}, "review": {}, "complete": false}
 	opening_gap = {}
 	opening_gap_active = false
@@ -252,6 +262,14 @@ func _advance_steps(steps: int, sample_quotes: bool = true) -> void:
 		_check_challenges()
 		_advance_career()
 		_advance_fund()
+		if daily_sprint_active and day_after >= SmaDailyChallenge.SPRINT_DAYS:
+			paused = true
+			var sprint_res := record_daily_sprint()
+			toast_requested.emit(I18n.t("daily.completedToast", {
+				"code": daily_sprint_code,
+				"grade": String(sprint_res.get("grade", "B")),
+				"score": int(sprint_res.get("score", 1000)),
+			}))
 	var call_after := _current_call_id()
 	if call_after != call_before and not call_after.is_empty():
 		toast_requested.emit(I18n.t("toast.margin_call"))
@@ -2514,6 +2532,7 @@ func start_sandbox(cash: float, seed_value: String, difficulty: String) -> Dicti
 	quant = SmaQuant.default_config()
 	fund = SmaFund.create_state()
 	alerts = SmaAlerts.create_state()
+	office = SmaOffice.create_state()
 	narrative = SmaStoryService.new()
 	narrative.setup(self)
 	narrative.load_content()
@@ -2537,11 +2556,89 @@ func exit_sandbox() -> void:
 	if not sandbox_mode:
 		return
 	sandbox_mode = false
+	daily_sprint_active = false
+	daily_sprint_code = ""
 	if has_save() and load_game():
 		return
 	started = false
 	exchange = null
 	state_changed.emit("sandbox_exit")
+
+
+# ---------------------------------------------------------------------------
+# Pixel Office Renovation & Daily Same-Seed Sprint
+# ---------------------------------------------------------------------------
+
+func office_available_rp() -> int:
+	return SmaOffice.available_rp(office, academy, career, get_trade_count())
+
+
+func purchase_office_item(item_id: String) -> Dictionary:
+	var result := SmaOffice.purchase(office, item_id, academy, career, get_trade_count())
+	if not bool(result.get("ok", false)):
+		last_error = String(result.get("error", "office.errorUnknown"))
+		return result
+	if started and not sandbox_mode:
+		save_game(false)
+	state_changed.emit("office")
+	return result
+
+
+func toggle_office_item(item_id: String) -> bool:
+	var shown := SmaOffice.toggle_visibility(office, item_id)
+	if started and not sandbox_mode:
+		save_game(false)
+	state_changed.emit("office")
+	return shown
+
+
+func start_daily_sprint(raw_code: String = "") -> Dictionary:
+	if sandbox_mode:
+		exit_sandbox()
+	var code := SmaDailyChallenge.sanitize_code(raw_code)
+	var seed_val := SmaDailyChallenge.seed_for_code(code)
+	var res := start_sandbox(SmaDailyChallenge.START_CASH, seed_val, "normal")
+	if not bool(res.get("ok", false)):
+		return res
+	daily_sprint_active = true
+	daily_sprint_code = code
+	if narrative != null:
+		for sid in narrative.stories.keys():
+			narrative.seen[String(sid)] = true
+	paused = true
+	state_changed.emit("daily")
+	return {"ok": true, "code": code, "seed": seed_val}
+
+
+func daily_sprint_status() -> Dictionary:
+	if exchange == null:
+		return {}
+	var account: Dictionary = exchange.state["account"]
+	var total_trades: int = (account.get("trades", []) as Array).size() \
+		+ (account.get("optionTrades", []) as Array).size() \
+		+ (account.get("futuresTrades", []) as Array).size()
+	var eval := SmaDailyChallenge.evaluate(
+		SmaDailyChallenge.START_CASH,
+		exchange.equity(),
+		account.get("equityHistory", []),
+		total_trades,
+		int(exchange.state["dayIndex"])
+	)
+	var code := daily_sprint_code if daily_sprint_code != "" else SmaDailyChallenge.today_code()
+	eval["code"] = code
+	eval["seed"] = SmaDailyChallenge.seed_for_code(code)
+	eval["playerName"] = display_player_name()
+	return eval
+
+
+func record_daily_sprint() -> Dictionary:
+	var status := daily_sprint_status()
+	if status.is_empty():
+		return {}
+	daily_records = SmaDailyChallenge.record_result(daily_records, status)
+	SmaSaveService.export_to(DAILY_RECORDS_PATH, {"records": daily_records})
+	state_changed.emit("daily")
+	return status
 
 
 func restart_sandbox() -> void:
@@ -2620,6 +2717,7 @@ func save_game(manual: bool = true) -> bool:
 		"quant": quant,
 		"fund": fund,
 		"alerts": alerts,
+		"office": office,
 		"intro": intro,
 		"openingGap": opening_gap,
 		"blackFriday": black_friday,
@@ -2660,7 +2758,7 @@ func _decode_save(payload: Dictionary) -> Dictionary:
 			or typeof(payload.get("exchange")) != TYPE_DICTIONARY:
 		return {}
 	for key in ["settings", "academy", "challenges", "career", "quant", "fund",
-			"alerts", "history", "narrative", "intro", "openingGap", "blackFriday"]:
+			"alerts", "office", "history", "narrative", "intro", "openingGap", "blackFriday"]:
 		if typeof(payload.get(key, {})) != TYPE_DICTIONARY:
 			return {}
 	var saved_story: Dictionary = payload.get("narrative", {})
@@ -2728,6 +2826,7 @@ func _decode_save(payload: Dictionary) -> Dictionary:
 		"quant": SmaQuant.normalize_config(saved_quant),
 		"fund": SmaFund.normalize_state(payload.get("fund", {}), saved_day, String(engine.state["seed"])),
 		"alerts": SmaAlerts.normalize_state(payload.get("alerts", {})),
+		"office": SmaOffice.normalize_state(payload.get("office", {})),
 		"intro": saved_intro,
 		"openingGap": saved_gap,
 		"blackFriday": saved_bf,
@@ -2743,6 +2842,9 @@ func _apply_loaded_save(loaded: Dictionary) -> void:
 	quant = loaded["quant"]
 	fund = loaded["fund"]
 	alerts = loaded["alerts"]
+	office = loaded.get("office", SmaOffice.create_state())
+	daily_sprint_active = false
+	daily_sprint_code = ""
 	intro = loaded["intro"]
 	opening_gap = loaded["openingGap"]
 	opening_gap_active = false

@@ -152,6 +152,13 @@ static func icon_rect(kind: String, px_size: Vector2 = Vector2(16, 16)) -> Textu
 	return rect
 
 
+static func badge(text: String, bg: Color, fg: Color) -> PanelContainer:
+	var pill := PanelContainer.new()
+	pill.add_theme_stylebox_override("panel", SmaPixelArt.readout_box(bg, fg, 8, 4))
+	pill.add_child(label(text, 11, fg))
+	return pill
+
+
 static func cell(text: String, ratio: float = 1.0, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT,
 		color: Color = Color(0, 0, 0, 0), size: int = 12) -> Label:
 	var node := label(text, size, color)

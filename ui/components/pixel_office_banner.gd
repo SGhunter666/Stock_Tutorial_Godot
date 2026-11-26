@@ -167,10 +167,31 @@ func _win_x_grid() -> int:
 	return mini(168, maxi(124, int(w * 0.27)))
 
 
+func _has_prop(prop_id: String) -> bool:
+	if game == null or not ("office" in game):
+		return false
+	return SmaOffice.is_displayed(game.office, prop_id)
+
+
+func _hired_staff_ids() -> Array[String]:
+	var ids: Array[String] = []
+	if game != null and ("fund" in game) and typeof(game.fund) == TYPE_DICTIONARY:
+		for emp in game.fund.get("employees", []):
+			if typeof(emp) == TYPE_DICTIONARY:
+				var rid := String(emp.get("id", ""))
+				if rid != "" and not ids.has(rid):
+					ids.append(rid)
+	return ids
+
+
 func _hit_test(pos: Vector2) -> Dictionary:
 	var win_x := _win_x_grid()
 	var w := int(floor(size.x / float(PX)))
 	var win_total_w := maxi(60, w - win_x - 3)
+	# 0. Top-left Kairosoft Renovation Shop Button [★ 装修]
+	var shop_rect := Rect2(float(3 * PX), float(3 * PX), float(21 * PX), float(12 * PX))
+	if shop_rect.has_point(pos):
+		return {"zone": "shop", "rect": shop_rect}
 	# 1. Right-corner Mentor Avatar + Speech Bubble
 	if size.x >= 840.0:
 		var m_rect := Rect2(size.x - 266.0, size.y - 68.0, 258.0, 56.0)
@@ -194,7 +215,7 @@ func _hit_test(pos: Vector2) -> Dictionary:
 					break
 		return {"zone": "ticker", "ticker": picked, "rect": led_rect}
 	# 3. Left Honors Zone (Bookshelf / Award Plaque / Hanging Banner)
-	var honors_rect := Rect2(float(4 * PX), float(4 * PX), float((maxi(32, win_x - 76)) * PX), size.y - 20.0)
+	var honors_rect := Rect2(float(4 * PX), float(18 * PX), float((maxi(32, win_x - 76)) * PX), size.y - float(22 * PX))
 	if honors_rect.has_point(pos):
 		return {"zone": "honors", "rect": honors_rect}
 	# 4. Trader Desk & Coffee Mug Zone
@@ -215,6 +236,8 @@ func _gui_input(event: InputEvent) -> void:
 			_hover_ticker = sym
 			mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if z != "" else Control.CURSOR_ARROW
 			match z:
+				"shop":
+					tooltip_text = I18n.t("office.hoverShop")
 				"mentor":
 					tooltip_text = I18n.t("pixelOffice.hoverMentor")
 				"honors":
@@ -232,7 +255,9 @@ func _gui_input(event: InputEvent) -> void:
 		if z == "":
 			return
 		accept_event()
-		if z == "coffee":
+		if z == "shop":
+			hotspot_clicked.emit("shop", {})
+		elif z == "coffee":
 			_quip_index = (_quip_index + 1) % 6
 			_quip_text = I18n.t("pixelOffice.quip.%d" % (_quip_index + 1))
 			_quip_timer = 4.6
@@ -365,6 +390,13 @@ func _draw() -> void:
 
 
 func _draw_left_zone(tier: int, win_x: int, floor_y: int, alert: bool) -> void:
+	# Top-left Kairosoft Renovation Shop Button [★]
+	var shop_hov := _hover_zone == "shop"
+	_px(3, 4, 20, 11, INK)
+	_px(4, 5, 18, 9, Color("#f59e0b") if shop_hov else Color("#d97706"))
+	_px(4, 5, 18, 1, Color("#fef08a"))
+	_px(4, 13, 18, 1, Color("#78350f"))
+
 	# Hanging white/cream cloth banner with pixel pins (like "FARVIEW FUND I" in Reference B)
 	var bx := 26
 	var bw := maxi(80, win_x - bx - 10)
@@ -543,11 +575,21 @@ func _draw_workstation_left(gx: int, floor_y: int, quad: bool, alert: bool) -> v
 	_px(gx + 12, desk_y - 1, 3, 1, INK)
 	_px(gx + 27, desk_y - 1, 3, 1, INK)
 
-	# Steaming coffee mug on right side of desk
-	_px(gx + 47, desk_y - 4, 4, 4, INK)
-	_px(gx + 48, desk_y - 3, 2, 3, Color("#f8fafc"))
-	var steam_shift := (_frame / 2) % 3
-	_px(gx + 48 + (steam_shift % 2), desk_y - 6 - steam_shift, 1, 1, Color(1, 1, 1, 0.65))
+	# Steaming coffee mug OR Upgraded Pro Espresso Machine on right side of desk
+	if _has_prop("espresso_bar"):
+		_px(gx + 44, desk_y - 8, 9, 8, INK)
+		_px(gx + 45, desk_y - 7, 7, 2, Color("#dc2626"))
+		_px(gx + 45, desk_y - 5, 7, 4, Color("#cbd5e1"))
+		_px(gx + 46, desk_y - 3, 2, 2, Color("#1e293b"))
+		_px(gx + 49, desk_y - 3, 2, 2, Color("#f8fafc"))
+		var st_e := (_frame / 2) % 3
+		_px(gx + 46, desk_y - 10 - st_e, 1, 2, Color(1, 1, 1, 0.75))
+		_px(gx + 50, desk_y - 9 - ((st_e + 1) % 3), 1, 2, Color(1, 1, 1, 0.75))
+	else:
+		_px(gx + 47, desk_y - 4, 4, 4, INK)
+		_px(gx + 48, desk_y - 3, 2, 3, Color("#f8fafc"))
+		var steam_shift := (_frame / 2) % 3
+		_px(gx + 48 + (steam_shift % 2), desk_y - 6 - steam_shift, 1, 1, Color(1, 1, 1, 0.65))
 
 	# Wooden desk with drawers & under-desk PC tower
 	_px(gx, desk_y, desk_w, 3, INK)
@@ -631,24 +673,111 @@ func _draw_floor_actors(tier: int, win_x: int, w: int, floor_y: int, alert: bool
 		"G": Color("#86efac"), "g": Color("#22c55e"), "e": Color("#15803d"),
 		"w": Color("#f8fafc"), "s": Color("#cbd5e1"),
 	}
-	# Left workstation (Player's desk)
-	var left_desk_x := maxi(26, win_x - 74)
-	_draw_workstation_left(left_desk_x, floor_y, tier >= 2, alert)
+	# Optional Wall World Clocks (NYC / LDN / TKY) above left desk
+	if _has_prop("world_clocks"):
+		for ci in 3:
+			var cx := 28 + ci * 13
+			var cy := 21
+			if cx + 9 < win_x - 4:
+				_px(cx, cy, 8, 7, INK)
+				_px(cx + 1, cy + 1, 6, 5, Color("#f8fafc"))
+				_px(cx + 3, cy + 2, 1, 2, Color("#dc2626") if ci == 0 else Color("#1e293b"))
+				_px(cx + 4, cy + 3, 2, 1, Color("#1e293b"))
 
-	# Potted plant separating left wall & window
-	if win_x + 4 < w - 30:
+	# Left workstation (Player's desk — upgraded to Quad Rig if tier>=2 or bloomberg_rig owned)
+	var left_desk_x := maxi(26, win_x - 74)
+	_draw_workstation_left(left_desk_x, floor_y, tier >= 2 or _has_prop("bloomberg_rig"), alert)
+
+	# Quant Server Rack OR Potted plant separating left wall & window
+	if _has_prop("server_rack") and win_x + 4 < w - 30:
+		var rx := win_x - 15
+		var ry := floor_y - 27
+		_px(rx, ry, 13, 27, INK)
+		_px(rx + 1, ry + 1, 11, 25, Color("#1e293b"))
+		_px(rx + 2, ry + 2, 9, 23, Color("#0f172a"))
+		for blade in 5:
+			var by := ry + 3 + blade * 4
+			_px(rx + 3, by, 7, 2, Color("#334155"))
+			var led_on := ((_frame + blade * 3) % 4) != 0
+			var led_c := Color("#4ade80") if (blade % 2 == 0) else Color("#38bdf8")
+			if alert:
+				led_c = Color("#ef4444")
+			_px(rx + 3, by, 2, 1, led_c if led_on else Color("#fbbf24"))
+	elif win_x + 4 < w - 30:
 		_draw_sprite(win_x - 14, floor_y - 16, PLANT_SPRITE, plant_pal)
 
-	# Center analyst desk in front of panoramic window (Lin Lan + Gu Yan)
+	# Center analyst desk in front of panoramic window (Lin Lan + Gu Yan / Hired Staff)
+	var hired := _hired_staff_ids()
 	var center_x := win_x + 16
 	if center_x + 48 < w - 20:
-		_draw_center_analysts(center_x, floor_y, center_x + 92 < w - 24, alert)
+		var show_second := (tier >= 2 or not hired.is_empty()) and (center_x + 92 < w - 24)
+		_draw_center_analysts(center_x, floor_y, show_second, alert)
+		# Golden Maneki-Neko (Lucky Cat) on center analyst desk
+		if _has_prop("lucky_cat"):
+			var cat_x := center_x + 15
+			var cat_y := floor_y - 19
+			var paw_up := (_frame % 6) < 3
+			_px(cat_x, cat_y, 6, 7, INK)
+			_px(cat_x + 1, cat_y + 1, 4, 5, Color("#fde047"))
+			_px(cat_x + 1, cat_y + 4, 4, 1, Color("#ef4444"))
+			_px(cat_x + 2, cat_y + 5, 2, 1, Color("#f59e0b"))
+			if paw_up:
+				_px(cat_x, cat_y - 1, 2, 2, Color("#fef08a"))
 
-	# Right workstation on wide trading floors (Chen Xi / Quant Trader)
+	# Right workstation on wide trading floors (Quant / Hired Fund Specialists)
 	var right_reserve := 136 if w >= 420 else 18
 	var third_x := center_x + 104
 	if third_x + 58 < w - right_reserve:
-		_draw_workstation_left(third_x, floor_y, tier >= 3, alert)
+		_draw_workstation_left(third_x, floor_y, tier >= 3 or hired.size() >= 2, alert)
+
+	# Extra Hired Fund Specialists standing/working along panoramic window!
+	var role_colors := {
+		"research": Color("#38bdf8"),
+		"quant": Color("#a855f7"),
+		"risk": Color("#f59e0b"),
+		"trader": Color("#22c55e"),
+		"macro": Color("#ec4899"),
+		"operations": Color("#94a3b8"),
+		"compliance": Color("#14b8a6"),
+	}
+	var spec_x := third_x + 64
+	for s_idx in mini(hired.size(), 3):
+		var role_id := hired[s_idx]
+		var draw_sx := spec_x + s_idx * 20
+		if draw_sx + 16 >= w - right_reserve - 16:
+			break
+		var coat_c: Color = role_colors.get(role_id, Color("#3b82f6"))
+		var s_pal := {
+			"k": INK,
+			"H": Color("#1e293b") if (s_idx % 2 == 0) else Color("#78350f"),
+			"h": Color("#475569") if (s_idx % 2 == 0) else Color("#9a582b"),
+			"s": Color("#fcd5b8"),
+			"w": Color("#ffffff"),
+			"m": Color("#b45309"),
+			"W": coat_c,
+			"T": Color("#fef08a"),
+			"d": Color("#0f172a"),
+		}
+		_draw_sprite(draw_sx, floor_y - 19, ANALYST_MALE, s_pal)
+
+	# Charging Gold Bull Statue on Pedestal in front of panoramic skyline!
+	if _has_prop("bull_statue"):
+		var bull_x := w - right_reserve - 34
+		if bull_x > center_x + 86:
+			var by := floor_y - 14
+			# Pedestal
+			_px(bull_x, floor_y - 5, 16, 5, INK)
+			_px(bull_x + 1, floor_y - 4, 14, 3, Color("#475569"))
+			_px(bull_x + 2, floor_y - 4, 12, 1, Color("#94a3b8"))
+			# Golden Bull Body & Horns
+			_px(bull_x + 2, by + 2, 11, 6, INK)
+			_px(bull_x + 3, by + 3, 9, 4, Color("#fbbf24"))
+			_px(bull_x + 3, by + 3, 7, 1, Color("#fef08a"))
+			_px(bull_x + 11, by + 1, 4, 4, INK)
+			_px(bull_x + 12, by + 2, 2, 2, Color("#fbbf24"))
+			_px(bull_x + 14, by, 2, 2, Color("#fef08a")) # Horn!
+			_px(bull_x + 3, by + 7, 2, 2, Color("#d97706"))
+			_px(bull_x + 10, by + 7, 2, 2, Color("#d97706"))
 
 	# Far-right plant
 	if w - right_reserve - 16 > center_x + 56:
@@ -704,6 +833,10 @@ func _draw_text_and_mentor_overlay(tier: int, win_x: int, win_total_w: int, aler
 	var font10 := SmaUiTheme.pixel_font_10()
 	if font12 == null:
 		return
+
+	# 0. Top-left [★装修] label
+	draw_string(font12, Vector2(float(4 * PX), float(12 * PX)), I18n.t("office.badgeShort"),
+		HORIZONTAL_ALIGNMENT_CENTER, float(18 * PX), 12, Color("#090d16"))
 
 	# 1. Hanging cloth banner title on left wall
 	var title_str := I18n.t("pixelOffice.tier1")
@@ -792,7 +925,7 @@ func _draw_text_and_mentor_overlay(tier: int, win_x: int, win_total_w: int, aler
 			SmaUiTheme.ACCENT if mentor_hovered else SmaUiTheme.GOLD, false, 2.0)
 
 	# Subtle pixel hover indicator ring on hovered interactive floor zones
-	if _hover_zone in ["honors", "coffee", "ticker"]:
+	if _hover_zone in ["shop", "honors", "coffee", "ticker"]:
 		var h_info := _hit_test(get_local_mouse_position())
 		if h_info.has("rect"):
 			var r: Rect2 = h_info["rect"]

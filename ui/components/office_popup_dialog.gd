@@ -1,5 +1,6 @@
 ## Interactive pixel modals launched from hotspots inside SmaPixelOfficeBanner:
-##   "mentor": Live Mentor Portfolio & Risk Diagnostic Desk
+##   "mentor": Live Mentor Portfolio & Risk Diagnostic Desk (with animated portrait)
+##   "shop":   Kairosoft-style Pixel Office Renovation Workshop & Specialist Roster
 ##   "honors": Farview Pixel Trophy, Certificate & Achievement Case
 class_name SmaOfficePopupDialog
 extends Control
@@ -7,19 +8,30 @@ extends Control
 signal closed
 signal navigate_requested(screen_id: String)
 
+const PROP_ICONS := {
+	"espresso_bar": "prop_espresso",
+	"lucky_cat": "prop_cat",
+	"bloomberg_rig": "prop_bloomberg",
+	"world_clocks": "prop_clocks",
+	"server_rack": "prop_server",
+	"bull_statue": "prop_bull",
+}
+
 var game: Node
 var mode := "mentor"
 var mentor_id := "lin_lan"
+var _panel: PanelContainer
 
 
 func setup(game_ref: Node, popup_mode: String = "mentor", target_mentor: String = "lin_lan") -> void:
 	game = game_ref
 	mode = popup_mode
 	mentor_id = target_mentor
-	_build()
+	_build_shell()
+	_rebuild_panel()
 
 
-func _build() -> void:
+func _build_shell() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 62
@@ -36,27 +48,60 @@ func _build() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
 
-	var panel := SmaKit.modal_card(20)
-	panel.custom_minimum_size = Vector2(760, 0)
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	center.add_child(panel)
-
-	if mode == "honors":
-		_build_honors(panel)
-	else:
-		_build_mentor_diag(panel)
+	_panel = SmaKit.modal_card(18)
+	_panel.custom_minimum_size = Vector2(800, 0)
+	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	center.add_child(_panel)
 
 
-func _build_mentor_diag(panel: PanelContainer) -> void:
-	var root := SmaKit.vbox(12)
-	panel.add_child(root)
-	var head := SmaKit.hbox(10)
-	head.add_child(SmaKit.icon_rect("logo", Vector2(22, 22)))
-	head.add_child(SmaKit.title(I18n.t("pixelOffice.diagTitle"), 20))
+func _rebuild_panel() -> void:
+	if _panel == null:
+		return
+	SmaKit.clear_children(_panel)
+	var root := SmaKit.vbox(10)
+	_panel.add_child(root)
+
+	# Unified Kairosoft × PC-98 top tab bar
+	var head := SmaKit.hbox(8)
+	for tab in [
+		["mentor", "logo", I18n.t("office.tabMentor")],
+		["shop", "office", I18n.t("office.tabShop")],
+		["honors", "challenges", I18n.t("office.tabHonors")],
+	]:
+		var tid := String(tab[0])
+		var btn := SmaKit.button(String(tab[2]), func():
+			mode = tid
+			_play_sfx("pixel_click")
+			_rebuild_panel(), mode == tid)
+		btn.icon = SmaPixelArt.icon(String(tab[1]))
+		head.add_child(btn)
 	head.add_child(SmaKit.hspacer())
+	head.add_child(SmaKit.arcade_button(I18n.t("poster.openShort"), "amber", func():
+		var m := get_tree().get_first_node_in_group("main")
+		_close()
+		if m != null and m.has_method("open_poster"):
+			m.open_poster()))
 	head.add_child(SmaKit.button(I18n.t("common.close"), _close))
 	root.add_child(head)
 	root.add_child(SmaKit.separator())
+
+	if mode == "shop":
+		_build_shop(root)
+	elif mode == "honors":
+		_build_honors(root)
+	else:
+		_build_mentor_diag(root)
+
+
+func _build_mentor_diag(root: VBoxContainer) -> void:
+	var equity: float = float(game.get_equity()) if game != null else 100000.0
+	var cash := float(game.exchange.state["account"]["cash"]) if (game != null and game.exchange != null) else 100000.0
+	var cash_pct := (cash / maxf(1.0, equity)) * 100.0
+	var rev: Dictionary = game.review_summary() if (game != null and game.exchange != null) else {}
+	var conc_pct := float(rev.get("concentrationPct", 0.0))
+	var win_pct := float(rev.get("winRatePct", 0.0))
+	var real_pnl := float(rev.get("realizedPnl", 0.0))
+	var is_warn := conc_pct > 25.0 or cash_pct < 20.0
 
 	var body := SmaKit.hbox(18)
 	root.add_child(body)
@@ -69,11 +114,16 @@ func _build_mentor_diag(panel: PanelContainer) -> void:
 		p_frame.add_theme_stylebox_override("panel",
 			SmaPixelArt.card_box(Color("#08111f"), SmaUiTheme.ACCENT, Color("#040811"), 4, false))
 		var p_rect := TextureRect.new()
-		p_rect.texture = load(px_path) as Texture2D
+		var tex := load(px_path) as Texture2D
+		p_rect.texture = tex
 		p_rect.custom_minimum_size = Vector2(144, 192)
 		p_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		p_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		p_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var anim := SmaPortraitAnimator.new()
+		anim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		p_rect.add_child(anim)
+		anim.configure(mentor_id, tex, "crisis" if is_warn else "praise")
 		p_frame.add_child(p_rect)
 		left_col.add_child(p_frame)
 		var m_name := I18n.t("story.char.%s.name" % mentor_id) if I18n.has_key("story.char.%s.name" % mentor_id) else mentor_id
@@ -83,14 +133,9 @@ func _build_mentor_diag(panel: PanelContainer) -> void:
 		body.add_child(left_col)
 
 	var col := SmaKit.vbox(8)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(col)
-	var equity: float = float(game.get_equity()) if game != null else 100000.0
-	var cash := float(game.exchange.state["account"]["cash"]) if (game != null and game.exchange != null) else 100000.0
-	var cash_pct := (cash / maxf(1.0, equity)) * 100.0
-	var rev: Dictionary = game.review_summary() if (game != null and game.exchange != null) else {}
-	var conc_pct := float(rev.get("concentrationPct", 0.0))
-	var win_pct := float(rev.get("winRatePct", 0.0))
-	var real_pnl := float(rev.get("realizedPnl", 0.0))
+	col.add_child(SmaKit.title(I18n.t("pixelOffice.diagTitle"), 18))
 
 	var grid := GridContainer.new()
 	grid.columns = 2
@@ -105,6 +150,7 @@ func _build_mentor_diag(panel: PanelContainer) -> void:
 		[I18n.t("dashboard.realized"), SmaFormat.signed_money(real_pnl), SmaKit.value_color(real_pnl)],
 	]:
 		var m_card := SmaKit.card(8)
+		m_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var m_box := SmaKit.vbox(2)
 		m_card.add_child(m_box)
 		m_box.add_child(SmaKit.caption(String(spec[0])))
@@ -145,23 +191,124 @@ func _build_mentor_diag(panel: PanelContainer) -> void:
 		col.add_child(obj_card)
 
 
-func _build_honors(panel: PanelContainer) -> void:
-	var root := SmaKit.vbox(10)
-	panel.add_child(root)
-	var head := SmaKit.hbox(10)
-	head.add_child(SmaKit.icon_rect("challenges", Vector2(20, 20)))
-	head.add_child(SmaKit.title(I18n.t("pixelOffice.honorsTitle"), 20))
-	head.add_child(SmaKit.hspacer())
-	head.add_child(SmaKit.button(I18n.t("common.close"), _close))
-	root.add_child(head)
-	root.add_child(SmaKit.separator())
+func _build_shop(root: VBoxContainer) -> void:
+	var avail_rp: int = int(game.office_available_rp()) if game != null else SmaOffice.STARTER_RP
+	var rank_num: int = int(game.career.get("rank", 1)) if game != null else 1
+	var office_state: Dictionary = game.office if game != null else SmaOffice.create_state()
+	var owned_count := (office_state.get("owned", []) as Array).size()
+	var staff_list: Array = game.fund.get("employees", []) if game != null else []
 
+	var banner_row := SmaKit.hbox(10)
+	banner_row.add_child(SmaKit.title(I18n.t("office.shopTitle"), 18))
+	banner_row.add_child(SmaKit.hspacer())
+	banner_row.add_child(SmaKit.badge(
+		I18n.t("office.rpBadge", {"rp": avail_rp}),
+		Color("#3b2306"), SmaUiTheme.GOLD))
+	banner_row.add_child(SmaKit.badge(
+		I18n.t("office.ownedBadge", {"done": owned_count, "total": SmaOffice.ITEMS.size()}),
+		SmaUiTheme.PANEL_ALT, SmaUiTheme.ACCENT))
+	banner_row.add_child(SmaKit.badge(
+		I18n.t("office.staffBadge", {"count": staff_list.size()}),
+		SmaUiTheme.PANEL_ALT, SmaUiTheme.POSITIVE))
+	root.add_child(banner_row)
+
+	var hint := SmaKit.muted(I18n.t("office.rpHint"), 11)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	root.add_child(hint)
+
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 8)
+	for item in SmaOffice.ITEMS:
+		var iid := String(item["id"])
+		var cost := int(item["cost"])
+		var min_rank := int(item["minRank"])
+		var owned := SmaOffice.is_owned(office_state, iid)
+		var displayed := SmaOffice.is_displayed(office_state, iid)
+		var card := SmaKit.card(10)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var box := SmaKit.vbox(6)
+		card.add_child(box)
+
+		var top := SmaKit.hbox(8)
+		top.add_child(SmaKit.icon_rect(String(PROP_ICONS.get(iid, "office")), Vector2(24, 24)))
+		var titles := SmaKit.vbox(1)
+		titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		titles.add_child(SmaKit.label(I18n.t(String(item["titleKey"])), 13,
+			SmaUiTheme.GOLD if owned else SmaUiTheme.TEXT))
+		var desc := SmaKit.muted(I18n.t(String(item["descKey"])), 10)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		titles.add_child(desc)
+		top.add_child(titles)
+		box.add_child(top)
+
+		var foot := SmaKit.hbox(8)
+		if min_rank > 1:
+			foot.add_child(SmaKit.caption("Rank %d+" % min_rank))
+		foot.add_child(SmaKit.hspacer())
+		if owned:
+			var toggle_label := I18n.t("office.displayed") if displayed else I18n.t("office.stored")
+			var toggle_btn := SmaKit.button(toggle_label, func():
+				if game != null:
+					game.toggle_office_item(iid)
+					_play_sfx("pixel_click")
+					_rebuild_panel(), displayed)
+			foot.add_child(toggle_btn)
+		elif rank_num < min_rank:
+			var lock_btn := SmaKit.button(I18n.t("office.needRank", {"rank": min_rank}))
+			lock_btn.disabled = true
+			foot.add_child(lock_btn)
+		elif avail_rp < cost:
+			var wait_btn := SmaKit.button("%d RP" % cost)
+			wait_btn.disabled = true
+			foot.add_child(wait_btn)
+		else:
+			foot.add_child(SmaKit.arcade_button(
+				I18n.t("office.buyBtn", {"cost": cost}), "buy", func():
+					_buy_item(iid)))
+		box.add_child(foot)
+		grid.add_child(card)
+	root.add_child(grid)
+
+	var staff_foot := SmaKit.hbox(8)
+	var staff_note := I18n.t("office.staffHintNone") if staff_list.is_empty() else I18n.t(
+		"office.staffHintActive", {"count": staff_list.size()})
+	staff_foot.add_child(SmaKit.muted(staff_note, 11))
+	staff_foot.add_child(SmaKit.hspacer())
+	if game != null and game.is_fund_active():
+		staff_foot.add_child(SmaKit.button(I18n.t("nav.fund"), func():
+			_close()
+			navigate_requested.emit("fund")))
+	root.add_child(staff_foot)
+
+
+func _buy_item(item_id: String) -> void:
+	if game == null:
+		return
+	var res: Dictionary = game.purchase_office_item(item_id)
+	if not bool(res.get("ok", false)):
+		game.toast(I18n.t(String(res.get("error", "office.errorUnknown"))))
+		return
+	_play_sfx("achievement")
+	var m := get_tree().get_first_node_in_group("main")
+	if m != null and m.get("_pixel_fx") != null:
+		m._pixel_fx.spawn_burst(size * 0.5, SmaUiTheme.GOLD, 14)
+	var def: Dictionary = res.get("item", {})
+	game.toast(I18n.t("office.boughtToast", {
+		"item": I18n.t(String(def.get("titleKey", item_id))),
+	}))
+	_rebuild_panel()
+
+
+func _build_honors(root: VBoxContainer) -> void:
 	var rank_num := int(game.career.get("rank", 1)) if game != null else 1
 	var rank_def: Dictionary = SmaCareer.rank_def(rank_num)
 	var lvl: Dictionary = SmaAcademy.level_info(game.academy) if game != null else {"level": 1, "xp": 0}
 	var unlocked_ach: Array = game.academy.get("achievements", []) if game != null else []
 	var certs: Array = game.career.get("certificates", []) if game != null else []
 
+	root.add_child(SmaKit.title(I18n.t("pixelOffice.honorsTitle"), 18))
 	var summary := SmaKit.hbox(12)
 	for pill in [
 		[I18n.t("nav.career"), "Rank %d · %s" % [rank_num, I18n.t(String(rank_def.get("titleKey", "career.rank.retail.title")))], SmaUiTheme.GOLD],
@@ -169,6 +316,7 @@ func _build_honors(panel: PanelContainer) -> void:
 		[I18n.t("academy.achievementsTitle"), "%d / %d" % [unlocked_ach.size(), SmaAcademy.ACHIEVEMENTS.size()], SmaUiTheme.POSITIVE],
 	]:
 		var c := SmaKit.card(8)
+		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var b := SmaKit.vbox(2)
 		c.add_child(b)
 		b.add_child(SmaKit.caption(String(pill[0])))
@@ -176,7 +324,7 @@ func _build_honors(panel: PanelContainer) -> void:
 		summary.add_child(c)
 	root.add_child(summary)
 
-	var scroll := SmaKit.scroll(320)
+	var scroll := SmaKit.scroll(280)
 	var list := SmaKit.vbox(6)
 	scroll.add_child(list)
 	if not certs.is_empty():
@@ -189,6 +337,7 @@ func _build_honors(panel: PanelContainer) -> void:
 		var aid := String(ach["id"])
 		var earned := unlocked_ach.has(aid)
 		var cell := SmaKit.card(8)
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var row := SmaKit.hbox(8)
 		cell.add_child(row)
 		row.add_child(SmaKit.icon_rect("watchlist" if earned else "cb_unchecked", Vector2(16, 16)))
@@ -210,6 +359,12 @@ func _build_honors(panel: PanelContainer) -> void:
 		_close()
 		navigate_requested.emit("academy")))
 	root.add_child(foot)
+
+
+func _play_sfx(sound: String) -> void:
+	var audio := get_node_or_null("/root/Sfx")
+	if audio != null and audio.has_method("play"):
+		audio.play(sound)
 
 
 func _unhandled_input(event: InputEvent) -> void:

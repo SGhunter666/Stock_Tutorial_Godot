@@ -84,3 +84,44 @@ func run() -> void:
 		"pixel academy resolves calm study BGM")
 	eq(String(audio_script.resolve_mood(true, true, false, true, "trade")), "pixel_crisis",
 		"crisis overrides pixel BGM to urgent ostinato")
+
+	describe("pixel-beta12-office-daily-portrait-poster")
+	for prop_icon in ["prop_espresso", "prop_cat", "prop_bloomberg", "prop_clocks", "prop_server", "prop_bull"]:
+		check(SmaPixelArt.icon(prop_icon) != null, "pixel prop icon generated: %s" % prop_icon)
+
+	var off_state := SmaOffice.create_state()
+	var mock_acad := {"xp": 40, "achievements": ["first_trade"]}
+	var mock_career := {"rank": 1, "certificates": []}
+	var start_rp := SmaOffice.available_rp(off_state, mock_acad, mock_career, 2)
+	eq(start_rp, 160 + 40 + 30 + 80, "deterministic RP formula sums starter + xp + trades + achievements")
+	var rank_fail := SmaOffice.purchase(off_state, "bull_statue", mock_acad, mock_career, 2)
+	eq(bool(rank_fail["ok"]), false, "rank-3 bull statue blocked at rank 1")
+	eq(String(rank_fail["error"]), "office.errorRank", "rank gate returns office.errorRank")
+	var buy_esp := SmaOffice.purchase(off_state, "espresso_bar", mock_acad, mock_career, 2)
+	eq(bool(buy_esp["ok"]), true, "espresso_bar purchased cleanly")
+	eq(SmaOffice.is_owned(off_state, "espresso_bar"), true, "espresso_bar marked owned")
+	eq(SmaOffice.is_displayed(off_state, "espresso_bar"), true, "espresso_bar displayed by default")
+	eq(SmaOffice.toggle_visibility(off_state, "espresso_bar"), false, "toggle hides espresso_bar")
+	eq(SmaOffice.is_displayed(off_state, "espresso_bar"), false, "espresso_bar hidden after toggle")
+	eq(SmaOffice.toggle_visibility(off_state, "espresso_bar"), true, "second toggle shows espresso_bar")
+	var norm_off := SmaOffice.normalize_state({"owned": ["espresso_bar", "bogus_id", "espresso_bar"], "hidden": []})
+	eq((norm_off["owned"] as Array).size(), 1, "normalize_state deduplicates and strips unknown items")
+
+	eq(SmaDailyChallenge.sanitize_code(" 2026-11-26!! "), "2026-11-26", "daily code sanitizer strips punctuation")
+	eq(SmaDailyChallenge.seed_for_code("2026-11-26"), "daily-2026-11-26", "daily seed deterministic prefix")
+	var ev_zero := SmaDailyChallenge.evaluate(100000.0, 100000.0, [], 0, 10)
+	check(int(ev_zero["score"]) <= 950, "zero-trade passive run capped at <= 950")
+	var ev_s := SmaDailyChallenge.evaluate(100000.0, 108000.0, [{"equity": 100000.0}, {"equity": 104000.0}], 6, 10)
+	eq(String(ev_s["grade"]), "S", "+8% zero-drawdown sprint earns Grade S")
+	eq(bool(ev_s["completed"]), true, "10-day sprint marked completed")
+	var recs: Array = []
+	recs = SmaDailyChallenge.record_result(recs, {"code": "2026-11-26", "score": 1100, "grade": "B"})
+	recs = SmaDailyChallenge.record_result(recs, {"code": "2026-11-26", "score": 980, "grade": "C"})
+	eq(int(recs[0]["score"]), 1100, "lower retry score does not overwrite personal best")
+	recs = SmaDailyChallenge.record_result(recs, {"code": "2026-11-26", "score": 1520, "grade": "S"})
+	eq(int(recs[0]["score"]), 1520, "higher retry score updates personal best")
+
+	eq(SmaPortraitAnimator.RIGS.size(), 7, "all 7 character portraits rigged for pixel blink & lip-sync")
+	eq(SmaPortraitAnimator.resolve_mood("black_friday", "Calm text"), "crisis", "crisis story resolves crisis mood")
+	eq(SmaPortraitAnimator.resolve_mood("opening", "恭喜你稳健通关"), "praise", "praise text resolves praise mood")
+	eq(SmaPortraitAnimator.resolve_mood("opening", "你的止损计划是什么？"), "focus", "question resolves focus mood")

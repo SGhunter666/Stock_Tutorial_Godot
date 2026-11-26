@@ -1110,6 +1110,7 @@ func _ready() -> void:
 
 	_check_live_trade_clock(main, failures)
 	await _check_pixel_beta10(main, failures)
+	await _check_pixel_beta12(main, failures)
 
 	if failures.is_empty():
 		print("INTEGRATION OK equity=%.2f day=%d stories=%d" % [
@@ -1169,6 +1170,96 @@ func _check_pixel_beta10(main: SmaMain, failures: Array[String]) -> void:
 		else:
 			found_popup._close()
 			await get_tree().process_frame
+
+
+func _check_pixel_beta12(main: SmaMain, failures: Array[String]) -> void:
+	# 1. Portrait micro-animator wired into dialogue panel
+	if main._dialogue == null or main._dialogue._portrait_anim == null:
+		failures.append("dialogue panel missing SmaPortraitAnimator")
+
+	# 2. Kairosoft Pixel Office Renovation (zero-cash-impact RP + persistence + shop hotspot)
+	var banner := main._office_banner
+	banner.size = Vector2(1180, 118)
+	if String(banner._hit_test(Vector2(24, 14)).get("zone", "")) != "shop":
+		failures.append("office banner top-left badge did not hit shop hotspot")
+
+	var eq_before_shop := Game.get_equity()
+	var cash_before_shop := Game.get_cash()
+	var buy_res := Game.purchase_office_item("espresso_bar")
+	if not bool(buy_res.get("ok", false)) or not SmaOffice.is_displayed(Game.office, "espresso_bar"):
+		failures.append("purchase_office_item('espresso_bar') failed")
+	if absf(Game.get_equity() - eq_before_shop) > 0.001 or absf(Game.get_cash() - cash_before_shop) > 0.001:
+		failures.append("purchasing office furniture mutated trading cash or equity")
+	Game.save_game(false)
+	Game.office = SmaOffice.create_state()
+	Game.load_game()
+	await get_tree().process_frame
+	if not SmaOffice.is_displayed(Game.office, "espresso_bar"):
+		failures.append("purchased office furniture did not persist across save/load")
+
+	main._on_office_hotspot("shop", {})
+	await get_tree().process_frame
+	var shop_dlg: SmaOfficePopupDialog = null
+	for child in main.get_children():
+		if child is SmaOfficePopupDialog:
+			shop_dlg = child
+			break
+	if shop_dlg == null or shop_dlg.mode != "shop":
+		failures.append("shop hotspot did not open SmaOfficePopupDialog in shop mode")
+	else:
+		shop_dlg._close()
+		await get_tree().process_frame
+
+	# 3. Pixel Diploma / Battle Poster modal & headless PNG export
+	var poster := main.open_poster()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if poster == null or not is_instance_valid(poster):
+		failures.append("open_poster() did not instantiate SmaReportPoster")
+	else:
+		var poster_png := "user://saves/integration_poster_check.png"
+		if not await poster.capture_to_png(poster_png):
+			failures.append("SmaReportPoster.capture_to_png failed")
+		else:
+			var png_img := Image.load_from_file(ProjectSettings.globalize_path(poster_png))
+			if png_img == null or png_img.get_width() < 400 or png_img.get_height() < 250:
+				failures.append("exported poster PNG dimensions invalid")
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(poster_png))
+		if poster._saved_user_path != "":
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(poster._saved_user_path))
+		poster._close()
+		await get_tree().process_frame
+
+	# 4. Daily Same-Seed 10-Day Sprint isolation & career restoration
+	var had_daily_file := SmaSaveService.exists(Game.DAILY_RECORDS_PATH)
+	var prev_daily_records := Game.daily_records.duplicate(true)
+	var career_eq := Game.get_equity()
+	var career_rank := Game.get_career_rank()
+	var sprint := Game.start_daily_sprint("2026-11-26")
+	await get_tree().process_frame
+	if not bool(sprint.get("ok", false)) or not Game.daily_sprint_active \
+			or String(Game.exchange.state["seed"]) != "daily-2026-11-26":
+		failures.append("start_daily_sprint did not launch deterministic daily-2026-11-26 sandbox")
+	if not Game.academy_is_tool_unlocked("order.limit") or not Game.academy_is_tool_unlocked("trade.short"):
+		failures.append("daily sprint did not unlock advanced trading tools")
+	Game.submit_order({"ticker": "APLA", "side": "buy", "type": "market", "qty": 5})
+	var rec_status := Game.record_daily_sprint()
+	if int(rec_status.get("trades", 0)) < 1 or Game.daily_records.is_empty():
+		failures.append("record_daily_sprint did not record trade participation")
+	main.navigate("challenges")
+	await get_tree().process_frame
+	Game.exit_sandbox()
+	await get_tree().process_frame
+	if Game.daily_sprint_active or Game.sandbox_mode:
+		failures.append("exit_sandbox did not clear daily_sprint_active")
+	if absf(Game.get_equity() - career_eq) > 0.05 or Game.get_career_rank() != career_rank \
+			or not SmaOffice.is_displayed(Game.office, "espresso_bar"):
+		failures.append("exiting daily sprint did not cleanly restore career save & office state")
+	Game.daily_records = prev_daily_records
+	if had_daily_file:
+		SmaSaveService.export_to(Game.DAILY_RECORDS_PATH, {"records": prev_daily_records})
+	else:
+		SmaSaveService.clear(Game.DAILY_RECORDS_PATH)
 
 
 func _check_live_trade_clock(main: SmaMain, failures: Array[String]) -> void:
