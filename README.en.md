@@ -32,9 +32,10 @@ After reviewing your first trade, open **Opening Gap** from the dashboard. Make 
 | Academy | 32 core units (core + 4 parallel tracks, 85% placement test-out) + 6 branch units = 38 units |
 | Academy stages | 8 |
 | Glossary | 85 terms |
-| Story & Campaigns | 16 stories, 36 triggers, 7 main characters + playable Opening Gap & Black Friday crisis campaigns |
-| Challenges | 14 goal-based trading challenges |
-| Achievements | 30 |
+| Story & Campaigns | 16 stories, 36 triggers, 7 animated PC-98 pixel characters + playable Opening Gap & Black Friday crisis campaigns |
+| Challenges & Daily Sprint | 14 goal-based challenges + **Daily Same-Seed 10-Day Sprint** with risk-adjusted leaderboard |
+| Pixel Office Renovation | Zero-ledger-impact `RP` workshop (6 toggleable pixel props) + 7 hired fund specialist roles stationed live on the trading floor |
+| Achievements & Posters | 30 achievements + 1-click **16-Bit Gold-Rimmed Pixel Diploma / Battle Poster PNG** export |
 | Career ranks | 8 |
 | Fund roles | 7 |
 | History lab | 4 real daily-bar scenarios |
@@ -47,9 +48,25 @@ The default seed is `academy-2026` and the default starting cash is **USD 100,00
 
 ## Screenshots
 
-### Trading Desk (Kairosoft Oak Desk × CRT Pixel Hybrid — Default Style A+B)
+### Trading Desk & Upgraded Pixel Floor (Kairosoft Oak Desk × CRT Pixel Hybrid — Default Style A+B)
 
 ![Trading desk](docs/screenshots/trade.png)
+
+### Kairosoft Pixel Desk Renovation Workshop & Specialist Roster
+
+![Pixel Renovation Workshop](docs/screenshots/renovation_shop.png)
+
+### 16-Bit Gold-Rimmed Pixel Diploma & Battle Poster (1-Click PNG Export)
+
+![Pixel Diploma Poster](docs/screenshots/diploma_poster.png)
+
+### Daily Same-Seed 10-Day Sprint & Personal Best Leaderboard
+
+![Daily Seed Sprint](docs/screenshots/daily_sprint.png)
+
+### Animated PC-98 Character Portraits (Blinking, Lip-Sync & Pixel Emote Badges)
+
+![Animated PC-98 Portrait Dialogue](docs/screenshots/portrait_anim.png)
 
 ### Kairosoft Warm Cream Parchment Pixel Palette (Style B)
 

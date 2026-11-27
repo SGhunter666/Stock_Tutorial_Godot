@@ -1,0 +1,125 @@
+name: Release Windows, macOS & Web Packages
+
+on:
+  push:
+    tags:
+      - "beta-*"
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to publish (e.g. beta-13)"
+        required: true
+        default: "beta-13"
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.2"
+  GODOT_RELEASE: "4.7.2-stable"
+
+jobs:
+  release:
+    name: Test, Export & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Godot ${{ env.GODOT_RELEASE }} & Desktop/Web templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/godot
+            ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable
+          key: godot-all-${{ env.GODOT_RELEASE }}-v1
+
+      - name: Install Godot ${{ env.GODOT_RELEASE }} & export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/bin ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable /tmp/gd
+          curl -fsSL -o /tmp/gd/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${{ env.GODOT_RELEASE }}/Godot_v${{ env.GODOT_RELEASE }}_linux.x86_64.zip"
+          unzip -q /tmp/gd/godot.zip -d /tmp/gd
+          mv "/tmp/gd/Godot_v${{ env.GODOT_RELEASE }}_linux.x86_64" ~/.local/bin/godot
+          chmod +x ~/.local/bin/godot
+
+          curl -fsSL -o /tmp/gd/templates.tpz \
+            "https://github.com/godotengine/godot-builds/releases/download/${{ env.GODOT_RELEASE }}/Godot_v${{ env.GODOT_RELEASE }}_export_templates.tpz"
+          unzip -q -j /tmp/gd/templates.tpz \
+            "templates/version.txt" \
+            "templates/icudt_godot.dat" \
+            "templates/windows_release_x86_64.exe" \
+            "templates/windows_release_x86_64_console.exe" \
+            "templates/macos.zip" \
+            "templates/web_nothreads_release.zip" \
+            -d ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}.stable/
+          rm -rf /tmp/gd
+
+      - name: Import & run quality gates
+        run: |
+          ~/.local/bin/godot --headless --path . --import --quit
+          ~/.local/bin/godot --headless --path . --script res://tests/run_tests.gd
+          ~/.local/bin/godot --headless --path . res://tests/integration.tscn
+
+      - name: Export Windows x64, macOS Universal & Web HTML5 archives
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          mkdir -p dist/win dist/web build
+          touch dist/.gdignore build/.gdignore
+
+          ~/.local/bin/godot --headless --path . --export-release "Windows Desktop" "dist/win/StockMarketAcademy_${TAG}.exe"
+          (cd dist/win && zip -q -r "../StockMarketAcademy_${TAG}_windows_x64.zip" .)
+
+          ~/.local/bin/godot --headless --path . --export-release "macOS" "dist/StockMarketAcademy_${TAG}_macos_universal.zip"
+
+          ~/.local/bin/godot --headless --path . --export-release "Web" "dist/web/index.html"
+          touch dist/web/.nojekyll
+          (cd dist/web && zip -q -r "../StockMarketAcademy_${TAG}_web_html5.zip" .)
+
+          ls -lh dist/*.zip
+
+      - name: Generate release notes
+        run: |
+          python3 - <<'PY' > dist/RELEASE_NOTES.md
+          import os, re
+          tag = os.environ.get("RELEASE_TAG", "beta-13")
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(r"(## [^\n]+\n+.*?)(?=\n## |\Z)", text, flags=re.S)
+          latest = m.group(1).strip() if m else ""
+          print(f"🌐 **网页免下载即点即玩 (Play in Browser)**: <https://sghunter666.github.io/Stock_Tutorial_Godot/>\n")
+          print("### 📦 下载说明 / Downloads")
+          print(f"- **Windows (64-bit)**: `StockMarketAcademy_{tag}_windows_x64.zip` — 解压后直接双击 `.exe` 运行（Extract and run `.exe`）")
+          print(f"- **macOS (Apple Silicon + Intel Universal)**: `StockMarketAcademy_{tag}_macos_universal.zip` — 解压后打开 `.app`（首次若提示未公证，右键选择「打开」即可）")
+          print(f"- **Web (HTML5 Offline Bundle)**: `StockMarketAcademy_{tag}_web_html5.zip`\n")
+          if latest:
+              print("---\n")
+              print(latest)
+          PY
+        env:
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Stock Market Academy ${{ steps.meta.outputs.tag }} (16-Bit Pixel Edition)
+          body_path: dist/RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            dist/StockMarketAcademy_${{ steps.meta.outputs.tag }}_windows_x64.zip
+            dist/StockMarketAcademy_${{ steps.meta.outputs.tag }}_macos_universal.zip
+            dist/StockMarketAcademy_${{ steps.meta.outputs.tag }}_web_html5.zip
