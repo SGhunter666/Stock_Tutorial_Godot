@@ -230,6 +230,16 @@ func _news_card(item: Dictionary) -> PanelContainer:
 			"surprise": SmaFormat.pct(float(item.get("surprisePct", 0.0)), 1),
 			"guidance": I18n.t("news.guidance.%s" % String(item.get("guidance", "maintain"))),
 		}), 10))
+		var reason := String(item.get("reactionReason", ""))
+		if reason != "":
+			var surprise_val := float(item.get("surprisePct", 0.0))
+			var divergence := (surprise_val >= 2.0 and pct < 0.0) or (surprise_val <= -2.0 and pct > 0.0)
+			var reason_lbl := SmaKit.label(I18n.t("news.earningsReasonLine", {
+				"short": I18n.t("earnings.reasonShort.%s" % reason),
+				"desc": I18n.t("earnings.reasonDesc.%s" % reason),
+			}), 10, SmaUiTheme.GOLD if divergence else SmaUiTheme.MUTED)
+			reason_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(reason_lbl)
 	if ticker != "":
 		var footer := SmaKit.hbox(8)
 		footer.add_child(SmaKit.muted("%s · %s" % [ticker, company_name], 10))

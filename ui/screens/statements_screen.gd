@@ -44,11 +44,17 @@ func refresh(_reason: String = "") -> void:
 	_render_sections(report)
 
 
-func _render_header(tickers: Array, history: Array, report: Dictionary) -> void:
+func _render_header(tickers: Array, history: Array, _report: Dictionary) -> void:
 	var header := SmaKit.hbox(10)
 	var titles := SmaKit.vbox(2)
 	titles.add_child(SmaKit.label(I18n.t("statements.title"), 20))
 	titles.add_child(SmaKit.muted(I18n.t("statements.subtitle"), 12))
+	var cov := SmaFundamentals.filing_coverage(game.get_day())
+	titles.add_child(SmaKit.label(I18n.t("statements.coverageBadge", {
+		"companies": int(cov.get("companies", 100)),
+		"perYear": int(cov.get("perYear", 400)),
+		"released": int(cov.get("releasedFilings", 700)),
+	}), 11, SmaUiTheme.GOLD))
 	header.add_child(titles)
 	header.add_child(SmaKit.hspacer())
 	var ticker_select := OptionButton.new()
@@ -87,7 +93,7 @@ func _render_summary(report: Dictionary) -> void:
 		I18n.t("statements.note")], 10)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(note)
-	var grid := SmaKit.hbox(20)
+	var grid := SmaKit.flow(18)
 	grid.add_child(_metric("exchange.reportPeriod", String(report["periodLabel"])))
 	grid.add_child(_metric("exchange.reportedOnLabel", String(report["reportDate"])))
 	grid.add_child(_metric("exchange.reportEps", SmaFormat.money(float(income["eps"]))))
@@ -95,6 +101,19 @@ func _render_summary(report: Dictionary) -> void:
 		SmaFormat.pct_plain(float(ratios["netMargin"]) * 100.0, 1)))
 	grid.add_child(_metric("exchange.statement.sharesOutstanding",
 		SmaFormat.compact(float(income["sharesOutstanding"]))))
+	var highlights: Dictionary = report.get("highlights", {})
+	if not highlights.is_empty():
+		var gm_bps := int(highlights.get("grossMarginDeltaBps", 0))
+		var gm_text := ("%+d bps" % gm_bps)
+		grid.add_child(_metric("statements.yoyRevenue",
+			SmaFormat.pct(float(highlights.get("yoyRevenuePct", 0.0)), 1)))
+		grid.add_child(_metric("statements.yoyEps",
+			SmaFormat.pct(float(highlights.get("yoyEpsPct", 0.0)), 1)))
+		grid.add_child(_metric("statements.gmDelta", gm_text))
+		grid.add_child(_metric("statements.capexYoY",
+			SmaFormat.pct(float(highlights.get("capexYoYPct", 0.0)), 1)))
+		grid.add_child(_metric("statements.forwardGuidance",
+			I18n.t("earnings.guidance.%s" % String(highlights.get("guidance", "maintain")))))
 	if float(report["splitFactor"]) > 1.0:
 		grid.add_child(_metric("exchange.statementSplitFactor",
 			"×" + SmaFormat.num(float(report["splitFactor"]), 0)))

@@ -26,10 +26,12 @@ const MACRO_EVENTS := [
 
 static func _apply_shock(cs: Dictionary, pct: float) -> void:
 	var last := maxf(0.01, float(cs.get("last", 0.0)) * (1.0 + pct / 100.0))
+	var base := maxf(0.01, float(cs.get("company", {}).get("price", last)))
 	cs["last"] = last
 	cs["open"] = last
 	cs["high"] = last
 	cs["low"] = last
+	cs["fairValue"] = clampf(last, base * 0.15, base * 6.0)
 
 
 static func _push(state: Dictionary, entry: Dictionary) -> void:

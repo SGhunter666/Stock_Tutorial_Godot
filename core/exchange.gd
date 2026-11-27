@@ -99,6 +99,7 @@ func _init(seed_value: String = "sim-exchange-v1", cash: float = START_CASH,
 		},
 		"stats": {"tradeCount": 0, "volume": 0, "seconds": 0},
 	}
+	_refresh_session_drifts()
 	for ticker in companies.keys():
 		quote(ticker)
 	record_equity_snapshot()
@@ -145,11 +146,13 @@ func _create_company_state(company: Dictionary, seed_value: String) -> Dictionar
 
 ## Charts and optimisers need history before the first simulated session, so
 ## every instrument starts with deterministic daily bars ending at its price,
-## shaped by its real-world archetype (klineShape + vol).
+## shaped by its real-world archetype, multi-day pullbacks, volume-price
+## correlation, and actual historical quarterly earnings candles.
 static func _seed_daily_history(company: Dictionary, seed_value: String) -> Array:
 	var ticker := String(company.get("ticker", "SIMX"))
 	var price := maxf(0.5, float(company.get("price", 100.0)))
 	var base_vol := clampf(float(company.get("vol", 0.016)), 0.008, 0.055)
+	var is_etf := bool(company.get("isEtf", false))
 	var shape := String(company.get("klineShape", ""))
 	if shape == "":
 		var stg := String(company.get("stage", "mature"))
@@ -157,41 +160,68 @@ static func _seed_daily_history(company: Dictionary, seed_value: String) -> Arra
 			shape = "bull_trend"
 		elif stg == "turnaround":
 			shape = "turnaround_dip"
+	var hist_earnings := {}
+	if not is_etf and not SmaCompanyCatalog.get_company(ticker).is_empty():
+		for q in [-3, -2]:
+			var r_day := SmaFundamentals.report_day_for(ticker, q)
+			if r_day >= -HISTORY_DAYS and r_day < 0:
+				var ev := SmaEarnings.historical_event(ticker, q, seed_value)
+				if not ev.is_empty():
+					hist_earnings[r_day] = ev
 	var rng := SmaRng.new("%s|%s|history" % [seed_value, ticker])
 	var bars: Array = []
 	var cursor_price := price * (0.9 + rng.next() * 0.2)
 	var phase := rng.next() * TAU
 	for index in HISTORY_DAYS:
+		var hist_day := index - HISTORY_DAYS
 		var t := float(index) / float(maxi(1, HISTORY_DAYS - 1))
+		var pullback := sin(t * TAU * 4.2 + phase * 1.7) * base_vol * 0.28
 		var bias := 0.0
 		var wick_mult := 0.35
 		match shape:
 			"bull_parabolic":
-				bias = 0.0022 + 0.0048 * t * t
-				wick_mult = 0.42
-			"bull_trend":
-				bias = 0.0024
-				wick_mult = 0.36
-			"steady_compounder":
-				bias = 0.0014
-				wick_mult = 0.28
-			"cyclical_wave":
-				bias = sin(t * TAU * 1.35 + phase) * base_vol * 0.45
-				wick_mult = 0.38
-			"turnaround_dip":
-				bias = -0.0038 if t < 0.68 else 0.0026
+				bias = 0.0018 + 0.0044 * t * t + pullback
 				wick_mult = 0.44
+			"bull_trend":
+				bias = 0.0020 + pullback
+				wick_mult = 0.38
+			"steady_compounder":
+				bias = 0.0013 + pullback * 0.65
+				wick_mult = 0.30
+			"cyclical_wave":
+				bias = sin(t * TAU * 1.35 + phase) * base_vol * 0.45 + pullback * 0.5
+				wick_mult = 0.40
+			"turnaround_dip":
+				bias = (-0.0036 if t < 0.68 else 0.0028) + pullback * 0.7
+				wick_mult = 0.46
 			"high_beta_swing":
-				bias = sin(t * TAU * 2.1 + phase) * base_vol * 0.55
-				wick_mult = 0.52
-		var drift := bias + rng.normal() * base_vol * 0.78
-		var open_price := cursor_price
+				bias = sin(t * TAU * 2.1 + phase) * base_vol * 0.55 + pullback * 0.8
+				wick_mult = 0.54
+			_:
+				bias = pullback * 0.6
+		var drift := bias + rng.normal() * base_vol * 0.82
+		var open_price := cursor_price * (1.0 + rng.normal() * base_vol * 0.14)
 		var close_price := maxf(0.5, cursor_price * (1.0 + drift))
+		var vol_base := float(company.get("avgVolume", 500000.0))
+		var vol_mult := clampf(0.58 + rng.next() * 0.52
+			+ absf(drift) / maxf(0.006, base_vol) * 0.55, 0.42, 3.0)
+		if hist_earnings.has(hist_day):
+			var ev: Dictionary = hist_earnings[hist_day]
+			var impact := float(ev.get("pct", 0.0)) / 100.0
+			var tmpl := String(ev.get("template", "earningsInline"))
+			close_price = maxf(0.5, cursor_price * (1.0 + impact))
+			if tmpl == "earningsBeat" and impact < 0.0:
+				open_price = cursor_price * 1.015
+			elif tmpl == "earningsMiss" and impact > 0.0:
+				open_price = maxf(0.5, cursor_price * 0.985)
+			else:
+				open_price = maxf(0.5, cursor_price * (1.0 + impact * 0.78))
+			vol_mult = clampf(2.15 + rng.next() * 0.75, 2.0, 3.4)
+			wick_mult = 0.48
 		var high := maxf(open_price, close_price) * (1.0 + absf(rng.normal()) * base_vol * wick_mult)
 		var low := minf(open_price, close_price) * maxf(0.2, 1.0 - absf(rng.normal()) * base_vol * wick_mult)
-		var vol_base := float(company.get("avgVolume", 500000.0))
-		var bar_vol := maxi(10000, int(vol_base * (0.65 + rng.next() * 0.75)))
-		var day := SmaCalendar.iso_date(index - HISTORY_DAYS)
+		var bar_vol := maxi(10000, int(round(vol_base * vol_mult)))
+		var day := SmaCalendar.iso_date(hist_day)
 		bars.append({
 			"d": day, "end": day,
 			"o": open_price, "h": high, "l": low, "c": close_price,
@@ -203,7 +233,10 @@ static func _seed_daily_history(company: Dictionary, seed_value: String) -> Arra
 	for bar in bars:
 		for key in ["o", "h", "l", "c"]:
 			bar[key] = SmaFormat.round_to(float(bar[key]) * factor, 2)
-	bars[bars.size() - 1]["c"] = price
+	var last_bar: Dictionary = bars[bars.size() - 1]
+	last_bar["c"] = price
+	last_bar["h"] = maxf(float(last_bar["h"]), maxf(float(last_bar["o"]), price))
+	last_bar["l"] = minf(float(last_bar["l"]), minf(float(last_bar["o"]), price))
 	return bars
 
 
@@ -931,6 +964,67 @@ func _prune_orders() -> void:
 # Simulated participants
 # ---------------------------------------------------------------------------
 
+## Computes once-per-day macro, valuation, and pre-earnings positioning drift
+## for each stock as a pure function of `(seed, dayIndex, ticker, company)`.
+## Keeping this deterministic and side-effect-free preserves 100% fast-forward
+## parity and save/load roundtrip determinism without touching `state.rngState`.
+func _refresh_session_drifts() -> void:
+	var day := int(state.get("dayIndex", 0))
+	var seed_str := String(state.get("seed", "sim-exchange-v1"))
+	var macro := SmaMacro.world(day, seed_str)
+	var real_rate := float(macro.get("realRate", 0.3))
+	var regime := String(macro.get("regime", "neutral"))
+	var next_base_q := SmaFundamentals.latest_quarter(day)
+	for ticker in state["companies"].keys():
+		var cs: Dictionary = state["companies"][ticker]
+		if bool(cs.get("isEtf", false)):
+			cs["sessionDrift"] = 0.0
+			continue
+		var company: Dictionary = cs["company"]
+		var sector := String(company.get("sector", "technology"))
+		var stage := String(company.get("stage", "mature"))
+		var raw_pe: Variant = company.get("financials", {}).get("pe", 20.0)
+		var pe := float(raw_pe) if raw_pe != null else 20.0
+		var qoq := clampf(float(company.get("qoqGrowth", 0.0)), -0.08, 0.12)
+		var daily_drift := qoq / 63.0 * 0.65
+		# 1. Macro regime & real-interest-rate valuation sensitivity
+		var rate_excess := real_rate - 0.8
+		if sector in ["technology", "realestate"] or pe >= 35.0:
+			daily_drift -= rate_excess * 0.0011
+		elif sector == "financials":
+			daily_drift += rate_excess * 0.0008
+		elif sector == "utilities":
+			daily_drift -= rate_excess * 0.0006
+		if regime == "expansion":
+			if sector in ["technology", "consumer", "industrials", "financials"]:
+				daily_drift += 0.0007
+		elif regime == "inflation":
+			if sector in ["energy", "materials"]:
+				daily_drift += 0.0011
+			elif sector in ["consumer", "industrials"]:
+				daily_drift -= 0.0006
+		elif regime == "slowdown":
+			if sector in ["healthcare", "utilities", "telecom"]:
+				daily_drift += 0.0007
+			else:
+				daily_drift -= 0.0007
+		# 2. Pre-earnings positioning ("Buy the rumor" run-up vs cautious hedging)
+		for q in [next_base_q, next_base_q + 1]:
+			var r_day := SmaFundamentals.report_day_for(String(ticker), q)
+			var days_until := r_day - day
+			if days_until >= 1 and days_until <= 12:
+				var pos_rng := SmaRng.new("%s|pre-earn|%s|%d" % [seed_str, ticker, q])
+				var hype_roll := pos_rng.normal()
+				if stage == "highGrowth" or pe >= 30.0:
+					daily_drift += clampf(0.0022 + hype_roll * 0.0024, -0.0025, 0.0065)
+				elif stage == "turnaround":
+					daily_drift += clampf(-0.0020 + hype_roll * 0.0022, -0.0055, 0.0030)
+				else:
+					daily_drift += clampf(hype_roll * 0.0018, -0.0035, 0.0038)
+				break
+		cs["sessionDrift"] = clampf(daily_drift, -0.012, 0.012) / 780.0
+
+
 func _update_factors(rng: SmaRng) -> void:
 	state["marketFactor"] = float(state["marketFactor"]) * 0.92 + rng.normal() * 0.0009
 	var factors: Dictionary = state["sectorFactors"]
@@ -944,7 +1038,8 @@ func _update_factors(rng: SmaRng) -> void:
 		var sector_value := float(factors.get(String(company["sector"]), 0.0))
 		var idio := rng.normal() * float(company["vol"]) * 0.012
 		var drift := float(company["beta"]) * float(state["marketFactor"]) * 0.0012
-		drift += float(company["sectorCorrelation"]) * sector_value * 0.0009 + idio
+		drift += float(company["sectorCorrelation"]) * sector_value * 0.0009
+		drift += float(cs.get("sessionDrift", 0.0)) + idio
 		var fair := float(cs["fairValue"]) * exp(drift)
 		var base := float(company["price"])
 		cs["fairValue"] = clampf(fair, base * 0.15, base * 6.0)
@@ -1149,6 +1244,7 @@ func _close_session(rng: SmaRng) -> void:
 	state["corporateEvents"] = SmaCorporate.apply_session_open(state)
 	state["newsToday"] = SmaEarnings.maybe_emit(state, int(state["dayIndex"])) \
 		+ SmaNews.maybe_emit(state, rng)
+	_refresh_session_drifts()
 	_pay_dividends()
 	SmaEtfs.mark(state["companies"])
 	state["optionSettlements"] = []
@@ -1926,6 +2022,8 @@ func to_dict() -> Dictionary:
 			"delisted": cs["delisted"],
 			"book": cs["book"].to_dict(),
 		}
+		if cs.has("lastEarnings") and cs["lastEarnings"] is Dictionary:
+			companies[ticker]["lastEarnings"] = cs["lastEarnings"]
 	return {
 		"version": SAVE_VERSION,
 		"seed": state["seed"],
@@ -2059,6 +2157,8 @@ static func from_dict(data: Dictionary) -> SmaExchange:
 				"capitalFactor", "haltedUntilDay", "delisted"]:
 			if saved.has(key):
 				cs[key] = saved[key]
+		if saved.has("lastEarnings") and saved["lastEarnings"] is Dictionary:
+			cs["lastEarnings"] = saved["lastEarnings"].duplicate(true)
 		cs["series"] = saved.get("series", SmaMinuteSeries.create())
 		var book := SmaOrderBook.new(ticker)
 		var book_data: Dictionary = saved.get("book", {})
@@ -2087,6 +2187,7 @@ static func from_dict(data: Dictionary) -> SmaExchange:
 			"owner": String(order.get("owner", "")),
 			"action": String(order.get("action", "")),
 		})
+	engine._refresh_session_drifts()
 	return engine
 
 

@@ -20,6 +20,32 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA16_ONLY") == "1":
+		Game.new_game("beta16-earnings")
+		await _settle(4)
+		_dismiss_story()
+		for uid in ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8", "u9", "u10", "u11", "u12"]:
+			if Game.academy["units"].has(uid):
+				Game.academy["units"][uid]["completed"] = true
+		Game.set_chart_timeframe("1D")
+		var pick_ticker := "NVDO"
+		var recent_hist := SmaEarnings.recent_historical(Game.get_day(),
+			String(Game.exchange.state.get("seed", "beta16-earnings")), 40)
+		for ev in recent_hist:
+			if String(ev.get("template", "")) == "earningsBeat" and float(ev.get("pct", 0.0)) < 0.0:
+				pick_ticker = String(ev["ticker"])
+				break
+		Game.select_ticker(pick_ticker)
+		main.navigate("earnings")
+		await _settle(5)
+		await _shot("beta16_earnings_center")
+		main.navigate("statements")
+		await _settle(5)
+		await _shot("beta16_statements_400")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA15_ONLY") == "1":
 		Game.new_game("beta15-stocks")
 		await _settle(4)

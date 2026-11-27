@@ -52,13 +52,18 @@ func _build() -> void:
 	if game.exchange != null:
 		var last_earnings: Dictionary = game.exchange.state.get("companies", {}) \
 			.get(ticker, {}).get("lastEarnings", {})
+		if last_earnings.is_empty():
+			var seed_str := String(game.exchange.state.get("seed", "sim-exchange-v1"))
+			var latest_q := SmaFundamentals.latest_quarter(game.get_day(), ticker)
+			last_earnings = SmaEarnings.historical_event(ticker, latest_q, seed_str)
 		if not last_earnings.is_empty():
 			var earnings_card := SmaKit.card(10)
 			var earnings_box := SmaKit.vbox(4)
 			earnings_card.add_child(earnings_box)
-			earnings_box.add_child(SmaKit.label("%s · %s" % [
+			earnings_box.add_child(SmaKit.label("%s · %s (%s)" % [
 				I18n.t("financials.lastEarnings"),
-				String(last_earnings.get("periodLabel", ""))], 12, SmaUiTheme.INFO))
+				String(last_earnings.get("periodLabel", "")),
+				SmaFormat.pct(float(last_earnings.get("pct", 0.0)), 1)], 12, SmaUiTheme.INFO))
 			earnings_box.add_child(SmaKit.muted(I18n.t("news.earningsDetail", {
 				"eps": SmaFormat.num(float(last_earnings.get("eps", 0.0)), 2),
 				"expected": SmaFormat.num(float(last_earnings.get("expectedEps", 0.0)), 2),
@@ -66,6 +71,14 @@ func _build() -> void:
 				"guidance": I18n.t("news.guidance.%s" % String(
 					last_earnings.get("guidance", "maintain"))),
 			}), 10))
+			var reason := String(last_earnings.get("reactionReason", ""))
+			if reason != "":
+				var reason_lbl := SmaKit.label(I18n.t("news.earningsReasonLine", {
+					"short": I18n.t("earnings.reasonShort.%s" % reason),
+					"desc": I18n.t("earnings.reasonDesc.%s" % reason),
+				}), 10, SmaUiTheme.GOLD)
+				reason_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				earnings_box.add_child(reason_lbl)
 			root.add_child(earnings_card)
 	root.add_child(SmaKit.separator())
 	var columns := GridContainer.new()

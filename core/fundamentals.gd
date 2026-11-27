@@ -1,7 +1,8 @@
 ## Deterministic quarterly report model for the simulated companies. The catalog
-## stores one annual filing per issuer; this module derives a stable quarterly
-## history from it with a seeded seasonal pattern so the statement page can offer
-## real quarter selection without inventing random live data.
+## stores one annual filing per issuer; this module derives a full, accounting-
+## reconciled 3-statement quarterly series (400 formal filings per simulated
+## year across all 100 companies, plus 800 historical filings at game start)
+## with sector-specific seasonality, margin/CapEx cycles, and forward guidance.
 class_name SmaFundamentals
 extends RefCounted
 
@@ -13,6 +14,28 @@ const MAX_QUARTER := 40
 const TAX_RATE := 0.21
 const INTEREST_RATE := 0.04
 const SEASONAL := [0.96, 0.99, 1.02, 1.03]
+
+static var _base_cache: Dictionary = {}
+static var _report_cache: Dictionary = {}
+
+## Real-world sector seasonality (Q1..Q4 weights summing to 4.0):
+## - Consumer & Tech peak in Q4 holiday shopping / enterprise budget flush.
+## - Financials peak in Q1 capital-markets & underwriting issuance.
+## - Energy & Utilities peak in Q1 winter heating and Q3 summer cooling/driving.
+## - Industrials, Materials & Real Estate peak in Q2-Q3 construction/leasing.
+## - Healthcare & Telecom exhibit steady recurring demand across the year.
+const SECTOR_SEASONAL := {
+	"consumer": [0.93, 0.96, 0.99, 1.12],
+	"technology": [0.94, 0.97, 1.01, 1.08],
+	"financials": [1.06, 1.00, 0.97, 0.97],
+	"energy": [1.04, 0.95, 1.05, 0.96],
+	"utilities": [1.05, 0.94, 1.05, 0.96],
+	"industrials": [0.93, 1.04, 1.05, 0.98],
+	"materials": [0.94, 1.04, 1.04, 0.98],
+	"healthcare": [0.98, 1.00, 1.01, 1.01],
+	"telecom": [0.98, 0.99, 1.01, 1.02],
+	"realestate": [0.96, 1.03, 1.03, 0.98],
+}
 
 
 static func latest_quarter(day: int, ticker: String = "") -> int:
@@ -47,6 +70,25 @@ static func period_label(quarter: int) -> String:
 	return _period_label(quarter)
 
 
+## Summary statistics of the formal quarterly filing universe at `day`, used to
+## surface coverage transparency (100 companies * 4 quarters = 400 filings/year).
+static func filing_coverage(day: int = 0) -> Dictionary:
+	var companies := SmaCompanyCatalog.load_companies()
+	var company_count := companies.size()
+	var released := 0
+	for ticker in companies.keys():
+		var latest := latest_quarter(day, String(ticker))
+		released += maxi(0, latest - FIRST_QUARTER + 1)
+	var total_quarters := MAX_QUARTER - FIRST_QUARTER + 1
+	return {
+		"companies": company_count,
+		"perYear": company_count * 4,
+		"releasedFilings": released,
+		"historyWindowPerCompany": 8,
+		"totalModeledFilings": company_count * total_quarters,
+	}
+
+
 static func _round2(value: float) -> float:
 	return SmaFormat.round_to(value, 2)
 
@@ -66,34 +108,47 @@ static func split_factor_through(ticker: String, day: int) -> float:
 	return factor
 
 
-static func report(ticker: String, quarter: int) -> Dictionary:
+static func _seasonal_weight(sector: String, quarter: int) -> float:
+	var date := SmaCalendar.date_for_trading_day(quarter_end_day(quarter))
+	var q_index := clampi(int(floor(float(int(date["month"]) - 1) / 3.0)), 0, 3)
+	var weights: Array = SECTOR_SEASONAL.get(sector, SEASONAL)
+	return float(weights[q_index])
+
+
+static func _base_report(ticker: String, quarter: int) -> Dictionary:
+	var cache_key := "%s:%d" % [ticker, quarter]
+	if _base_cache.has(cache_key):
+		return _base_cache[cache_key]
 	var company := SmaCompanyCatalog.get_company(ticker)
 	if company.is_empty():
 		return {}
 	var financials: Dictionary = company.get("financials", {})
+	var sector := String(company.get("sector", "technology"))
+	var stage := String(company.get("stage", "mature"))
 	var shares := maxf(1.0, float(company.get("sharesOutstanding",
 		company.get("shares", 1.0))))
 	var annual_revenue := float(financials.get("revenue", 0.0))
 	var annual_gross := float(financials.get("grossProfit", 0.0))
 	var annual_operating := float(financials.get("operatingIncome", 0.0))
-	var annual_net := float(financials.get("netIncome", 0.0))
 	var assets := float(financials.get("totalAssets", 0.0))
 	var liabilities := float(financials.get("totalLiabilities", 0.0))
 	var debt := float(financials.get("debt", 0.0))
 	var cash := float(financials.get("cash", 0.0))
 	var capex := absf(float(financials.get("capex", 0.0)))
 	var rng := SmaRng.new("fundamentals:%s:%d" % [ticker, quarter])
-	var season := float(SEASONAL[posmod(quarter, SEASONAL.size())])
-	var cycle := 1.0 + 0.035 * sin(float(quarter) * 0.8 + float(abs(hash(ticker)) % 628) / 100.0)
+	var season := _seasonal_weight(sector, quarter)
+	var cycle := 1.0 + 0.038 * sin(float(quarter) * 0.82 + float(abs(hash(ticker)) % 628) / 100.0)
 	var qoq_growth := clampf(float(company.get("qoqGrowth", 0.0)), -0.08, 0.12)
 	var growth_trend := pow(1.0 + qoq_growth, clampf(float(quarter), -12.0, 16.0))
-	var revenue := annual_revenue / 4.0 * season * cycle * growth_trend \
-		* (1.0 + rng.normal() * 0.012)
-	var gross_margin := annual_gross / annual_revenue if annual_revenue > 0.0 else 0.0
-	gross_margin = clampf(gross_margin + rng.normal() * 0.006, 0.02, 0.95)
+	var rev_noise := rng.normal() * 0.022
+	var revenue := maxf(1.0, annual_revenue / 4.0 * season * cycle * growth_trend * (1.0 + rev_noise))
+	var base_gm := annual_gross / annual_revenue if annual_revenue > 0.0 else 0.35
+	var gross_margin := clampf(base_gm + rng.normal() * 0.012, 0.02, 0.95)
 	var gross_profit := revenue * gross_margin
-	var operating_margin := annual_operating / annual_revenue if annual_revenue > 0.0 else 0.0
-	operating_margin = clampf(operating_margin + rng.normal() * 0.005, -0.2, 0.7)
+	var base_om := annual_operating / annual_revenue if annual_revenue > 0.0 else 0.12
+	var operating_margin := clampf(
+		base_om + (gross_margin - base_gm) * 0.65 + rng.normal() * 0.008,
+		-0.25, maxf(0.01, gross_margin - 0.01))
 	var operating_income := revenue * operating_margin
 	var operating_expenses := maxf(0.0, gross_profit - operating_income)
 	var interest_expense := debt * INTEREST_RATE / 4.0
@@ -116,7 +171,11 @@ static func report(ticker: String, quarter: int) -> Dictionary:
 	var depreciation := ppe * 0.02
 	var working_capital := (receivables + inventory) * (rng.next() - 0.5) * 0.1
 	var operating_cash := net_income + depreciation - working_capital
-	var quarter_capex := -capex / 4.0
+	var capex_surge_roll := rng.next()
+	var capex_cycle := clampf(
+		1.0 + rng.normal() * 0.16 + (0.18 if (stage == "highGrowth" or sector == "technology") and capex_surge_roll < 0.32 else 0.0),
+		0.65, 1.72)
+	var quarter_capex := -capex / 4.0 * growth_trend * capex_cycle
 	var investing_cash := quarter_capex + (rng.next() - 0.5) * revenue * 0.01
 	var debt_issuance := (rng.next() - 0.5) * debt * 0.02
 	var financing_cash := debt_issuance - dividends_paid
@@ -124,7 +183,7 @@ static func report(ticker: String, quarter: int) -> Dictionary:
 	var free_cash := operating_cash + quarter_capex
 	var as_of_day := report_day_for(ticker, quarter)
 	var split_factor := split_factor_through(ticker, as_of_day)
-	return {
+	var result := {
 		"ticker": ticker,
 		"quarter": quarter,
 		"periodLabel": _period_label(quarter),
@@ -176,6 +235,76 @@ static func report(ticker: String, quarter: int) -> Dictionary:
 			"quarterlyDividendPerShare": quarterly_dividend,
 		},
 	}
+	_base_cache[cache_key] = result
+	return result
+
+
+static func report(ticker: String, quarter: int) -> Dictionary:
+	var cache_key := "%s:%d" % [ticker, quarter]
+	if _report_cache.has(cache_key):
+		return _report_cache[cache_key]
+	var base_entry := _base_report(ticker, quarter)
+	if base_entry.is_empty():
+		return {}
+	var current: Dictionary = base_entry.duplicate(true)
+	var company := SmaCompanyCatalog.get_company(ticker)
+	var qoq_growth := clampf(float(company.get("qoqGrowth", 0.0)), -0.08, 0.12)
+	var expected_annual := pow(1.0 + qoq_growth, 4.0) - 1.0
+	var prior_year := _base_report(ticker, quarter - 4)
+	var prior_quarter := _base_report(ticker, quarter - 1)
+	var next_quarter := _base_report(ticker, quarter + 1)
+	var prior_next := _base_report(ticker, quarter - 3)
+	var cur_rev := float(current["income"]["revenue"])
+	var cur_eps := float(current["income"]["eps"])
+	var cur_gm := float(current["ratios"]["grossMargin"])
+	var cur_capex := absf(float(current["cashFlow"]["capex"]))
+	var yoy_rev_pct := 0.0
+	var yoy_eps_pct := 0.0
+	var gm_delta_bps := 0
+	var capex_yoy_pct := 0.0
+	if not prior_year.is_empty():
+		var py_rev := float(prior_year["income"]["revenue"])
+		var py_eps := float(prior_year["income"]["eps"])
+		var py_gm := float(prior_year["ratios"]["grossMargin"])
+		var py_capex := absf(float(prior_year["cashFlow"]["capex"]))
+		if py_rev > 0.0:
+			yoy_rev_pct = SmaFormat.round_to((cur_rev / py_rev - 1.0) * 100.0, 1)
+		if absf(py_eps) > 0.0001:
+			yoy_eps_pct = SmaFormat.round_to((cur_eps - py_eps) / absf(py_eps) * 100.0, 1)
+		gm_delta_bps = int(round((cur_gm - py_gm) * 10000.0))
+		if py_capex > 0.0:
+			capex_yoy_pct = SmaFormat.round_to((cur_capex / py_capex - 1.0) * 100.0, 1)
+	var qoq_rev_pct := 0.0
+	if not prior_quarter.is_empty() and float(prior_quarter["income"]["revenue"]) > 0.0:
+		qoq_rev_pct = SmaFormat.round_to(
+			(cur_rev / float(prior_quarter["income"]["revenue"]) - 1.0) * 100.0, 1)
+	var guidance := "maintain"
+	var forward_yoy_pct := yoy_rev_pct
+	if not next_quarter.is_empty() and not prior_next.is_empty():
+		var next_rev := float(next_quarter["income"]["revenue"])
+		var base_next_rev := maxf(1.0, float(prior_next["income"]["revenue"]))
+		var fwd_growth := next_rev / base_next_rev - 1.0
+		forward_yoy_pct = SmaFormat.round_to(fwd_growth * 100.0, 1)
+		var fwd_om_shift := float(next_quarter["ratios"]["operatingMargin"]) \
+			- float(prior_next["ratios"]["operatingMargin"])
+		var mgmt_rng := SmaRng.new("guidance:%s:%d" % [ticker, quarter])
+		var guidance_signal := (fwd_growth - expected_annual) + fwd_om_shift * 0.85 \
+			+ mgmt_rng.normal() * 0.026
+		if guidance_signal >= 0.020:
+			guidance = "raise"
+		elif guidance_signal <= -0.018:
+			guidance = "cut"
+	current["highlights"] = {
+		"yoyRevenuePct": yoy_rev_pct,
+		"qoqRevenuePct": qoq_rev_pct,
+		"yoyEpsPct": yoy_eps_pct,
+		"grossMarginDeltaBps": gm_delta_bps,
+		"capexYoYPct": capex_yoy_pct,
+		"forwardRevenueYoYPct": forward_yoy_pct,
+		"guidance": guidance,
+	}
+	_report_cache[cache_key] = current
+	return current
 
 
 static func history(ticker: String, count: int = 8, day: int = 0) -> Array:

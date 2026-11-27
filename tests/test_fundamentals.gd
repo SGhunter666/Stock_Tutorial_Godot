@@ -52,3 +52,35 @@ func run() -> void:
 		"APLA split factor applied after quarter six")
 	eq(SmaFundamentals.split_factor_through("QVAL", 5 * 63), 0.5,
 		"reverse split factor applied")
+
+	describe("fundamentals-400-annual-filings")
+	var cov := SmaFundamentals.filing_coverage(0)
+	eq(int(cov["companies"]), 100, "coverage tracks all 100 listed companies")
+	eq(int(cov["perYear"]), 400, "coverage delivers 400 formal filings per simulated year")
+	ge(float(cov["releasedFilings"]), 700.0, "at least 700 historical filings released on day 0")
+	eq(int(cov["totalModeledFilings"]), 4900, "4900 formal quarterly filings modeled across cycle")
+	var companies := SmaCompanyCatalog.load_companies()
+	var annual_count := 0
+	var guidance_seen := {}
+	for ticker in companies.keys():
+		for q in [0, 1, 2, 3]:
+			var q_rep := SmaFundamentals.report(String(ticker), q)
+			if not q_rep.is_empty():
+				annual_count += 1
+				var q_inc: Dictionary = q_rep["income"]
+				var q_bal: Dictionary = q_rep["balance"]
+				var q_cf: Dictionary = q_rep["cashFlow"]
+				var q_hl: Dictionary = q_rep.get("highlights", {})
+				le(absf(float(q_inc["operatingIncome"]) - (float(q_inc["grossProfit"])
+					- float(q_inc["operatingExpenses"]))), 0.05,
+					"operating income reconciles for %s Q%d" % [ticker, q])
+				le(absf(float(q_bal["totalAssets"]) - float(q_bal["totalLiabilities"])
+					- float(q_bal["equity"])), 0.05,
+					"balance sheet reconciles for %s Q%d" % [ticker, q])
+				le(absf(float(q_cf["netChange"]) - (float(q_cf["operatingCashFlow"])
+					+ float(q_cf["investingCashFlow"]) + float(q_cf["financingCashFlow"]))), 0.05,
+					"cash flow reconciles for %s Q%d" % [ticker, q])
+				guidance_seen[String(q_hl.get("guidance", ""))] = true
+	eq(annual_count, 400, "all 400 annual quarterly filings generated and reconciled")
+	check(guidance_seen.has("raise") and guidance_seen.has("maintain") and guidance_seen.has("cut"),
+		"400 filings span raise, maintain, and cut forward guidance")
