@@ -1,0 +1,132 @@
+{
+  "id": "bailout_rescue",
+  "title": {
+    "zh_CN": "折戟之夜：远望风控重组计划",
+    "en": "Shattered Book: Farview Restructuring Plan"
+  },
+  "start": "late_lamp",
+  "nodes": {
+    "late_lamp": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "（交易大厅的顶灯已经熄了一大半，林岚拉过一把椅子坐在你的工位旁）别盯着那条深水区净值曲线发呆了。十年前我第一次独立管盘时，也曾在流动性枯竭的夜里看着净值跌去四成。",
+        "en": "(Half the ceiling lights on the floor are already dark; Lin Lan pulls a chair beside your desk) Stop staring at that underwater equity curve. Ten years ago on my first solo book, I watched 40% evaporate in a single liquidity freeze too."
+      },
+      "next": "su_he_audit"
+    },
+    "su_he_audit": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "你的账户净值已经跌破远望二级风控红线（$58,000）。高倍融资、逆势扛单或是遭遇逼空，只要经历过一次刻骨铭心的痛，比背诵一百遍教科书都管用。学院不想让你因为一次重创就删档从零开始——我们启动了《远望风控重组保护机制》。",
+        "en": "Your account equity has breached Farview's Tier-2 risk floor ($58,000). Over-leveraging, fighting the tape, or getting caught in a short squeeze teaches more in one scar than a hundred textbooks. You shouldn't have to wipe your save over one blow-up — we're activating the Farview Risk Restructuring Protocol."
+      },
+      "next": "lao_chen_nod"
+    },
+    "lao_chen_nod": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "老陈 · 交易大厅前辈",
+        "en": "Lao Chen · Floor Veteran"
+      },
+      "text": {
+        "zh_CN": "华尔街活下来的老家伙，谁身上没两道疤？摔倒不可怕，带着教训爬起来把本金一点点挣回来，那才叫真本事。",
+        "en": "Show me an old-timer on Wall Street without a scar or two. Getting knocked down isn't fatal — getting back up with strict stops and grinding your book back is what makes a trader."
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "面对账户重创后的《远望风控重组方案》，你的决定是：",
+        "en": "Facing the Farview Risk Restructuring offer after a severe drawdown, what do you choose?"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "签署风控军令状，接受远望重组备用金注资（+$35,000 实盘现金），重整旗鼓！",
+            "en": "Sign the risk covenant & accept Farview's restructuring injection (+$35,000 cash) to rebuild!"
+          },
+          "next": "restructure_reply",
+          "effects": [
+            {
+              "set_flag": "bailout_choice",
+              "value": "restructure"
+            },
+            {
+              "add_cash": 35000.0,
+              "memo": "farview_restructure"
+            },
+            {
+              "toast": {
+                "zh_CN": "风控重组完成：+$35,000 重整备用金已注入实盘账户！",
+                "en": "Restructuring complete: +$35,000 recovery capital credited!"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "婉拒大额输血，仅领 $5,000 应急保证金缓冲，凭剩余本金极限翻盘！",
+            "en": "Decline full bailout; take only a $5,000 margin buffer and claw back the hard way!"
+          },
+          "next": "grit_reply",
+          "effects": [
+            {
+              "set_flag": "bailout_choice",
+              "value": "grit"
+            },
+            {
+              "add_cash": 5000.0,
+              "memo": "farview_buffer"
+            },
+            {
+              "toast": {
+                "zh_CN": "硬核自救：立下【绝地翻盘】誓言（+$5,000 应急缓冲）！",
+                "en": "Iron-grit path: Vowed a pure comeback (+$5,000 margin buffer)!"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "restructure_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "重整资金已经划入你的现金账户。记住今晚签下的规矩：建仓先设止损，单票绝不赌身家。去把失去的阵地一寸一寸赢回来吧。",
+        "en": "Restructuring funds have hit your cash balance. Remember the covenant you signed tonight: set stops before entry, and never bet the farm on a single ticker. Now go earn your ground back."
+      },
+      "next": "end"
+    },
+    "grit_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "有骨气。既然选了最难的绝地反击路，就更要珍惜手里的每一颗子弹。等你重新站回 $100,000 水位线的那天，整座远望大厅都会为你鼓掌。",
+        "en": "Spoken with backbone. Walking the steepest comeback road means every bullet counts. The day you climb back above the $100,000 watermark, the entire Farview floor will applaud."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

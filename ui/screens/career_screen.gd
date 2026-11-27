@@ -152,6 +152,35 @@ func _render_current(data: Dictionary) -> void:
 		row.add_child(bar)
 		box.add_child(row)
 
+	var live_track: Dictionary = data.get("liveTrack", {})
+	if bool(live_track.get("available", false)):
+		box.add_child(SmaKit.separator())
+		var lt_head := SmaKit.hbox(8)
+		var lt_done := bool(live_track.get("done", false))
+		lt_head.add_child(SmaKit.label(I18n.t("career.liveTrack.title"), 13,
+			SmaUiTheme.POSITIVE if lt_done else SmaUiTheme.GOLD))
+		lt_head.add_child(SmaKit.hspacer())
+		lt_head.add_child(SmaKit.caption(I18n.t("career.liveTrack.badgeReady" if lt_done
+			else "career.liveTrack.badgeAlt")))
+		box.add_child(lt_head)
+		for check in live_track.get("checks", []):
+			var ck_kind := String(check.get("kind", ""))
+			var ck_done := bool(check.get("done", false))
+			var ck_line := SmaKit.hbox(8)
+			ck_line.add_child(SmaKit.label("✓" if ck_done else "○", 12,
+				SmaUiTheme.POSITIVE if ck_done else SmaUiTheme.DIM))
+			var ck_lbl := I18n.t("career.req.equity", {"value": SmaFormat.money(float(check["target"]))}) \
+				if ck_kind == "equity" else I18n.t("career.liveTrack.%s" % ck_kind, {
+					"target": int(check["target"]),
+				})
+			ck_line.add_child(SmaKit.label(ck_lbl, 12,
+				SmaUiTheme.TEXT if ck_done else SmaUiTheme.MUTED))
+			ck_line.add_child(SmaKit.hspacer())
+			var ck_val := "%s / %s" % [SmaFormat.money(float(check["current"])), SmaFormat.money(float(check["target"]))] \
+				if ck_kind == "equity" else "%d / %d" % [int(check["current"]), int(check["target"])]
+			ck_line.add_child(SmaKit.muted(ck_val, 11))
+			box.add_child(ck_line)
+
 	var actions := SmaKit.hbox(8)
 	if not next.is_empty():
 		var button := SmaKit.button(I18n.t("career.promote", {

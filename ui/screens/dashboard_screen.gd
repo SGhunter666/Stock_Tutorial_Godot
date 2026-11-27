@@ -25,6 +25,8 @@ func refresh(_reason: String = "") -> void:
 	if game == null or not game.started:
 		return
 	_render_header()
+	if not game.last_close_recap.is_empty():
+		_body.add_child(_render_close_recap())
 	_body.add_child(_render_objective())
 	_body.add_child(_render_rivals())
 	if game.has_intro_task():
@@ -80,6 +82,50 @@ func _render_header() -> void:
 	header.add_child(SmaKit.button(I18n.t("dashboard.openAcademy"),
 		_go_academy, true))
 	_body.add_child(header)
+
+
+func _render_close_recap() -> Control:
+	var r: Dictionary = game.last_close_recap
+	var card := PanelContainer.new()
+	var border_col := SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT
+	card.add_theme_stylebox_override("panel",
+		SmaUiTheme.panel_style(SmaUiTheme.PANEL_ALT, border_col, 10, false))
+	var row := SmaKit.hbox(12)
+	card.add_child(row)
+	var pnl := float(r.get("pnl", 0.0))
+	var pct := float(r.get("pnlPct", 0.0))
+	row.add_child(SmaKit.label(I18n.t("recap.title", {
+		"date": String(r.get("date", "")),
+	}), 13, SmaUiTheme.GOLD))
+	row.add_child(SmaKit.label("%s (%s)" % [
+		SmaFormat.signed_money(pnl), SmaFormat.pct(pct),
+	], 13, SmaKit.value_color(pnl)))
+	if bool(r.get("hasBook", false)):
+		var b_tk := String(r.get("bestTicker", ""))
+		var w_tk := String(r.get("worstTicker", ""))
+		if b_tk != "":
+			row.add_child(SmaKit.label(I18n.t("recap.best", {
+				"ticker": b_tk, "pnl": SmaFormat.signed_money(float(r.get("bestPnl", 0.0))),
+			}), 12, SmaKit.value_color(float(r.get("bestPnl", 0.0)))))
+		if w_tk != "" and w_tk != b_tk:
+			row.add_child(SmaKit.label(I18n.t("recap.worst", {
+				"ticker": w_tk, "pnl": SmaFormat.signed_money(float(r.get("worstPnl", 0.0))),
+			}), 12, SmaKit.value_color(float(r.get("worstPnl", 0.0)))))
+	else:
+		row.add_child(SmaKit.muted(I18n.t("recap.flatBook"), 11))
+	var divs := float(r.get("dividends", 0.0))
+	if divs > 0.0:
+		row.add_child(SmaKit.label(I18n.t("recap.dividend", {
+			"amount": SmaFormat.money(divs),
+		}), 11, SmaUiTheme.POSITIVE))
+	row.add_child(SmaKit.hspacer())
+	var now_r := int(r.get("rank", 1))
+	var prev_r := int(r.get("prevRank", now_r))
+	var delta_txt := "▲" if now_r < prev_r else ("▼" if now_r > prev_r else "•")
+	row.add_child(SmaKit.label(I18n.t("recap.rankBadge", {
+		"rank": now_r, "delta": delta_txt,
+	}), 12, SmaUiTheme.ACCENT))
+	return card
 
 
 func _render_objective() -> Control:

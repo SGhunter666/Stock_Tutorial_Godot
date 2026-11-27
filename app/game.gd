@@ -45,6 +45,8 @@ var quant: Dictionary = SmaQuant.default_config()
 var fund: Dictionary = SmaFund.create_state()
 var alerts: Dictionary = SmaAlerts.create_state()
 var office: Dictionary = SmaOffice.create_state()
+var last_close_recap: Dictionary = {}
+var _pending_recap: Dictionary = {}
 var daily_sprint_active := false
 var daily_sprint_code := ""
 var daily_records: Array = []
@@ -141,6 +143,8 @@ func new_game(seed_value: String = DEFAULT_SEED) -> void:
 	fund = SmaFund.create_state()
 	alerts = SmaAlerts.create_state()
 	office = SmaOffice.create_state()
+	last_close_recap = {}
+	_pending_recap = {}
 	intro = {"plan": {}, "receipt": {}, "review": {}, "complete": false}
 	opening_gap = {}
 	opening_gap_active = false
@@ -211,6 +215,7 @@ func _advance_steps(steps: int, sample_quotes: bool = true) -> void:
 	for index in steps:
 		if int(exchange.state["second"]) == SmaExchange.SESSION_SECONDS - 1:
 			_record_intro_close()
+			_capture_session_recap_pre_close()
 		exchange.advance_second(sample_quotes)
 		_check_price_alerts()
 		if not exchange.last_player_fills.is_empty():
@@ -256,6 +261,7 @@ func _advance_steps(steps: int, sample_quotes: bool = true) -> void:
 		if earnings_count > 0:
 			toast_requested.emit(I18n.t("toast.earningsToday", {
 				"count": earnings_count}))
+		_finalize_session_recap(day_after, paid)
 		if not sandbox_mode and day_after in [2, 4, 6, 8, 12]:
 			toast_requested.emit(I18n.t("toast.seatUpgrade.day%d" % day_after))
 			academy_changed.emit()
@@ -458,6 +464,98 @@ func _record_intro_fill(fill: Dictionary) -> void:
 		"day": int(receipt.get("day", fill["day"])), "qty": total_qty, "gross": total_value,
 		"price": total_value / total_qty, "fee": float(receipt.get("fee", 0.0)) + float(fill["fee"]),
 		"weight": held * price / equity * 100.0 if equity > 0.0 else 0.0}
+
+
+func _capture_session_recap_pre_close() -> void:
+	if exchange == null:
+		return
+	var account: Dictionary = exchange.state["account"]
+	var companies: Dictionary = exchange.state["companies"]
+	var closed_day := int(exchange.state["dayIndex"])
+	var eq_end := exchange.equity()
+	var eq_start := float(account.get("initialCash", START_CASH))
+	var eq_hist: Array = account.get("equityHistory", [])
+	for pt in eq_hist:
+		if int(pt.get("day", -1)) < closed_day:
+			eq_start = float(pt.get("equity", eq_start))
+	var best_ticker := ""
+	var best_pnl := -INF
+	var worst_ticker := ""
+	var worst_pnl := INF
+	var has_book := false
+	for tk in account.get("positions", {}).keys():
+		var qty := int(account["positions"][tk].get("qty", 0))
+		if qty <= 0 or not companies.has(tk):
+			continue
+		has_book = true
+		var cs: Dictionary = companies[tk]
+		var dpnl := (float(cs["last"]) - float(cs["prevClose"])) * float(qty)
+		if dpnl > best_pnl:
+			best_pnl = dpnl
+			best_ticker = String(tk)
+		if dpnl < worst_pnl:
+			worst_pnl = dpnl
+			worst_ticker = String(tk)
+	for tk in account.get("shorts", {}).keys():
+		var sqty := int(account["shorts"][tk].get("qty", 0))
+		if sqty <= 0 or not companies.has(tk):
+			continue
+		has_book = true
+		var cs: Dictionary = companies[tk]
+		var spnl := (float(cs["prevClose"]) - float(cs["last"])) * float(sqty)
+		if spnl > best_pnl:
+			best_pnl = spnl
+			best_ticker = "-%s" % String(tk)
+		if spnl < worst_pnl:
+			worst_pnl = spnl
+			worst_ticker = "-%s" % String(tk)
+	_pending_recap = {
+		"closedDay": closed_day,
+		"date": SmaCalendar.iso_date(closed_day),
+		"equityStart": SmaFormat.round_to(eq_start, 2),
+		"equityEnd": SmaFormat.round_to(eq_end, 2),
+		"pnl": SmaFormat.round_to(eq_end - eq_start, 2),
+		"pnlPct": SmaFormat.round_to((eq_end - eq_start) / maxf(1.0, eq_start) * 100.0, 2),
+		"hasBook": has_book,
+		"bestTicker": best_ticker if best_pnl > -INF * 0.5 else "",
+		"bestPnl": SmaFormat.round_to(best_pnl, 2) if best_pnl > -INF * 0.5 else 0.0,
+		"worstTicker": worst_ticker if worst_pnl < INF * 0.5 else "",
+		"worstPnl": SmaFormat.round_to(worst_pnl, 2) if worst_pnl < INF * 0.5 else 0.0,
+	}
+
+
+func _finalize_session_recap(day_after: int, dividends_paid: float) -> void:
+	if _pending_recap.is_empty():
+		return
+	var prev_rank := int(last_close_recap.get("rank", 0))
+	var now_rank := 1
+	for entry in rival_leaderboard():
+		if bool(entry.get("isPlayer", false)):
+			now_rank = int(entry.get("rank", 1))
+			break
+	var recap := _pending_recap.duplicate(true)
+	_pending_recap = {}
+	recap["nextDay"] = day_after
+	recap["dividends"] = SmaFormat.round_to(dividends_paid, 2)
+	recap["rank"] = now_rank
+	recap["prevRank"] = prev_rank if prev_rank > 0 else now_rank
+	last_close_recap = recap
+	if not sandbox_mode:
+		var pnl_val := float(recap["pnl"])
+		var best_tk := String(recap["bestTicker"])
+		if bool(recap["hasBook"]) and best_tk != "":
+			toast_requested.emit(I18n.t("recap.toast", {
+				"pnl": SmaFormat.signed_money(pnl_val),
+				"pct": SmaFormat.pct(float(recap["pnlPct"])),
+				"best": best_tk,
+				"rank": now_rank,
+			}))
+		else:
+			toast_requested.emit(I18n.t("recap.toastCash", {
+				"pnl": SmaFormat.signed_money(pnl_val),
+				"rank": now_rank,
+			}))
+	state_changed.emit("recap")
 
 
 func _record_intro_close() -> void:
@@ -2598,6 +2696,8 @@ func start_sandbox(cash: float, seed_value: String, difficulty: String) -> Dicti
 	fund = SmaFund.create_state()
 	alerts = SmaAlerts.create_state()
 	office = SmaOffice.create_state()
+	last_close_recap = {}
+	_pending_recap = {}
 	narrative = SmaStoryService.new()
 	narrative.setup(self)
 	narrative.load_content()
@@ -2934,6 +3034,8 @@ func _apply_loaded_save(loaded: Dictionary) -> void:
 	fund = loaded["fund"]
 	alerts = loaded["alerts"]
 	office = loaded.get("office", SmaOffice.create_state())
+	last_close_recap = {}
+	_pending_recap = {}
 	daily_sprint_active = false
 	daily_sprint_code = ""
 	intro = loaded["intro"]

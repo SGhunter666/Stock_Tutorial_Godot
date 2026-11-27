@@ -131,6 +131,31 @@
       }
     },
     {
+      "id": "bailout_drawdown",
+      "event": "day_closed",
+      "story": "bailout_rescue",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "day_gte": 2
+          },
+          {
+            "equity_lte": 58000.0
+          }
+        ]
+      }
+    },
+    {
+      "id": "bailout_margin_emergency",
+      "event": "margin_call",
+      "story": "bailout_rescue",
+      "once": true,
+      "condition": {
+        "equity_lte": 58000.0
+      }
+    },
+    {
       "id": "research_unit",
       "event": "unit_completed",
       "story": "research",

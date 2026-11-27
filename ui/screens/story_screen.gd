@@ -5,7 +5,7 @@ extends SmaScreen
 
 const CHAPTER_ORDER := [
 	"opening", "first_trade", "day_one", "dividend", "rival_mania",
-	"diversify", "tilt_intervention", "research", "macro_shock",
+	"diversify", "tilt_intervention", "bailout_rescue", "research", "macro_shock",
 	"earnings_paradox", "short_mirror", "leverage_night", "options_expiry",
 	"client_trust", "wang_letter", "crisis_eve", "black_friday",
 	"graduation", "graduation_unfunded", "epilogue",
@@ -13,7 +13,7 @@ const CHAPTER_ORDER := [
 const CHARACTER_ORDER := ["lin_lan", "gu_yan", "su_he", "zhou_heng", "chen_xi", "wang", "lao_chen"]
 const DECISION_FLAGS := [
 	"path", "discipline", "mission_day1", "income_style", "rival_stance",
-	"diversify", "tilt_response", "research", "risk_response",
+	"diversify", "tilt_response", "bailout_choice", "research", "risk_response",
 	"earnings_mindset", "ethics", "leverage", "option_style",
 	"client_trust", "wang_followup", "hedge", "crisis_choice", "ending_path",
 ]

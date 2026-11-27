@@ -108,6 +108,19 @@ const RANKS := [
 		"requirements": []},
 ]
 
+## Dual-track live-trading promotion thresholds (alternative to Academy exams):
+## players who grow real equity, stay active across sessions, and trade
+## consistently can advance all the way to Hedge Fund Founder without quizzes.
+const LIVE_PROMOTION_RULES := {
+	1: {"days": 3, "trades": 3, "equity": 101000.0},
+	2: {"days": 6, "trades": 8, "equity": 104000.0},
+	3: {"days": 10, "trades": 14, "equity": 108000.0},
+	4: {"days": 15, "trades": 20, "equity": 114000.0},
+	5: {"days": 22, "trades": 28, "equity": 125000.0},
+	6: {"days": 30, "trades": 38, "equity": 150000.0},
+	7: {"days": 40, "trades": 50, "equity": 185000.0},
+}
+
 
 static func create_state(day: int = 0) -> Dictionary:
 	return {
@@ -343,17 +356,52 @@ static func _branch_unit_for(branch_id: String) -> String:
 	return ""
 
 
+static func live_track_progress(rank_num: int, ctx: Dictionary) -> Dictionary:
+	if not LIVE_PROMOTION_RULES.has(rank_num):
+		return {"available": false, "done": false, "checks": []}
+	var rule: Dictionary = LIVE_PROMOTION_RULES[rank_num]
+	var cur_day := int(ctx.get("day", 0))
+	var cur_trades := int(ctx.get("trades", 0)) + int(ctx.get("optionTrades", 0)) \
+		+ int(ctx.get("futuresTrades", 0))
+	var cur_eq := float(ctx.get("equity", 0.0))
+	var req_days := int(rule["days"])
+	var req_trades := int(rule["trades"])
+	var req_eq := float(rule["equity"])
+	var d_ok := cur_day >= req_days
+	var t_ok := cur_trades >= req_trades
+	var e_ok := cur_eq >= req_eq
+	return {
+		"available": true,
+		"done": d_ok and t_ok and e_ok,
+		"checks": [
+			{"kind": "liveDays", "current": mini(cur_day, req_days), "rawCurrent": cur_day,
+				"target": req_days, "done": d_ok,
+				"pct": minf(100.0, float(cur_day) / float(maxi(1, req_days)) * 100.0)},
+			{"kind": "liveTrades", "current": mini(cur_trades, req_trades), "rawCurrent": cur_trades,
+				"target": req_trades, "done": t_ok,
+				"pct": minf(100.0, float(cur_trades) / float(maxi(1, req_trades)) * 100.0)},
+			{"kind": "equity", "current": minf(cur_eq, req_eq), "rawCurrent": cur_eq,
+				"target": req_eq, "done": e_ok,
+				"pct": minf(100.0, cur_eq / maxf(1.0, req_eq) * 100.0)},
+		],
+	}
+
+
 static func progress(career: Dictionary, ctx: Dictionary) -> Dictionary:
 	var rank := rank_def(int(career.get("rank", 1)))
-	var next := rank_def(int(rank["number"]) + 1) if int(rank["number"]) < RANKS.size() else {}
+	var rank_num := int(rank["number"])
+	var next := rank_def(rank_num + 1) if rank_num < RANKS.size() else {}
 	var requirements: Array = []
 	for requirement in rank["requirements"]:
 		requirements.append(_requirement_progress(requirement, career, ctx))
-	var ready := not next.is_empty()
+	var academic_ready := not next.is_empty()
 	for entry in requirements:
 		if not bool(entry["done"]):
-			ready = false
+			academic_ready = false
 			break
+	var live_track := live_track_progress(rank_num, ctx) if not next.is_empty() \
+		else {"available": false, "done": false, "checks": []}
+	var ready := (not next.is_empty()) and (academic_ready or bool(live_track.get("done", false)))
 	var salary := float(rank["salary"])
 	var next_salary_day := int(career["salaryPaidDay"]) + SALARY_INTERVAL if salary > 0.0 else -1
 	var active_tasks := 0
@@ -364,7 +412,8 @@ static func progress(career: Dictionary, ctx: Dictionary) -> Dictionary:
 		elif String(task["status"]) == "available":
 			available_tasks += 1
 	return {
-		"rank": rank, "next": next, "requirements": requirements, "ready": ready,
+		"rank": rank, "next": next, "requirements": requirements,
+		"academicReady": academic_ready, "liveTrack": live_track, "ready": ready,
 		"salary": salary, "nextSalaryDay": next_salary_day,
 		"daysToSalary": maxi(0, next_salary_day - int(ctx.get("day", 0))) \
 			if next_salary_day >= 0 else -1,

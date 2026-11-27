@@ -31,6 +31,9 @@ var _meta_label: Label
 var _profile_label: Label
 var _sensitivity_label: Label
 var _reason_label: Label
+var _earnings_badge_label: Label
+var _ticker_news_box: VBoxContainer
+var _ticker_news_key := ""
 var _watch_button: Button
 var _indicators_card: PanelContainer
 var _indicator_labels: Dictionary = {}
@@ -176,6 +179,9 @@ func _build() -> void:
 	_reason_label = SmaKit.label("", 11, SmaUiTheme.GOLD)
 	_reason_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	quote_vbox.add_child(_reason_label)
+	_earnings_badge_label = SmaKit.label("", 11, SmaUiTheme.INFO)
+	_earnings_badge_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	quote_vbox.add_child(_earnings_badge_label)
 	quote_card.add_child(quote_vbox)
 	root.add_child(quote_card)
 
@@ -503,6 +509,23 @@ func _build() -> void:
 	orders_box.add_child(order_scroll)
 	right.add_child(orders_card)
 
+	var news_card := SmaKit.card(10)
+	var news_wrap := SmaKit.vbox(5)
+	news_card.add_child(news_wrap)
+	var news_head := SmaKit.hbox(6)
+	news_head.add_child(SmaKit.label(I18n.t("trade.tickerNewsTitle"), 13))
+	news_head.add_child(SmaKit.hspacer())
+	var open_news_btn := SmaKit.button(I18n.t("nav.news"), func():
+		var m := get_tree().get_first_node_in_group("main")
+		if m != null and m.has_method("navigate"):
+			m.navigate("news"))
+	SmaKit.set_small_font(open_news_btn, 10)
+	news_head.add_child(open_news_btn)
+	news_wrap.add_child(news_head)
+	_ticker_news_box = SmaKit.vbox(4)
+	news_wrap.add_child(_ticker_news_box)
+	right.add_child(news_card)
+
 	_select_defaults()
 	refresh()
 
@@ -775,12 +798,14 @@ func refresh(reason: String = "") -> void:
 	if ticker_changed:
 		_position_key = ""
 		_indicator_cache_key = ""
+		_ticker_news_key = ""
 	_update_tool_gates()
 	_update_book(ticker)
 	_update_chart(ticker)
 	_update_indicators(ticker, last)
 	_update_position(ticker)
 	_update_orders()
+	_update_ticker_news(ticker)
 	_update_available()
 	_update_estimate()
 	_update_oco(ticker, last)
@@ -802,6 +827,82 @@ func _update_quote_numbers(quote: Dictionary) -> void:
 		_reason_label.text = SmaKit.format_attribution(game.exchange.state, sym)
 		_reason_label.add_theme_color_override("font_color",
 			SmaUiTheme.GOLD if absf(change) >= 0.25 else SmaUiTheme.MUTED)
+		if _earnings_badge_label != null:
+			var cur_day: int = int(game.get_day())
+			var next_er := SmaEarnings.next_for_ticker(sym, cur_day)
+			if next_er.is_empty():
+				_earnings_badge_label.visible = false
+			else:
+				_earnings_badge_label.visible = true
+				var d_left := int(next_er["daysUntil"])
+				var period := String(next_er["periodLabel"])
+				if d_left == 0:
+					_earnings_badge_label.text = I18n.t("trade.earningsTodayBadge", {"period": period})
+					_earnings_badge_label.add_theme_color_override("font_color", SmaUiTheme.WARNING)
+				elif d_left <= 8:
+					_earnings_badge_label.text = I18n.t("trade.earningsSoonBadge", {
+						"period": period, "days": d_left,
+					})
+					_earnings_badge_label.add_theme_color_override("font_color", SmaUiTheme.WARNING)
+				else:
+					_earnings_badge_label.text = I18n.t("trade.earningsNormalBadge", {
+						"period": period, "days": d_left,
+					})
+					_earnings_badge_label.add_theme_color_override("font_color", SmaUiTheme.INFO)
+
+
+func _update_ticker_news(ticker: String) -> void:
+	if _ticker_news_box == null or game == null or game.exchange == null:
+		return
+	var seq := int(game.exchange.state.get("newsSeq", 0))
+	var cur_day: int = int(game.get_day())
+	var nkey := "%s|%d|%d" % [ticker, cur_day, seq]
+	if nkey == _ticker_news_key:
+		return
+	_ticker_news_key = nkey
+	SmaKit.clear_children(_ticker_news_box)
+	var all_news: Array = game.news_items()
+	var matched: Array = []
+	for idx in range(all_news.size() - 1, -1, -1):
+		var item: Dictionary = all_news[idx]
+		if String(item.get("ticker", "")) == ticker:
+			matched.append(item)
+			if matched.size() >= 3:
+				break
+	if matched.size() < 2 and not SmaEtfs.is_etf(ticker):
+		var q_prev := SmaFundamentals.latest_quarter(cur_day, ticker)
+		var hist_ev := SmaEarnings.historical_event(ticker, q_prev,
+			String(game.exchange.state.get("seed", "sim-exchange-v1")))
+		if not hist_ev.is_empty() and int(hist_ev.get("day", 999)) <= cur_day:
+			var dup := false
+			for m in matched:
+				if String(m.get("kind", "")) == "earnings" and int(m.get("day", -999)) == int(hist_ev["day"]):
+					dup = true
+					break
+			if not dup:
+				matched.append(hist_ev)
+	if matched.is_empty():
+		_ticker_news_box.add_child(SmaKit.muted(I18n.t("trade.tickerNewsEmpty"), 11))
+		return
+	var company_name := String(SmaCompanyCatalog.get_company(ticker).get("name", ticker))
+	for item in matched:
+		var pct := float(item.get("pct", 0.0))
+		var tkey := "news.template.%s" % String(item.get("template", ""))
+		var headline := I18n.t(tkey, {
+			"company": company_name,
+			"pct": SmaFormat.num(absf(pct), 1) + "%",
+			"period": String(item.get("periodLabel", "")),
+			"eps": SmaFormat.num(float(item.get("eps", 0.0)), 2),
+			"expected": SmaFormat.num(float(item.get("expectedEps", 0.0)), 2),
+			"surprise": SmaFormat.pct(float(item.get("surprisePct", 0.0)), 1),
+		})
+		var line := SmaKit.label("[%s · %s] %s" % [
+			SmaCalendar.iso_date(int(item.get("day", 0))),
+			SmaFormat.pct(pct, 1),
+			headline,
+		], 11, SmaKit.value_color(pct) if absf(pct) >= 1.5 else SmaUiTheme.MUTED)
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_ticker_news_box.add_child(line)
 
 
 func _update_tool_gates() -> void:

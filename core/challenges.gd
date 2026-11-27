@@ -135,9 +135,35 @@ static func by_id(challenge_id: String) -> Dictionary:
 	return {}
 
 
-static func is_unlocked(academy: Dictionary, definition: Dictionary) -> bool:
+const UNLOCK_DAYS := {
+	"firstProfit": 1,
+	"dividendCollector": 4,
+	"etfAllocator": 4,
+	"riskManager": 6,
+	"cashGuard": 6,
+	"multiAssetExplorer": 6,
+	"shortSeller": 8,
+	"optionsStarter": 12,
+	"incomeDesk": 12,
+	"optionsIncome": 12,
+	"volatilityDesk": 12,
+	"futuresStarter": 12,
+	"hedger": 12,
+	"allRound": 16,
+}
+
+
+static func unlock_day_for(challenge_id: String) -> int:
+	return int(UNLOCK_DAYS.get(challenge_id, 0))
+
+
+static func is_unlocked(academy: Dictionary, definition: Dictionary, day: int = 0) -> bool:
 	if definition.is_empty():
 		return false
+	var cid := String(definition.get("id", ""))
+	var auto_day := int(UNLOCK_DAYS.get(cid, -1))
+	if auto_day > 0 and day >= auto_day:
+		return true
 	return SmaAcademy.is_unit_complete(academy, String(definition["unlockUnit"]))
 
 
@@ -153,7 +179,7 @@ static func start(state: Dictionary, academy: Dictionary, challenge_id: String,
 		return {"ok": false, "error": "challenges.errorUnknown"}
 	if not state.get("active", {}).is_empty():
 		return {"ok": false, "error": "challenges.errorActive"}
-	if not is_unlocked(academy, definition):
+	if not is_unlocked(academy, definition, day):
 		return {"ok": false, "error": "challenges.errorLocked"}
 	if equity_value <= 0.0:
 		return {"ok": false, "error": "challenges.errorEquity"}

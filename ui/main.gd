@@ -83,6 +83,7 @@ const COMPACT_HEIGHT := 740.0
 
 var _screens: Dictionary = {}
 var _nav_buttons: Dictionary = {}
+var _nav_label_keys: Dictionary = {}
 var _group_open: Dictionary = {
 	"overview": true, "research": true, "execution": true,
 	"growth": true, "fund_lab": false, "system": false,
@@ -647,8 +648,10 @@ func _build_sidebar() -> Control:
 		_group_boxes[gid] = items_box
 		for entry in section["items"]:
 			var screen_id := String(entry[0])
+			var label_key := String(entry[1])
 			_screen_group[screen_id] = gid
-			var button := SmaKit.toggle(I18n.t(String(entry[1])), group)
+			_nav_label_keys[screen_id] = label_key
+			var button := SmaKit.toggle(I18n.t(label_key), group)
 			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			button.custom_minimum_size.y = 32
 			if SmaUiTheme.is_pixel():
@@ -779,9 +782,55 @@ func open_ticker(ticker: String, screen_id: String = "trade") -> void:
 	navigate(screen_id)
 
 
+func _nav_badge_for(screen_id: String) -> String:
+	if not Game.started or Game.exchange == null:
+		return ""
+	match screen_id:
+		"career":
+			if bool(Game.career_progress().get("ready", false)):
+				return I18n.t("nav.badge.promote")
+		"fund":
+			var fstatus := String(Game.fund.get("status", "none"))
+			if Game.fund_unlocked() and fstatus == "none":
+				return I18n.t("nav.badge.foundFund")
+			if fstatus == "active":
+				var pending_red := 0
+				for req in Game.fund.get("redemptions", []):
+					if String(req.get("status", "pending")) == "pending":
+						pending_red += 1
+				if pending_red > 0:
+					return I18n.t("nav.badge.redemption", {"count": pending_red})
+		"earnings":
+			var er_today := 0
+			for item in Game.exchange.news_today():
+				if String(item.get("kind", "")) == "earnings":
+					er_today += 1
+			if er_today > 0:
+				return "[%d]" % er_today
+		"story":
+			if Game.narrative != null and Game.narrative.is_active():
+				return "●"
+	return ""
+
+
 func _refresh_nav() -> void:
+	var group_has_badge: Dictionary = {}
 	for id in _nav_buttons.keys():
-		_nav_buttons[id].button_pressed = id == _current_screen
+		var btn: Button = _nav_buttons[id]
+		btn.button_pressed = id == _current_screen
+		var base_key := String(_nav_label_keys.get(id, ""))
+		if base_key != "":
+			var badge := _nav_badge_for(String(id))
+			btn.text = ("%s %s" % [I18n.t(base_key), badge]) if badge != "" else I18n.t(base_key)
+			if badge != "":
+				group_has_badge[String(_screen_group.get(id, ""))] = true
+	for section in NAV_GROUPS:
+		var gid := String(section["id"])
+		if _group_headers.has(gid):
+			var open_now := bool(_group_open.get(gid, true))
+			var dot := " ★" if (not open_now and bool(group_has_badge.get(gid, false))) else ""
+			_group_headers[gid].text = "%s %s%s" % [
+				"▾" if open_now else "▸", I18n.t(String(section["titleKey"])), dot]
 	if _story_badge != null:
 		var active := Game.started and Game.narrative != null and Game.narrative.is_active()
 		_story_badge.text = "● %s" % I18n.t("story.active") if active else ""
@@ -822,12 +871,14 @@ func _on_academy_changed() -> void:
 	if _last_xp >= 0 and now_xp > _last_xp and _pixel_fx != null:
 		_pixel_fx.spawn_xp_gain(now_xp - _last_xp)
 	_last_xp = now_xp
+	_refresh_nav()
 	if _screens.has("academy"):
 		_screens["academy"].refresh("academy")
 
 
 func _on_game_started() -> void:
 	_last_xp = _current_xp()
+	_refresh_nav()
 	if _start_overlay != null:
 		_start_overlay.visible = false
 	_sync_compact_layout()

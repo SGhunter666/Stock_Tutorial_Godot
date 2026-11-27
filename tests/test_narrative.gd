@@ -89,8 +89,8 @@ func run() -> void:
 	describe("story-load")
 	var host := FakeHost.new()
 	var service := _make_service(host)
-	eq(service.stories.size(), 20, "twenty stories registered")
-	eq(service.triggers.size(), 41, "forty-one trigger definitions registered")
+	eq(service.stories.size(), 21, "twenty-one stories registered")
+	eq(service.triggers.size(), 43, "forty-three trigger definitions registered")
 	eq(service.characters.size(), 7, "seven character portraits registered")
 	check(service.speaker_lookup.has("Lin Lan"), "english character alias registered")
 	check(service.speaker_lookup.has("Mr. Wang"), "client character alias registered")
@@ -199,7 +199,7 @@ func run() -> void:
 	service5.from_dict(saved)
 	eq(String(service5.flags.get("path", "")), "value", "flags survive restore")
 	check(bool(service5.seen.get("opening", false)), "seen stories survive restore")
-	eq(service5.stories.size(), 20, "stories are re-registered on load")
+	eq(service5.stories.size(), 21, "stories are re-registered on load")
 
 	describe("story-new-conditions")
 	var host8 := FakeHost.new()
@@ -554,3 +554,47 @@ func run() -> void:
 	var gu_crash := SmaRivals.gu_yan_snapshot(ex.state, 100000.0)
 	check(bool(gu_crash.get("marginCalled", false)), "Gu Yan triggers margin call on -12% basket crash")
 	approx(float(gu_crash.get("leverage", 0.0)), 0.85, 0.01, "Gu Yan leverage cut to 0.85x after blow-up")
+
+	describe("beta20-bailout-and-live-career")
+	var bail_host := FakeHost.new()
+	var bail_service := _make_service(bail_host)
+	bail_service.seen["day_one"] = true
+	bail_service.seen["tilt_intervention"] = true
+	bail_host.day = 5
+	bail_host.cash = 48000.0
+	bail_service.handle_event("day_closed", {"day": 5})
+	eq(bail_service.active_id, "bailout_rescue", "equity <= 58k triggers Farview bailout protocol")
+	var bail_choice := _advance_to_choice(bail_service)
+	eq(bail_choice["choices"].size(), 2, "bailout offers full restructure or iron-grit path")
+	check(bail_service.choose(0), "restructure injection accepted")
+	approx(bail_host.cash, 83000.0, 0.01, "+$35,000 recovery capital credited")
+	eq(String(bail_service.flags.get("bailout_choice", "")), "restructure", "bailout_choice flag saved")
+
+	var live_career := SmaCareer.create_state(0)
+	var empty_acad := SmaAcademy.create_state()
+	for target_rank in [2, 3, 4, 5]:
+		var ctx := {
+			"academy": empty_acad,
+			"day": 20,
+			"equity": 120000.0,
+			"initialCash": 100000.0,
+			"careerIncome": 0.0,
+			"trades": 24,
+			"optionTrades": 0,
+			"futuresTrades": 0,
+			"equityHistory": [],
+			"challengesCompleted": [],
+			"tickers": ["APLA", "NVDO"],
+		}
+		var prom := SmaCareer.promote(live_career, ctx, 20)
+		check(bool(prom.get("ok", false)), "live-track promotes to rank %d without quizzes" % target_rank)
+	eq(int(live_career["rank"]), 5, "live-track reaches Rank 5 Portfolio Manager")
+	check(SmaFund.unlocked(live_career), "Rank 5 via live-track unlocks founding a Hedge Fund")
+
+	var risk_def := SmaChallenges.by_id("riskManager")
+	check(not SmaChallenges.is_unlocked(empty_acad, risk_def, 0), "riskManager locked on day 0 without u15")
+	check(SmaChallenges.is_unlocked(empty_acad, risk_def, 6), "riskManager auto-unlocks on day 6")
+
+	var next_nvdo := SmaEarnings.next_for_ticker("NVDO", 10)
+	check(not next_nvdo.is_empty() and int(next_nvdo.get("daysUntil", -1)) >= 0,
+		"next_for_ticker computes upcoming earnings countdown")

@@ -122,7 +122,9 @@ func _render_locked() -> void:
 	box.add_child(SmaKit.muted(I18n.t("fund.lockedText", {
 		"rank": SmaFund.RANK_REQUIREMENT, "current": int(game.career.get("rank", 1)),
 	}), 12))
-	box.add_child(SmaKit.muted(I18n.t("fund.lockedHint"), 11))
+	var hint_dual := SmaKit.muted(I18n.t("fund.lockedHintDual"), 11)
+	hint_dual.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(hint_dual)
 	box.add_child(SmaKit.button(I18n.t("fund.goCareer"), _go_career, true))
 	_body.add_child(card)
 

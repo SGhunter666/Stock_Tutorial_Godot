@@ -20,6 +20,49 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA20_ONLY") == "1":
+		Game.new_game("beta20-smooth")
+		await _settle(4)
+		_dismiss_story()
+		Game.submit_order({"ticker": "NVDO", "side": "buy", "type": "market", "qty": 80})
+		_dismiss_story()
+		Game.submit_order({"ticker": "MSFY", "side": "buy", "type": "market", "qty": 30})
+		Game.submit_order({"ticker": "APLA", "side": "buy", "type": "market", "qty": 20})
+		for d in 4:
+			Game._advance_steps(SmaExchange.SESSION_SECONDS, false)
+			_dismiss_story()
+		Game.exchange.state["account"]["cash"] = float(Game.exchange.state["account"]["cash"]) + 2500.0
+		Game.intro["complete"] = true
+		if main._pixel_fx != null:
+			main._pixel_fx._popups.clear()
+			main._pixel_fx._sparks.clear()
+			main._pixel_fx.queue_redraw()
+		main._refresh_nav()
+		main.navigate("dashboard")
+		main._screens["dashboard"].refresh()
+		await _settle(5)
+		await _shot("beta20_dashboard_recap")
+		main.navigate("career")
+		main._screens["career"].refresh()
+		await _settle(5)
+		await _shot("beta20_career_live_track")
+		var soon_tk := "NVDO"
+		for tk in SmaCompanyCatalog.load_companies().keys():
+			var ner := SmaEarnings.next_for_ticker(String(tk), Game.get_day())
+			if not ner.is_empty() and int(ner.get("daysUntil", 99)) <= 12:
+				soon_tk = String(tk)
+				break
+		Game.select_ticker(soon_tk)
+		main.navigate("trade")
+		var ts20: SmaTradeScreen = main._screens["trade"]
+		ts20._on_timeframe("1D")
+		ts20.refresh()
+		await _settle(5)
+		await _shot("beta20_trade_earnings_feed")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA19_ONLY") == "1":
 		Game.new_game("beta19-rivals")
 		await _settle(4)

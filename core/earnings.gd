@@ -435,3 +435,24 @@ static func upcoming(state: Dictionary, day: int, limit: int = 3) -> Array:
 		if rows.size() >= limit:
 			break
 	return rows
+
+
+static func next_for_ticker(ticker: String, day: int) -> Dictionary:
+	var sym := ticker.to_upper()
+	var company := SmaCompanyCatalog.get_company(sym)
+	if company.is_empty() or bool(company.get("isEtf", false)):
+		return {}
+	var latest := SmaFundamentals.latest_quarter(day)
+	for quarter in range(latest, latest + 4):
+		if quarter < SmaFundamentals.FIRST_QUARTER:
+			continue
+		var rday := SmaFundamentals.report_day_for(sym, quarter)
+		if rday >= day:
+			return {
+				"ticker": sym,
+				"day": rday,
+				"daysUntil": rday - day,
+				"quarter": quarter,
+				"periodLabel": SmaFundamentals.period_label(quarter),
+			}
+	return {}

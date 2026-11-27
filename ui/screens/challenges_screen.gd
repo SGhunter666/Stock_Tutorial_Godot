@@ -305,7 +305,8 @@ func _challenge_card(definition: Dictionary) -> PanelContainer:
 	var failed: bool = game.challenges["failed"].has(challenge_id)
 	var active_id := String(game.challenges["active"].get("id", ""))
 	var active := active_id == challenge_id
-	var unlocked := SmaChallenges.is_unlocked(game.academy, definition)
+	var cur_day: int = int(game.get_day())
+	var unlocked := SmaChallenges.is_unlocked(game.academy, definition, cur_day)
 	var card := SmaKit.card(12)
 	var box := SmaKit.vbox(6)
 	card.add_child(box)
@@ -344,9 +345,14 @@ func _challenge_card(definition: Dictionary) -> PanelContainer:
 		}), 11))
 	footer.add_child(SmaKit.hspacer())
 	if not unlocked:
-		footer.add_child(SmaKit.muted(I18n.t("challenges.lockedByUnit", {
+		var auto_day := SmaChallenges.unlock_day_for(challenge_id)
+		var lock_txt := I18n.t("challenges.lockedDual", {
+			"unit": I18n.t(String(SmaAcademy.unit(String(definition["unlockUnit"])).get("titleKey", ""))),
+			"day": auto_day + 1,
+		}) if auto_day > 0 else I18n.t("challenges.lockedByUnit", {
 			"unit": SmaAcademy.unit(String(definition["unlockUnit"])).get("titleKey", ""),
-		}), 10))
+		})
+		footer.add_child(SmaKit.muted(lock_txt, 10))
 		footer.add_child(SmaKit.button(I18n.t("challenges.goUnlock"), _go_academy))
 	elif not active:
 		footer.add_child(SmaKit.button(

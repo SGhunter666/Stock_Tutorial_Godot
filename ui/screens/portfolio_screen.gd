@@ -289,8 +289,10 @@ func _update_long() -> void:
 		return
 	for row in rows:
 		var ticker := String(row["ticker"])
+		var qty := int(row["qty"])
+		var outer := SmaKit.hbox(6)
 		var line := SmaKit.data_row([
-			ticker, String(row["name"]), SmaFormat.quantity(float(row["qty"])),
+			ticker, String(row["name"]), SmaFormat.quantity(float(qty)),
 			SmaFormat.num(float(row["avgCost"]), 2), SmaFormat.num(float(row["last"]), 2),
 			SmaFormat.money(float(row["marketValue"])), SmaFormat.signed_money(float(row["unrealized"])),
 		], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], [
@@ -299,7 +301,26 @@ func _update_long() -> void:
 		], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
 			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
 			HORIZONTAL_ALIGNMENT_RIGHT])
-		_long_box.add_child(_clickable_row(line, _open_ticker.bind(ticker)))
+		var row_btn := _clickable_row(line, _open_ticker.bind(ticker))
+		row_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		outer.add_child(row_btn)
+		if qty >= 2:
+			var half_b := SmaKit.button(I18n.t("trade.closeHalf"),
+				_quick_portfolio_close.bind(ticker, "sell", int(floor(qty / 2.0))))
+			SmaKit.set_small_font(half_b, 10)
+			outer.add_child(half_b)
+		var all_b := SmaKit.button(I18n.t("trade.closeAll"),
+			_quick_portfolio_close.bind(ticker, "sell", qty))
+		SmaKit.set_small_font(all_b, 10)
+		outer.add_child(all_b)
+		_long_box.add_child(outer)
+
+
+func _quick_portfolio_close(ticker: String, side: String, qty: int) -> void:
+	if game == null or qty <= 0:
+		return
+	game.submit_order({"ticker": ticker, "side": side, "type": "market", "qty": qty})
+	refresh("quick_close")
 
 
 func _update_short() -> void:
@@ -310,8 +331,10 @@ func _update_short() -> void:
 		return
 	for row in rows:
 		var ticker := String(row["ticker"])
+		var qty := int(row["qty"])
+		var outer := SmaKit.hbox(6)
 		var line := SmaKit.data_row([
-			ticker, String(row["name"]), SmaFormat.quantity(float(row["qty"])),
+			ticker, String(row["name"]), SmaFormat.quantity(float(qty)),
 			SmaFormat.num(float(row["avgPrice"]), 2), SmaFormat.num(float(row["last"]), 2),
 			SmaFormat.money(float(row["marketValue"])), SmaFormat.signed_money(float(row["unrealized"])),
 		], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], [
@@ -320,7 +343,19 @@ func _update_short() -> void:
 		], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT,
 			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT,
 			HORIZONTAL_ALIGNMENT_RIGHT])
-		_short_box.add_child(_clickable_row(line, _open_ticker.bind(ticker)))
+		var row_btn := _clickable_row(line, _open_ticker.bind(ticker))
+		row_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		outer.add_child(row_btn)
+		if qty >= 2:
+			var half_b := SmaKit.button(I18n.t("trade.closeHalf"),
+				_quick_portfolio_close.bind(ticker, "cover", int(floor(qty / 2.0))))
+			SmaKit.set_small_font(half_b, 10)
+			outer.add_child(half_b)
+		var all_b := SmaKit.button(I18n.t("trade.closeAll"),
+			_quick_portfolio_close.bind(ticker, "cover", qty))
+		SmaKit.set_small_font(all_b, 10)
+		outer.add_child(all_b)
+		_short_box.add_child(outer)
 
 
 func _update_other_assets() -> void:
