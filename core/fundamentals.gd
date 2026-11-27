@@ -85,7 +85,9 @@ static func report(ticker: String, quarter: int) -> Dictionary:
 	var rng := SmaRng.new("fundamentals:%s:%d" % [ticker, quarter])
 	var season := float(SEASONAL[posmod(quarter, SEASONAL.size())])
 	var cycle := 1.0 + 0.035 * sin(float(quarter) * 0.8 + float(abs(hash(ticker)) % 628) / 100.0)
-	var revenue := annual_revenue / 4.0 * season * cycle \
+	var qoq_growth := clampf(float(company.get("qoqGrowth", 0.0)), -0.08, 0.12)
+	var growth_trend := pow(1.0 + qoq_growth, clampf(float(quarter), -12.0, 16.0))
+	var revenue := annual_revenue / 4.0 * season * cycle * growth_trend \
 		* (1.0 + rng.normal() * 0.012)
 	var gross_margin := annual_gross / annual_revenue if annual_revenue > 0.0 else 0.0
 	gross_margin = clampf(gross_margin + rng.normal() * 0.006, 0.02, 0.95)

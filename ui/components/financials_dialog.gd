@@ -41,6 +41,13 @@ func _build() -> void:
 	header.add_child(SmaKit.hspacer())
 	header.add_child(SmaKit.button(I18n.t("common.close"), _close))
 	root.add_child(header)
+	var desc_text := String(company.get("descriptionZh", "")) if I18n.locale == "zh_CN" else ""
+	if desc_text == "":
+		desc_text = String(company.get("description", ""))
+	if desc_text != "":
+		var desc_lbl := SmaKit.label(desc_text, 12, SmaUiTheme.GOLD)
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		root.add_child(desc_lbl)
 	root.add_child(SmaKit.muted(I18n.t("financials.subtitle"), 12))
 	if game.exchange != null:
 		var last_earnings: Dictionary = game.exchange.state.get("companies", {}) \

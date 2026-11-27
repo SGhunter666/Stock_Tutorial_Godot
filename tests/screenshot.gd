@@ -20,6 +20,32 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA15_ONLY") == "1":
+		Game.new_game("beta15-stocks")
+		await _settle(4)
+		_dismiss_story()
+		for uid in ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8"]:
+			if Game.academy["units"].has(uid):
+				Game.academy["units"][uid]["completed"] = true
+		main.navigate("market")
+		await _settle(5)
+		await _shot("beta15_market_100")
+		Game.select_ticker("TSMX")
+		main.navigate("trade")
+		var ts15: SmaTradeScreen = main._screens["trade"]
+		ts15._on_timeframe("1D")
+		ts15._boll_toggle.button_pressed = true
+		ts15._sync_chart_overlays()
+		ts15.refresh()
+		await _settle(5)
+		await _shot("beta15_tsmx_kline")
+		ts15._open_financials()
+		await _settle(5)
+		await _shot("beta15_tsmx_financials")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_FONT_CHECK") == "1":
 		Game.new_game("font-check")
 		await _settle(4)

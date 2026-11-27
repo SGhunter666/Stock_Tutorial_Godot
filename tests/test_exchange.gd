@@ -4,8 +4,8 @@ extends "res://tests/test_base.gd"
 func run() -> void:
 	describe("exchange-init")
 	var exchange := SmaExchange.new("test-seed", 100000.0)
-	eq(exchange.state["companies"].size(), 61, "universe has 57 companies and 4 ETFs")
-	eq(exchange.state["quotes"].size(), 61, "every instrument has a quote")
+	eq(exchange.state["companies"].size(), 104, "universe has 100 companies and 4 ETFs")
+	eq(exchange.state["quotes"].size(), 104, "every instrument has a quote")
 	approx(exchange.equity(), 100000.0, 0.001, "initial equity equals cash")
 
 	describe("exchange-buy")

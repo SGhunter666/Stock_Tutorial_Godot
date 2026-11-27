@@ -4,7 +4,7 @@ extends "res://tests/test_base.gd"
 func run() -> void:
 	describe("catalog")
 	var companies := SmaCompanyCatalog.load_companies()
-	eq(companies.size(), 57, "catalog exposes 57 companies")
+	eq(companies.size(), 100, "catalog exposes 100 companies")
 	var references := 0
 	var originals := 0
 	var tickers := {}
@@ -25,10 +25,18 @@ func run() -> void:
 			references += 1
 		else:
 			originals += 1
-	eq(references, 20, "twenty reference-inspired companies")
+	eq(references, 63, "sixty-three reference-inspired companies")
 	eq(originals, 37, "thirty-seven wholly original companies")
 	for sector_name in sector_counts.keys():
-		ge(float(sector_counts[sector_name]), 3.0, "sector %s has at least 3 companies" % sector_name)
+		ge(float(sector_counts[sector_name]), 4.0, "sector %s has at least 4 companies" % sector_name)
+
+	describe("catalog-fundamentals-all-100")
+	for ticker in companies.keys():
+		var rep := SmaFundamentals.report(String(ticker), -2)
+		check(not rep.is_empty(), "quarterly report generated for %s" % ticker)
+		var bal: Dictionary = rep["balance"]
+		le(absf(float(bal["totalAssets"]) - float(bal["totalLiabilities"]) - float(bal["equity"])),
+			0.05, "quarterly balance sheet reconciles for %s" % ticker)
 
 	describe("catalog-financials")
 	for ticker in companies.keys():

@@ -116,7 +116,7 @@ func _create_company_state(company: Dictionary, seed_value: String) -> Dictionar
 	var half := maxf(0.01, price * float(company["spread"]) / 20000.0)
 	book.set_market_maker(price - half, price + half, mm_size)
 	var series := SmaMinuteSeries.create()
-	series["daily"] = _seed_daily_history(ticker, price, seed_value)
+	series["daily"] = _seed_daily_history(company, seed_value)
 	var prev_close := price
 	if series["daily"].size() >= 2:
 		prev_close = float(series["daily"][series["daily"].size() - 2]["c"])
@@ -144,22 +144,58 @@ func _create_company_state(company: Dictionary, seed_value: String) -> Dictionar
 
 
 ## Charts and optimisers need history before the first simulated session, so
-## every instrument starts with deterministic daily bars ending at its price.
-static func _seed_daily_history(ticker: String, price: float, seed_value: String) -> Array:
+## every instrument starts with deterministic daily bars ending at its price,
+## shaped by its real-world archetype (klineShape + vol).
+static func _seed_daily_history(company: Dictionary, seed_value: String) -> Array:
+	var ticker := String(company.get("ticker", "SIMX"))
+	var price := maxf(0.5, float(company.get("price", 100.0)))
+	var base_vol := clampf(float(company.get("vol", 0.016)), 0.008, 0.055)
+	var shape := String(company.get("klineShape", ""))
+	if shape == "":
+		var stg := String(company.get("stage", "mature"))
+		if stg == "highGrowth":
+			shape = "bull_trend"
+		elif stg == "turnaround":
+			shape = "turnaround_dip"
 	var rng := SmaRng.new("%s|%s|history" % [seed_value, ticker])
 	var bars: Array = []
 	var cursor_price := price * (0.9 + rng.next() * 0.2)
+	var phase := rng.next() * TAU
 	for index in HISTORY_DAYS:
-		var drift := rng.normal() * 0.012
+		var t := float(index) / float(maxi(1, HISTORY_DAYS - 1))
+		var bias := 0.0
+		var wick_mult := 0.35
+		match shape:
+			"bull_parabolic":
+				bias = 0.0022 + 0.0048 * t * t
+				wick_mult = 0.42
+			"bull_trend":
+				bias = 0.0024
+				wick_mult = 0.36
+			"steady_compounder":
+				bias = 0.0014
+				wick_mult = 0.28
+			"cyclical_wave":
+				bias = sin(t * TAU * 1.35 + phase) * base_vol * 0.45
+				wick_mult = 0.38
+			"turnaround_dip":
+				bias = -0.0038 if t < 0.68 else 0.0026
+				wick_mult = 0.44
+			"high_beta_swing":
+				bias = sin(t * TAU * 2.1 + phase) * base_vol * 0.55
+				wick_mult = 0.52
+		var drift := bias + rng.normal() * base_vol * 0.78
 		var open_price := cursor_price
 		var close_price := maxf(0.5, cursor_price * (1.0 + drift))
-		var high := maxf(open_price, close_price) * (1.0 + absf(rng.normal()) * 0.004)
-		var low := minf(open_price, close_price) * (1.0 - absf(rng.normal()) * 0.004)
+		var high := maxf(open_price, close_price) * (1.0 + absf(rng.normal()) * base_vol * wick_mult)
+		var low := minf(open_price, close_price) * maxf(0.2, 1.0 - absf(rng.normal()) * base_vol * wick_mult)
+		var vol_base := float(company.get("avgVolume", 500000.0))
+		var bar_vol := maxi(10000, int(vol_base * (0.65 + rng.next() * 0.75)))
 		var day := SmaCalendar.iso_date(index - HISTORY_DAYS)
 		bars.append({
 			"d": day, "end": day,
 			"o": open_price, "h": high, "l": low, "c": close_price,
-			"v": int(100000 + rng.next() * 900000),
+			"v": bar_vol,
 			"trades": 0, "finalized": true,
 		})
 		cursor_price = close_price

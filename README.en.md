@@ -4,7 +4,7 @@
 
 A single-player **16-bit pixel-art** financial education and trading simulation built with **Godot 4** — fusing an interactive Kairosoft-inspired pixel trading floor with a crisp PC-98 CRT terminal, procedural 16-bit FM chiptune music, stepped pixel indicator curves, and segmented LED order-book depth. Players start as a retail investor in a deterministic simulated market, learn trading, risk, options, futures, multi-asset investing, quantitative research, fund management and career decision-making, and follow a complete story arc from apprentice to fund leader.
 
-- Version: `beta-14` (100% Full 16-Bit Pixel Edition · 5-Tier Font Size Scaling & Web HTML5 Play-in-Browser)
+- Version: `beta-15` (100% Full 16-Bit Pixel Edition · 100-Stock Universe, 5-Tier Font Scaling & Web HTML5)
 - **🌐 Play in Browser (No Download)**: <https://sghunter666.github.io/Stock_Tutorial_Godot/> (IndexedDB persistent saves + native browser PNG diploma poster & JSON save import/export)
 - Engine: Godot `4.7+` (tested on `4.7.2`)
 - Renderer: GL Compatibility (integer bitmap font scaling, `NEAREST` filtering, WebGL 2 single-threaded WASM)
@@ -27,7 +27,7 @@ After reviewing your first trade, open **Opening Gap** from the dashboard. Make 
 
 | Item | Count / Content |
 | --- | --- |
-| Simulated stocks | 57 fictional companies (11 balanced sectors, ≥ 3 companies each) |
+| Simulated stocks | **100 simulated equities** (63 real-world-inspired icons such as `Nvidie`, `TaiSemi`, `Broadkom`, `Berkshyre`, `Eli Lillie`, `Costko` + 37 original issuers across 11 sectors, ≥ 4 per sector) |
 | ETFs | 4: `MKT`, `TECH`, `DIV`, `SMAL` |
 | Academy | 32 core units (core + 4 parallel tracks, 85% placement test-out) + 6 branch units = 38 units |
 | Academy stages | 8 |

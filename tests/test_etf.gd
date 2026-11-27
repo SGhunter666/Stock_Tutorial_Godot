@@ -19,7 +19,8 @@ func run() -> void:
 		approx(nav_value, start, 0.01, "initial NAV equals listing price for %s" % symbol)
 		eq(exchange.state["companies"][symbol]["isEtf"], true, "universe marks %s as ETF" % symbol)
 	var holdings := SmaEtfs.holdings_rows(exchange.state["companies"], "MKT")
-	eq(holdings.size(), 14, "broad-market ETF exposes every component")
+	eq(holdings.size(), SmaEtfs.definition("MKT")["components"].size(),
+		"broad-market ETF exposes every component")
 	var total_weight := 0.0
 	for row in holdings:
 		total_weight += float(row["weight"])

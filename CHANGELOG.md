@@ -1,5 +1,12 @@
 # Changelog
 
+## beta-15
+
+- **股票池扩容至 100 家上市公司 + 真实财报与 K 线性格建模（`data/companies.json` + `core/exchange.gd` + `core/fundamentals.gd`）**：
+  - 将可交易模拟股票从 57 只正式扩充至 **100 只**（外加 4 只成分升级的宽基/行业/红利/小盘 ETF 共 **104 只可交易标的**），包含 **63 家对标现实全球龙头的谐音映射公司**（如 `NVDO · Nvidie`、`TSMX · TaiSemi`、`AVGM · Broadkom`、`ASMX · ASMI Litho`、`PLTX · Palantix`、`BRKB · Berkshyre`、`GSAC · Goldmen Sachs`、`CSTK · Costko`、`MCDO · McDoneld's`、`LLLY · Eli Lillie`、`NOVO · Novo Nordix`、`BOEN · Boeink`、`XOMN · Exxom Mobil` 等），覆盖全部 11 个行业且每个行业至少 4 家。
+  - **六类真实 K 线形态引擎（`klineShape`）**：按现实商业模式为各股定制初始历史日 K 线结构——AI/减肥药陡峭主升浪（`bull_parabolic`）、成长趋势通道（`bull_trend`）、巴菲特/消费股低波慢牛复利（`steady_compounder`）、油气/铜矿/农机大宗周期波浪（`cyclical_wave`）、波音/英特尔/耐克/辉瑞底部反转筑底（`turnaround_dip`）与高 Beta 宽幅震荡（`high_beta_swing`）。
+  - **季度财报成长斜率与中英公司简介（`qoqGrowth` + `descriptionZh`）**：在 `SmaFundamentals` 中引入贴合现实的季度营收/EPS 复利增速曲线（高成长算力/创新药、稳健蓝筹与困境反转分化鲜明），并在财报弹窗顶部展示中文商业模式与护城河简介。
+
 ## beta-14
 
 - **五档全局字体大小自由调节 & 舒适阅读默认字号（`ui/theme.gd` + `ui/kit.gd` + `settings_screen.gd` + `main.gd`）**：
