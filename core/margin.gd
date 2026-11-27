@@ -18,6 +18,54 @@ static func _round2(value: float) -> float:
 	return roundf(value * 100.0) / 100.0
 
 
+## Broker margin debit rate floats with the central bank's policy rate (+380 bps
+## retail broker spread), teaching how rate-hike cycles raise leverage carry cost.
+static func live_margin_rate(state: Dictionary) -> float:
+	var day := int(state.get("dayIndex", 0))
+	var seed_str := String(state.get("seed", "sim-exchange-v1"))
+	var snap := SmaMacro.snapshot(day, seed_str)
+	var policy := float(snap.get("policyRate", 2.6)) / 100.0
+	return SmaFormat.round_to(clampf(policy + 0.038, 0.045, 0.125), 4)
+
+
+## Stock-specific annualized short borrow fee ("Easy-to-Borrow" 0.4% on mega-cap
+## blue chips vs "Hard-to-Borrow" 12%..42% on crowded speculative/thin names).
+static func borrow_fee_rate(company: Dictionary) -> float:
+	if company.is_empty() or bool(company.get("isEtf", false)):
+		return 0.004
+	var vol := float(company.get("vol", 0.02))
+	var liquidity := String(company.get("liquidity", "normal"))
+	var stage := String(company.get("stage", "mature"))
+	var risk := String(company.get("risk", "medium"))
+	if vol >= 0.038 or (liquidity == "thin" and stage in ["early", "turnaround"]):
+		var htb := 0.26 + clampf((vol - 0.035) * 9.0, 0.0, 0.16)
+		return SmaFormat.round_to(clampf(htb, 0.26, 0.42), 3)
+	if vol >= 0.029 or risk == "high" or liquidity == "thin":
+		var mid_htb := 0.11 + clampf((vol - 0.026) * 8.0, 0.0, 0.10)
+		return SmaFormat.round_to(clampf(mid_htb, 0.11, 0.22), 3)
+	if liquidity == "deep" and vol <= 0.019:
+		return 0.004
+	return 0.022
+
+
+## Estimated market-wide short interest (% of float) for squeeze-risk education.
+static func short_interest_pct(company: Dictionary, day: int = 0,
+		seed_str: String = "sim-exchange-v1") -> float:
+	if company.is_empty() or bool(company.get("isEtf", false)):
+		return 1.2
+	var ticker := String(company.get("ticker", "SIMX"))
+	var fee := borrow_fee_rate(company)
+	var base_si := 1.8
+	if fee >= 0.25:
+		base_si = 24.5
+	elif fee >= 0.10:
+		base_si = 13.5
+	elif fee >= 0.02:
+		base_si = 4.8
+	var wave := sin(float(day) * 0.09 + float(abs(hash(seed_str + ticker)) % 628) / 100.0)
+	return SmaFormat.round_to(clampf(base_si * (1.0 + 0.16 * wave), 0.8, 38.0), 1)
+
+
 static func create_state() -> Dictionary:
 	return {
 		"accruedInterest": 0.0,
@@ -153,6 +201,7 @@ static func margin_snapshot(state: Dictionary, exclude_order_id: String = "") ->
 		"buyingPower": _round2(maxf(0.0, (equity - initial_requirement) / INITIAL_LONG)),
 		"shortPower": _round2(maxf(0.0, (equity - initial_requirement) / INITIAL_SHORT)),
 		"borrowedCash": _round2(maxf(0.0, -cash)),
+		"marginRate": live_margin_rate(state),
 		"accruedInterest": _round2(float(margin.get("accruedInterest", 0.0))),
 		"accruedBorrowFees": _round2(float(margin.get("accruedBorrowFees", 0.0))),
 		"status": status,
@@ -169,7 +218,7 @@ static func can_open_position(state: Dictionary, action: String, gross: float,
 	return float(snapshot["equity"]) - fee >= required
 
 
-## Charges interest on debit cash and a borrow fee on short market value.
+## Charges central-bank-linked debit interest and stock-specific short borrow fees.
 static func accrue_margin_charges(state: Dictionary, days: int = 1) -> Dictionary:
 	var account: Dictionary = state.get("account", {})
 	var margin: Dictionary = account["margin"]
@@ -178,9 +227,22 @@ static func accrue_margin_charges(state: Dictionary, days: int = 1) -> Dictionar
 		return {"interest": 0.0, "borrowFee": 0.0, "total": 0.0}
 	var snapshot := margin_snapshot(state)
 	var interest_base := maxf(0.0, -float(account.get("cash", 0.0)))
-	var interest := _round2(interest_base * MARGIN_INTEREST_RATE * elapsed / ACCRUAL_DAYS)
-	var borrow_fee := _round2(float(snapshot["shortMarketValue"]) * BORROW_FEE_RATE
-		* elapsed / ACCRUAL_DAYS)
+	var margin_rate := live_margin_rate(state)
+	var interest := _round2(interest_base * margin_rate * elapsed / ACCRUAL_DAYS)
+	var raw_borrow_fee := 0.0
+	var companies: Dictionary = state.get("companies", {})
+	var shorts: Dictionary = account.get("shorts", {})
+	for ticker in shorts.keys():
+		var short: Dictionary = shorts[ticker]
+		var qty := int(short.get("qty", 0))
+		if qty <= 0:
+			continue
+		var cs: Dictionary = companies.get(ticker, {})
+		var company: Dictionary = cs.get("company", SmaCompanyCatalog.get_company(String(ticker)))
+		var price := float(cs.get("last", short.get("avgPrice", 0.0)))
+		var rate := borrow_fee_rate(company)
+		raw_borrow_fee += float(qty) * price * rate * float(elapsed) / ACCRUAL_DAYS
+	var borrow_fee := _round2(raw_borrow_fee)
 	var total := _round2(interest + borrow_fee)
 	if interest > 0.0:
 		margin["accruedInterest"] = _round2(float(margin["accruedInterest"]) + interest)

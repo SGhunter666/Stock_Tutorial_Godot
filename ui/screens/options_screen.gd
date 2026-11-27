@@ -175,6 +175,29 @@ func _render_header() -> void:
 		"exchange.optionStyleNote.%s" % game.option_style()), 10)
 	style_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.add_child(style_note)
+	var iv_state: Dictionary = _chain.get("ivState", {})
+	if not iv_state.is_empty():
+		var iv_status := String(iv_state.get("status", "normal"))
+		var iv_days := int(iv_state.get("daysToEarnings", -1))
+		var iv_mult := float(iv_state.get("multiplier", 1.0))
+		var iv_text := ""
+		var iv_color := SmaUiTheme.MUTED
+		if iv_status == "preEarnings":
+			iv_text = I18n.t("options.ivBannerPre", {
+				"days": iv_days, "mult": SmaFormat.num(iv_mult, 2),
+			})
+			iv_color = SmaUiTheme.WARNING
+		elif iv_status == "ivCrush":
+			iv_text = I18n.t("options.ivBannerCrush")
+			iv_color = SmaUiTheme.GOLD
+		elif iv_days > 0 and iv_days < 400:
+			iv_text = I18n.t("options.ivBannerNormal", {"days": iv_days})
+		if iv_text != "":
+			var iv_card := SmaKit.card(10)
+			var iv_lbl := SmaKit.label(iv_text, 11, iv_color)
+			iv_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			iv_card.add_child(iv_lbl)
+			_body.add_child(iv_card)
 
 
 func _on_style_changed(index: int) -> void:

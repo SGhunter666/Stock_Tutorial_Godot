@@ -34,7 +34,13 @@ func _build() -> void:
 	var root := SmaKit.vbox(10)
 	panel.add_child(root)
 	var company: Dictionary = game.exchange.company(ticker)
-	var financials: Dictionary = company.get("financials", {})
+	var quote: Dictionary = game.exchange.quote(ticker) if game.exchange != null else {}
+	var live_price := float(quote.get("last", company.get("price", 0.0)))
+	var split_factor := float(game.exchange.state.get("companies", {}).get(ticker, {})
+		.get("splitFactor", 1.0)) if game.exchange != null else 1.0
+	var live_fin := SmaFundamentals.live_valuation(ticker, live_price,
+		game.get_day() if game != null else 0, split_factor)
+	var financials: Dictionary = live_fin if not live_fin.is_empty() else company.get("financials", {})
 	var header := SmaKit.hbox(10)
 	header.add_child(SmaKit.label(ticker, 22, SmaUiTheme.ACCENT))
 	header.add_child(SmaKit.label(String(company.get("name", ticker)), 15))
@@ -49,6 +55,12 @@ func _build() -> void:
 		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		root.add_child(desc_lbl)
 	root.add_child(SmaKit.muted(I18n.t("financials.subtitle"), 12))
+	if not live_fin.is_empty():
+		root.add_child(SmaKit.label(I18n.t("financials.ttmBadge", {
+			"range": String(live_fin.get("periodRange", "TTM")),
+			"price": SmaFormat.money(live_price),
+			"split": SmaFormat.num(split_factor, 1),
+		}), 11, SmaUiTheme.ACCENT))
 	if game.exchange != null:
 		var last_earnings: Dictionary = game.exchange.state.get("companies", {}) \
 			.get(ticker, {}).get("lastEarnings", {})
@@ -105,9 +117,11 @@ func _build() -> void:
 		["financials.capex", _compact(financials.get("capex", 0.0))],
 		["financials.fcf", _compact(financials.get("freeCashFlow", 0.0))],
 	]))
+	var raw_pe: Variant = financials.get("pe", null)
+	var raw_pb: Variant = financials.get("pb", null)
 	columns.add_child(_section("financials.ratios", [
-		["financials.pe", SmaFormat.num(_number(financials.get("pe", 0.0)), 1)],
-		["financials.pb", SmaFormat.num(_number(financials.get("pb", 0.0)), 2)],
+		["financials.pe", SmaFormat.num(float(raw_pe), 1) if raw_pe != null and float(raw_pe) > 0.0 else "—"],
+		["financials.pb", SmaFormat.num(float(raw_pb), 2) if raw_pb != null and float(raw_pb) > 0.0 else "—"],
 		["financials.roe", SmaFormat.pct(_number(financials.get("roe", 0.0)) * 100.0)],
 		["financials.roic", SmaFormat.pct(_number(financials.get("roic", 0.0)) * 100.0)],
 		["financials.dividend", SmaFormat.money(_number(financials.get("dividendPerShare", 0.0)))],

@@ -26,6 +26,7 @@ static var _report_cache: Dictionary = {}
 ## - Healthcare & Telecom exhibit steady recurring demand across the year.
 const SECTOR_SEASONAL := {
 	"consumer": [0.93, 0.96, 0.99, 1.12],
+	"communication": [0.95, 0.98, 1.00, 1.07],
 	"technology": [0.94, 0.97, 1.01, 1.08],
 	"financials": [1.06, 1.00, 0.97, 0.97],
 	"energy": [1.04, 0.95, 1.05, 0.96],
@@ -316,3 +317,114 @@ static func history(ticker: String, count: int = 8, day: int = 0) -> Array:
 		if not entry.is_empty():
 			reports.append(entry)
 	return reports
+
+
+## Live Trailing-Twelve-Month (TTM) fundamentals and dynamic valuation ratios
+## (`P/E`, `P/B`, dividend yield, market cap) recomputed from the 4 most recent
+## released quarterly filings, live traded `price`, and `split_factor`.
+static func live_valuation(ticker: String, live_price: float, day: int = 0,
+		split_factor: float = 1.0) -> Dictionary:
+	var company := SmaCompanyCatalog.get_company(ticker)
+	if company.is_empty():
+		return {}
+	var financials: Dictionary = company.get("financials", {})
+	var safe_split := maxf(0.0001, split_factor)
+	var ttm_quarters := history(ticker, 4, day)
+	if ttm_quarters.is_empty():
+		var base_eps := float(financials.get("eps", 0.0)) / safe_split
+		var raw_pe: Variant = financials.get("pe", null)
+		var fallback_pe: Variant = (live_price / base_eps) if (base_eps > 0.01 and live_price > 0.0) else raw_pe
+		return {
+			"periodRange": "TTM",
+			"revenue": float(financials.get("revenue", 0.0)),
+			"grossProfit": float(financials.get("grossProfit", 0.0)),
+			"operatingIncome": float(financials.get("operatingIncome", 0.0)),
+			"netIncome": float(financials.get("netIncome", 0.0)),
+			"eps": base_eps,
+			"totalAssets": float(financials.get("totalAssets", 0.0)),
+			"totalLiabilities": float(financials.get("totalLiabilities", 0.0)),
+			"equity": float(financials.get("equity", 0.0)),
+			"cash": float(financials.get("cash", 0.0)),
+			"debt": float(financials.get("debt", 0.0)),
+			"operatingCashFlow": float(financials.get("operatingCashFlow", 0.0)),
+			"capex": float(financials.get("capex", 0.0)),
+			"freeCashFlow": float(financials.get("freeCashFlow", 0.0)),
+			"pe": fallback_pe,
+			"pb": financials.get("pb", null),
+			"roe": float(financials.get("roe", 0.0)),
+			"roic": float(financials.get("roic", 0.0)),
+			"dividendPerShare": float(financials.get("dividendPerShare", 0.0)) / safe_split,
+			"dividendYieldPct": 0.0,
+			"marketCap": float(company.get("sharesOutstanding", company.get("shares", 1.0))) * safe_split * live_price,
+		}
+	var ttm_rev := 0.0
+	var ttm_gp := 0.0
+	var ttm_op := 0.0
+	var ttm_ni := 0.0
+	var ttm_eps_raw := 0.0
+	var ttm_ocf := 0.0
+	var ttm_capex := 0.0
+	var ttm_fcf := 0.0
+	for q_rep in ttm_quarters:
+		var inc: Dictionary = q_rep["income"]
+		var cf: Dictionary = q_rep["cashFlow"]
+		ttm_rev += float(inc.get("revenue", 0.0))
+		ttm_gp += float(inc.get("grossProfit", 0.0))
+		ttm_op += float(inc.get("operatingIncome", 0.0))
+		ttm_ni += float(inc.get("netIncome", 0.0))
+		ttm_eps_raw += float(inc.get("eps", 0.0))
+		ttm_ocf += float(cf.get("operatingCashFlow", 0.0))
+		ttm_capex += float(cf.get("capex", 0.0))
+		ttm_fcf += float(cf.get("freeCashFlow", 0.0))
+	var scale := 4.0 / float(ttm_quarters.size())
+	ttm_rev *= scale
+	ttm_gp *= scale
+	ttm_op *= scale
+	ttm_ni *= scale
+	ttm_eps_raw *= scale
+	ttm_ocf *= scale
+	ttm_capex *= scale
+	ttm_fcf *= scale
+	var latest_rep: Dictionary = ttm_quarters[0]
+	var bal: Dictionary = latest_rep["balance"]
+	var rat: Dictionary = latest_rep["ratios"]
+	var base_shares := maxf(1.0, float(company.get("sharesOutstanding", company.get("shares", 1.0))))
+	var adj_shares := base_shares * safe_split
+	var adj_eps := SmaFormat.round_to(ttm_eps_raw / safe_split, 3)
+	var adj_bvps := float(rat.get("bookValuePerShare", 0.0)) / safe_split
+	var adj_div := float(rat.get("annualDividendPerShare", 0.0)) / safe_split
+	var live_pe: Variant = SmaFormat.round_to(live_price / adj_eps, 1) \
+		if (adj_eps > 0.01 and live_price > 0.0) else null
+	var live_pb: Variant = SmaFormat.round_to(live_price / adj_bvps, 2) \
+		if (adj_bvps > 0.01 and live_price > 0.0) else null
+	var div_yield := SmaFormat.round_to(adj_div / live_price * 100.0, 2) if live_price > 0.0 else 0.0
+	var eq_val := maxf(1.0, float(bal.get("equity", 1.0)))
+	var invested_cap := maxf(1.0, eq_val + float(bal.get("debt", 0.0)) - float(bal.get("cash", 0.0)) * 0.5)
+	var ttm_roe := clampf(ttm_ni / eq_val, -0.95, 1.8)
+	var ttm_roic := clampf(ttm_op * (1.0 - TAX_RATE) / invested_cap, -0.8, 1.5)
+	var oldest_label := String(ttm_quarters[ttm_quarters.size() - 1].get("periodLabel", ""))
+	var newest_label := String(latest_rep.get("periodLabel", ""))
+	return {
+		"periodRange": "%s – %s (TTM)" % [oldest_label, newest_label],
+		"revenue": _round2(ttm_rev),
+		"grossProfit": _round2(ttm_gp),
+		"operatingIncome": _round2(ttm_op),
+		"netIncome": _round2(ttm_ni),
+		"eps": adj_eps,
+		"totalAssets": float(bal.get("totalAssets", 0.0)),
+		"totalLiabilities": float(bal.get("totalLiabilities", 0.0)),
+		"equity": float(bal.get("equity", 0.0)),
+		"cash": float(bal.get("cash", 0.0)),
+		"debt": float(bal.get("debt", 0.0)),
+		"operatingCashFlow": _round2(ttm_ocf),
+		"capex": _round2(ttm_capex),
+		"freeCashFlow": _round2(ttm_fcf),
+		"pe": live_pe,
+		"pb": live_pb,
+		"roe": ttm_roe,
+		"roic": ttm_roic,
+		"dividendPerShare": SmaFormat.round_to(adj_div, 3),
+		"dividendYieldPct": div_yield,
+		"marketCap": _round2(adj_shares * live_price),
+		"splitFactor": safe_split,
+	}

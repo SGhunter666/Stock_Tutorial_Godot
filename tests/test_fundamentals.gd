@@ -84,3 +84,13 @@ func run() -> void:
 	eq(annual_count, 400, "all 400 annual quarterly filings generated and reconciled")
 	check(guidance_seen.has("raise") and guidance_seen.has("maintain") and guidance_seen.has("cut"),
 		"400 filings span raise, maintain, and cut forward guidance")
+
+	describe("fundamentals-live-ttm-valuation")
+	var val_base := SmaFundamentals.live_valuation("APLA", 180.0, 0, 1.0)
+	var val_double := SmaFundamentals.live_valuation("APLA", 360.0, 0, 1.0)
+	var val_split := SmaFundamentals.live_valuation("APLA", 45.0, 0, 4.0)
+	check(val_base["pe"] != null and float(val_base["pe"]) > 0.0, "live TTM P/E is positive")
+	approx(float(val_double["pe"]), float(val_base["pe"]) * 2.0, 0.3,
+		"doubling live stock price doubles live TTM P/E")
+	approx(float(val_split["pe"]), float(val_base["pe"]), 0.3,
+		"4-for-1 split at quartered price preserves identical live TTM P/E")

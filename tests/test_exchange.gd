@@ -4,8 +4,8 @@ extends "res://tests/test_base.gd"
 func run() -> void:
 	describe("exchange-init")
 	var exchange := SmaExchange.new("test-seed", 100000.0)
-	eq(exchange.state["companies"].size(), 104, "universe has 100 companies and 4 ETFs")
-	eq(exchange.state["quotes"].size(), 104, "every instrument has a quote")
+	eq(exchange.state["companies"].size(), 108, "universe has 100 companies and 8 ETFs")
+	eq(exchange.state["quotes"].size(), 108, "every instrument has a quote")
 	approx(exchange.equity(), 100000.0, 0.001, "initial equity equals cash")
 
 	describe("exchange-buy")
@@ -154,6 +154,26 @@ func run() -> void:
 	check(is_finite(float(snapshot["maintenanceExcess"])), "maintenance excess finite")
 	ge(float(snapshot["buyingPower"]), 0.0, "buying power non-negative")
 	eq(snapshot["status"], "ok", "healthy account is not in a margin call")
+	var easy_fee := SmaMargin.borrow_fee_rate(SmaCompanyCatalog.get_company("APLA"))
+	var hard_fee := SmaMargin.borrow_fee_rate(SmaCompanyCatalog.get_company("CONB"))
+	le(easy_fee, 0.01, "mega-cap blue chip has easy-to-borrow short fee")
+	ge(hard_fee, 0.25, "volatile speculative stock has hard-to-borrow short fee")
+	check(hard_fee > easy_fee * 20.0, "hard-to-borrow rate is vastly higher than blue-chip rate")
+
+	describe("exchange-liquidity-stress")
+	var stress_ex := SmaExchange.new("stress-spread-test", 100000.0)
+	var calm_q := stress_ex.quote("NVDO")
+	var calm_spread := float(calm_q["ask"]) - float(calm_q["bid"])
+	var nvdo_cs: Dictionary = stress_ex.state["companies"]["NVDO"]
+	nvdo_cs["last"] = float(nvdo_cs["prevClose"]) * 0.91
+	nvdo_cs["fairValue"] = nvdo_cs["last"]
+	stress_ex.refresh_liquidity("NVDO")
+	stress_ex.state["quotes"].erase("NVDO")
+	var panic_q := stress_ex.quote("NVDO")
+	var panic_spread := float(panic_q["ask"]) - float(panic_q["bid"])
+	check(panic_spread > calm_spread * 2.0,
+		"9% crash widens market-maker bid-ask spread significantly")
+	ge(float(panic_q["spreadMult"]), 2.2, "quote exposes liquidity stress multiplier")
 
 	describe("exchange-dividends")
 	var dividend_exchange := SmaExchange.new("dividend-test", 100000.0)

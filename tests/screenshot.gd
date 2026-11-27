@@ -20,6 +20,51 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA17_ONLY") == "1":
+		Game.new_game("beta17-realism")
+		await _settle(4)
+		_dismiss_story()
+		for uid in Game.academy["units"].keys():
+			Game.academy["units"][uid]["completed"] = true
+			Game.academy_mark_section_read(String(uid), "s1")
+		Game.exchange.state["dayIndex"] = 12
+		var pre_ticker := "NVDO"
+		var cur_day: int = Game.get_day()
+		for tk in SmaCompanyCatalog.load_companies().keys():
+			var ivs := SmaOptions.earnings_iv_state(String(tk), cur_day)
+			if String(ivs.get("status", "")) == "preEarnings":
+				pre_ticker = String(tk)
+				break
+		Game.select_ticker(pre_ticker)
+		main.navigate("options")
+		var os17: SmaOptionsScreen = main._screens["options"]
+		os17._ticker = pre_ticker
+		os17.refresh()
+		await _settle(5)
+		await _shot("beta17_options_iv")
+		main.navigate("etf")
+		var etfs17: SmaEtfScreen = main._screens["etf"]
+		etfs17._selected = "SEMI"
+		etfs17.refresh()
+		await _settle(5)
+		await _shot("beta17_etf_8funds")
+		var conb_cs: Dictionary = Game.exchange.state["companies"]["CONB"]
+		conb_cs["last"] = float(conb_cs["prevClose"]) * 0.91
+		conb_cs["fairValue"] = conb_cs["last"]
+		Game.exchange.refresh_liquidity("CONB")
+		Game.exchange.state["quotes"].erase("CONB")
+		Game.select_ticker("CONB")
+		main.navigate("trade")
+		var ts17: SmaTradeScreen = main._screens["trade"]
+		ts17._on_timeframe("1D")
+		ts17._on_side("short")
+		ts17.refresh()
+		await _settle(5)
+		await _shot("beta17_trade_htb_stress")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA16_ONLY") == "1":
 		Game.new_game("beta16-earnings")
 		await _settle(4)

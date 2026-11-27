@@ -60,6 +60,54 @@ const DEFS := [
 			{"ticker": "ARCR", "weight": 0.07},
 		],
 	},
+	{
+		"ticker": "SEMI", "name": "Global Semiconductor & AI ETF", "startPrice": 90.0,
+		"avgVolume": 6200000.0, "spread": 3.0, "impact": 0.42, "beta": 1.45,
+		"vol": 0.024, "sharesOutstanding": 42000000.0, "expenseRatio": 0.14,
+		"components": [
+			{"ticker": "NVDO", "weight": 0.18}, {"ticker": "TSMX", "weight": 0.16},
+			{"ticker": "AVGM", "weight": 0.14}, {"ticker": "ASMX", "weight": 0.13},
+			{"ticker": "AMDO", "weight": 0.11}, {"ticker": "ARMM", "weight": 0.09},
+			{"ticker": "MICR", "weight": 0.08}, {"ticker": "INTL", "weight": 0.06},
+			{"ticker": "NCRT", "weight": 0.05},
+		],
+	},
+	{
+		"ticker": "HLTH", "name": "BioPharma & MedTech ETF", "startPrice": 68.0,
+		"avgVolume": 3600000.0, "spread": 2.5, "impact": 0.34, "beta": 0.78,
+		"vol": 0.013, "sharesOutstanding": 34000000.0, "expenseRatio": 0.12,
+		"components": [
+			{"ticker": "LLLY", "weight": 0.20}, {"ticker": "UNHX", "weight": 0.18},
+			{"ticker": "NOVO", "weight": 0.15}, {"ticker": "JNJX", "weight": 0.14},
+			{"ticker": "ISRX", "weight": 0.11}, {"ticker": "PFZR", "weight": 0.09},
+			{"ticker": "HLXB", "weight": 0.05}, {"ticker": "AUMD", "weight": 0.04},
+			{"ticker": "VLTH", "weight": 0.04},
+		],
+	},
+	{
+		"ticker": "FINX", "name": "Wall Street Financials ETF", "startPrice": 62.0,
+		"avgVolume": 4400000.0, "spread": 2.2, "impact": 0.32, "beta": 1.05,
+		"vol": 0.015, "sharesOutstanding": 38000000.0, "expenseRatio": 0.11,
+		"components": [
+			{"ticker": "BRKB", "weight": 0.19}, {"ticker": "JGCH", "weight": 0.16},
+			{"ticker": "VISO", "weight": 0.14}, {"ticker": "MCCD", "weight": 0.12},
+			{"ticker": "GSAC", "weight": 0.10}, {"ticker": "BLKR", "weight": 0.09},
+			{"ticker": "MGSN", "weight": 0.08}, {"ticker": "PPLL", "weight": 0.06},
+			{"ticker": "CONB", "weight": 0.06},
+		],
+	},
+	{
+		"ticker": "NRGY", "name": "Energy & Critical Metals ETF", "startPrice": 52.0,
+		"avgVolume": 3900000.0, "spread": 2.8, "impact": 0.38, "beta": 1.10,
+		"vol": 0.018, "sharesOutstanding": 32000000.0, "expenseRatio": 0.14,
+		"components": [
+			{"ticker": "XOMN", "weight": 0.22}, {"ticker": "CVXN", "weight": 0.20},
+			{"ticker": "LNDX", "weight": 0.14}, {"ticker": "FCXM", "weight": 0.12},
+			{"ticker": "SLBX", "weight": 0.09}, {"ticker": "EMBO", "weight": 0.08},
+			{"ticker": "SLDY", "weight": 0.06}, {"ticker": "SPMN", "weight": 0.05},
+			{"ticker": "IRON", "weight": 0.04},
+		],
+	},
 ]
 
 const ETF_SECTOR := "etf"
@@ -199,6 +247,26 @@ static func premium(price: float, nav_value: float) -> float:
 	if nav_value <= 0.0:
 		return 0.0
 	return SmaFormat.round_to((price / nav_value - 1.0) * 100.0, 2)
+
+
+## Updates ETF fair values intraday every factor cycle to track live basket NAV
+## within realistic authorized-participant (AP) arbitrage bands, without
+## consuming RNG state.
+static func update_intraday(companies: Dictionary, market_factor: float = 0.0) -> Array:
+	var updated: Array = []
+	var ap_basis := clampf(market_factor * 0.28, -0.0035, 0.0035)
+	for etf in DEFS:
+		var symbol := String(etf["ticker"])
+		var cs: Dictionary = companies.get(symbol, {})
+		if cs.is_empty() or bool(cs.get("delisted", false)):
+			continue
+		var nav_val := nav(companies, symbol)
+		if nav_val <= 0.0:
+			continue
+		var base := maxf(0.01, float(etf["startPrice"]))
+		cs["fairValue"] = clampf(nav_val * (1.0 + ap_basis), base * 0.15, base * 6.0)
+		updated.append(symbol)
+	return updated
 
 
 ## Marks every ETF to its basket NAV at session close. The exchange refreshes

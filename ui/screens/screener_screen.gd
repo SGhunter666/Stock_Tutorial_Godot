@@ -207,23 +207,22 @@ func _matching_rows(filters: Dictionary) -> Array:
 		if query != "" and not symbol.to_lower().contains(query) \
 				and not String(company.get("name", "")).to_lower().contains(query):
 			continue
-		var financials: Dictionary = company.get("financials", {})
 		var quote: Dictionary = game.exchange.quote(symbol)
 		var last := float(quote.get("last", 0.0))
 		var change := float(quote.get("changePct", 0.0))
-		var eps := _number(financials.get("eps", 0.0))
-		var pe := (last / eps) if (eps > 0.0 and last > 0.0) else _number(financials.get("pe", 0.0))
+		var split_factor := float(game.exchange.state.get("companies", {}).get(symbol, {})
+			.get("splitFactor", 1.0))
+		var live_fin := SmaFundamentals.live_valuation(symbol, last, game.get_day(), split_factor)
+		var raw_pe: Variant = live_fin.get("pe", null)
+		var pe := float(raw_pe) if raw_pe != null else 0.0
 		if pe_max > 0.0 and (pe <= 0.0 or pe > pe_max):
 			continue
 		if change < change_min:
 			continue
-		var dividend := _number(financials.get("dividendPerShare", 0.0))
-		var yield_pct := dividend / last * 100.0 if last > 0.0 else 0.0
+		var yield_pct := float(live_fin.get("dividendYieldPct", 0.0))
 		if yield_min > 0.0 and yield_pct < yield_min:
 			continue
-		var shares := _number(company.get("sharesOutstanding", company.get("shares", 0.0)))
-		var cap_b := (shares * last / 1000000000.0) if (shares > 0.0 and last > 0.0) \
-			else (_number(company.get("marketCap", 0.0)) / 1000000000.0)
+		var cap_b := float(live_fin.get("marketCap", 0.0)) / 1000000000.0
 		if cap_min > 0.0 and cap_b < cap_min:
 			continue
 		result.append({

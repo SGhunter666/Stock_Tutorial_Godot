@@ -72,3 +72,23 @@ func run() -> void:
 	approx(exchange.market_index(), 1000.0, 1.0, "market index starts at 1000")
 	approx(exchange.market_index_change(), 0.0, 5.0,
 		"market index change is small on day zero")
+
+	describe("news-sector-authenticity-and-macro-rotation")
+	var gs_pool := SmaNews.pool_for_company(SmaCompanyCatalog.get_company("GSAC"))
+	for item in gs_pool:
+		check(String(item["template"]) != "recall",
+			"investment bank GSAC never receives a product recall event")
+	var llly_pool := SmaNews.pool_for_company(SmaCompanyCatalog.get_company("LLLY"))
+	var has_fda := false
+	for item in llly_pool:
+		if String(item["template"]) == "fdaApproval":
+			has_fda = true
+	check(has_fda, "pharma LLLY pool includes FDA clinical approval events")
+	var bank_hike := SmaNews.macro_sector_multiplier("rateHike", SmaCompanyCatalog.get_company("JGCH"))
+	var tech_hike := SmaNews.macro_sector_multiplier("rateHike", SmaCompanyCatalog.get_company("NVDO"))
+	check(bank_hike < 0.0 and tech_hike > 1.0,
+		"surprise rate hike benefits bank NIMs while hurting high-beta tech")
+	var oil_infl := SmaNews.macro_sector_multiplier("inflationHot", SmaCompanyCatalog.get_company("XOMN"))
+	var cons_infl := SmaNews.macro_sector_multiplier("inflationHot", SmaCompanyCatalog.get_company("WMRT"))
+	check(oil_infl < 0.0 and cons_infl > 0.5,
+		"hot inflation lifts oil producers while pressuring consumer margins")

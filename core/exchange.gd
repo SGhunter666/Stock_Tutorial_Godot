@@ -263,9 +263,43 @@ func quote(ticker: String) -> Dictionary:
 	quote_data["trades"] = int(cs["trades"])
 	quote_data["changePct"] = SmaFormat.round_to(change_pct, 4)
 	quote_data["fairValue"] = SmaFormat.round_to(float(cs["fairValue"]), 2)
+	quote_data["spreadMult"] = SmaFormat.round_to(float(cs.get("liquidityStress", 1.0)), 2)
 	quote_data["source"] = "SIMULATED"
 	state["quotes"][symbol] = quote_data
 	return quote_data
+
+
+## Computes real-world market-maker liquidity stress: during violent crashes,
+## gap shocks (>= 3.2%), thin-cap panics, or the chaotic first 15 minutes of an
+## earnings release, market makers pull depth and widen bid-ask spreads up to
+## 5.5x, punishing blind market orders with realistic slippage.
+func liquidity_stress(cs: Dictionary) -> Dictionary:
+	if state.is_empty():
+		return {"spreadMult": 1.0, "depthMult": 1.0}
+	var company: Dictionary = cs.get("company", {})
+	var prev_close := maxf(0.01, float(cs.get("prevClose", cs.get("last", 1.0))))
+	var last := maxf(0.01, float(cs.get("last", prev_close)))
+	var abs_move := absf(last - prev_close) / prev_close
+	var spread_mult := 1.0
+	var depth_mult := 1.0
+	if abs_move >= 0.032:
+		var excess := clampf((abs_move - 0.030) / 0.07, 0.0, 1.5)
+		spread_mult += excess * 2.8
+		depth_mult *= clampf(1.0 - excess * 0.42, 0.35, 1.0)
+	var day := int(state.get("dayIndex", 0))
+	var second := int(state.get("second", 0))
+	var last_earn: Dictionary = cs.get("lastEarnings", {})
+	if not last_earn.is_empty() and int(last_earn.get("day", -999)) == day and second < 900:
+		var open_decay := 1.0 - float(second) / 900.0
+		spread_mult += 1.5 * open_decay
+		depth_mult *= clampf(1.0 - 0.40 * open_decay, 0.40, 1.0)
+	if String(company.get("liquidity", "normal")) == "thin" \
+			and float(state.get("marketFactor", 0.0)) < -0.0022:
+		spread_mult *= 1.55
+		depth_mult *= 0.65
+	spread_mult = clampf(spread_mult, 1.0, 5.5)
+	depth_mult = clampf(depth_mult, 0.32, 1.0)
+	return {"spreadMult": spread_mult, "depthMult": depth_mult}
 
 
 func refresh_liquidity(ticker: String) -> void:
@@ -275,8 +309,13 @@ func refresh_liquidity(ticker: String) -> void:
 	var inventory_ratio := float(cs["inventory"]) / avg_volume
 	var inventory_shift := clampf(inventory_ratio * float(company["impact"]) * 0.5, -0.2, 0.2)
 	var mid := float(cs["fairValue"]) * (1.0 - inventory_shift)
-	var half := maxf(0.01, mid * float(company["spread"]) / 20000.0)
-	cs["book"].set_market_maker(maxf(0.01, mid - half), mid + half, float(cs["mmSize"]))
+	var stress := liquidity_stress(cs)
+	var spread_mult := float(stress["spreadMult"])
+	var depth_mult := float(stress["depthMult"])
+	cs["liquidityStress"] = spread_mult
+	var half := maxf(0.01, mid * float(company["spread"]) * spread_mult / 20000.0)
+	var eff_size := maxf(10.0, roundf(float(cs["mmSize"]) * depth_mult))
+	cs["book"].set_market_maker(maxf(0.01, mid - half), mid + half, eff_size)
 
 
 func _record_trade(ticker: String, price: float, qty: int, meta: Dictionary = {}) -> void:
@@ -1045,6 +1084,10 @@ func _update_factors(rng: SmaRng) -> void:
 		cs["fairValue"] = clampf(fair, base * 0.15, base * 6.0)
 		_dirty_liquidity[ticker] = true
 		_resting_dirty[ticker] = true
+	for etf_sym in SmaEtfs.update_intraday(state["companies"], float(state["marketFactor"])):
+		if not is_trading_halted(String(etf_sym)):
+			_dirty_liquidity[String(etf_sym)] = true
+			_resting_dirty[String(etf_sym)] = true
 
 
 func _choose_simulated_order(ticker: String, rng: SmaRng) -> Variant:

@@ -115,9 +115,48 @@ static func annual_volatility(company: Dictionary) -> float:
 	return clampf(daily * sqrt(float(TRADING_DAYS)), 0.12, 1.2)
 
 
-static func smile_vol(base_vol: float, spot: float, strike: float) -> float:
-	var moneyness := absf(log(maxf(0.01, strike) / maxf(0.01, spot)))
-	return maxf(0.1, base_vol * (1.0 + 0.18 * moneyness))
+## Models the real-world earnings implied-volatility cycle:
+## - 1..10 trading days ahead of a scheduled quarterly report, IV ramps up
+##   sharply (up to +58% on earnings eve) as market makers price gap risk.
+## - On the report day and the session right after, uncertainty resolves and
+##   IV collapses ("IV Crush"), often making long options lose value even when
+##   the stock moves modestly in the right direction.
+static func earnings_iv_state(ticker: String, day: int) -> Dictionary:
+	if ticker.is_empty() or SmaCompanyCatalog.get_company(ticker).is_empty():
+		return {"multiplier": 1.0, "status": "normal", "daysToEarnings": -1}
+	var base_q := SmaFundamentals.latest_quarter(day)
+	var nearest_future := 999
+	for q in range(base_q - 1, base_q + 3):
+		var r_day := SmaFundamentals.report_day_for(ticker, q)
+		if day == r_day or day == r_day + 1:
+			return {"multiplier": 0.90, "status": "ivCrush", "daysToEarnings": 0}
+		if r_day > day:
+			nearest_future = mini(nearest_future, r_day - day)
+	if nearest_future >= 1 and nearest_future <= 10:
+		var ramp := 1.0 + 0.58 * pow(float(11 - nearest_future) / 10.0, 1.35)
+		return {"multiplier": ramp, "status": "preEarnings", "daysToEarnings": nearest_future}
+	return {"multiplier": 1.0, "status": "normal", "daysToEarnings": nearest_future}
+
+
+## Asymmetric equity volatility skew ("Put Skew / Crash Fear"): downside strikes
+## and protective puts trade at a steeper implied-volatility premium than
+## equidistant upside calls.
+static func smile_vol(base_vol: float, spot: float, strike: float,
+		option_type: String = "call") -> float:
+	var log_m := log(maxf(0.01, strike) / maxf(0.01, spot))
+	var skew := 0.0
+	if log_m < 0.0:
+		skew = 0.36 * absf(log_m) + (0.035 if option_type == "put" else 0.0)
+	else:
+		skew = 0.12 * log_m
+	return maxf(0.1, base_vol * (1.0 + skew))
+
+
+static func live_iv(ticker: String, company: Dictionary, spot: float,
+		strike: float, option_type: String, day: int) -> float:
+	var iv_info := earnings_iv_state(ticker, day)
+	var base := annual_volatility(company) * float(iv_info["multiplier"])
+	return smile_vol(base, spot, strike, option_type)
 
 
 static func strike_step(spot: float) -> float:
@@ -145,7 +184,8 @@ static func strike_grid(spot: float, levels: int = 3) -> Array:
 static func build_chain(company: Dictionary, ticker: String, quote: Dictionary,
 		day: int) -> Dictionary:
 	var spot := maxf(0.01, float(quote.get("last", company.get("price", 0.0))))
-	var base_vol := annual_volatility(company)
+	var iv_state := earnings_iv_state(ticker, day)
+	var base_vol := annual_volatility(company) * float(iv_state["multiplier"])
 	var strikes := strike_grid(spot)
 	var expiries: Array = []
 	for days in EXPIRY_DAYS:
@@ -154,8 +194,8 @@ static func build_chain(company: Dictionary, ticker: String, quote: Dictionary,
 	for expiry in expiries:
 		var years := float(expiry["days"]) / float(TRADING_DAYS)
 		for strike in strikes:
-			var vol := smile_vol(base_vol, spot, float(strike))
 			for option_type in ["call", "put"]:
+				var vol := smile_vol(base_vol, spot, float(strike), option_type)
 				var greeks := black_scholes({
 					"type": option_type, "spot": spot, "strike": strike,
 					"years": years, "vol": vol, "rate": RISK_FREE_RATE,
@@ -180,6 +220,7 @@ static func build_chain(company: Dictionary, ticker: String, quote: Dictionary,
 				})
 	return {
 		"ticker": ticker, "spot": spot, "vol": base_vol,
+		"ivState": iv_state,
 		"expiries": expiries, "strikes": strikes, "contracts": contracts,
 	}
 
@@ -443,13 +484,23 @@ static func close_option(account: Dictionary, key: String, qty: int,
 
 static func option_quote_value(position: Dictionary, spot: float, day: int) -> Dictionary:
 	var years := maxf(0.0, float(int(position.get("expiryDay", 0)) - day) / float(TRADING_DAYS))
-	return black_scholes({
-		"type": String(position.get("type", "call")),
+	var opt_type := String(position.get("type", "call"))
+	var strike := float(position.get("strike", 0.0))
+	var vol := float(position.get("vol", 0.3))
+	if position.has("openedDay"):
+		var ticker := String(position.get("ticker", ""))
+		var company := SmaCompanyCatalog.get_company(ticker)
+		if not company.is_empty():
+			vol = live_iv(ticker, company, spot, strike, opt_type, day)
+	var mark := black_scholes({
+		"type": opt_type,
 		"spot": spot,
-		"strike": float(position.get("strike", 0.0)),
+		"strike": strike,
 		"years": years,
-		"vol": float(position.get("vol", 0.3)),
+		"vol": vol,
 	})
+	mark["iv"] = vol
+	return mark
 
 
 static func option_rows(account: Dictionary, spots: Dictionary, day: int) -> Array:

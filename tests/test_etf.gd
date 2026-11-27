@@ -5,7 +5,7 @@ extends "res://tests/test_base.gd"
 func run() -> void:
 	describe("etf-catalog")
 	var symbols := SmaEtfs.tickers()
-	eq(symbols.size(), 4, "four tradable ETFs")
+	eq(symbols.size(), 8, "eight tradable broad and sector ETFs")
 	for symbol in symbols:
 		var definition := SmaEtfs.definition(String(symbol))
 		eq(String(definition.get("ticker", "")), String(symbol), "definition matches ticker")
@@ -49,6 +49,16 @@ func run() -> void:
 	describe("etf-persistence")
 	var restored := SmaExchange.from_dict(exchange.to_dict())
 	eq(restored.state["companies"].has("TECH"), true, "ETF survives save/load")
+	eq(restored.state["companies"].has("SEMI"), true, "sector ETF SEMI survives save/load")
 	approx(SmaEtfs.nav(restored.state["companies"], "TECH"),
 		SmaEtfs.nav(exchange.state["companies"], "TECH"), 0.01,
 		"ETF NAV restores")
+
+	describe("etf-intraday-nav")
+	var live_etf_ex := SmaExchange.new("etf-intraday")
+	var semi_before := float(live_etf_ex.state["companies"]["SEMI"]["fairValue"])
+	live_etf_ex.state["companies"]["NVDO"]["last"] *= 1.15
+	SmaEtfs.update_intraday(live_etf_ex.state["companies"], 0.0)
+	var semi_after := float(live_etf_ex.state["companies"]["SEMI"]["fairValue"])
+	check(semi_after > semi_before * 1.02,
+		"SEMI ETF fair value updates intraday when NVDO surges")

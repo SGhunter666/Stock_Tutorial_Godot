@@ -54,6 +54,8 @@ var _estimate_label: Label
 var _fee_label: Label
 var _weight_label: Label
 var _available_label: Label
+var _short_info_label: Label
+var _micro_warn_label: Label
 var _feedback: Label
 var _intro_review: Button
 var _oco_card: PanelContainer
@@ -435,6 +437,14 @@ func _build() -> void:
 	_available_label = SmaKit.caption("")
 	_available_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ticket.add_child(_available_label)
+	_short_info_label = SmaKit.label("", 10, SmaUiTheme.GOLD)
+	_short_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_short_info_label.visible = false
+	ticket.add_child(_short_info_label)
+	_micro_warn_label = SmaKit.label("", 10, SmaUiTheme.WARNING)
+	_micro_warn_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_micro_warn_label.visible = false
+	ticket.add_child(_micro_warn_label)
 	_submit_button = SmaKit.arcade_button(I18n.t("trade.submit"), "buy", _submit, 20 if SmaUiTheme.is_pixel() else 13)
 	_submit_button.custom_minimum_size.y = 44 if SmaUiTheme.is_pixel() else 38
 	ticket.add_child(_submit_button)
@@ -711,15 +721,28 @@ func refresh(reason: String = "") -> void:
 		SmaKit.liquidity_label(String(company.get("liquidity", ""))),
 		SmaKit.style_label(SmaAcademy.style_of(ticker)),
 	]
-	var financials: Dictionary = company.get("financials", {})
-	var dividend_yield := float(financials.get("dividendPerShare", 0.0)) / maxf(0.01, last) * 100.0
-	var live_cap := float(company.get("sharesOutstanding", company.get("shares", 0.0))) * last
-	if live_cap <= 0.0:
-		live_cap = float(company.get("marketCap", 0.0))
-	_profile_label.text = "%s %.2f%% · %s %s" % [
-		I18n.t("company.dividendYield"), dividend_yield,
-		I18n.t("company.marketCap"), SmaFormat.compact(live_cap),
-	]
+	var split_factor := float(game.exchange.state.get("companies", {}).get(ticker, {})
+		.get("splitFactor", 1.0))
+	var live_fin := SmaFundamentals.live_valuation(ticker, last, game.get_day(), split_factor)
+	if not live_fin.is_empty():
+		var raw_pe: Variant = live_fin.get("pe", null)
+		var pe_str := ("P/E " + SmaFormat.num(float(raw_pe), 1) + " · ") \
+			if (raw_pe != null and float(raw_pe) > 0.0) else ""
+		_profile_label.text = "%s%s %.2f%% · %s %s" % [
+			pe_str,
+			I18n.t("company.dividendYield"), float(live_fin.get("dividendYieldPct", 0.0)),
+			I18n.t("company.marketCap"), SmaFormat.compact(float(live_fin.get("marketCap", 0.0))),
+		]
+	else:
+		var financials: Dictionary = company.get("financials", {})
+		var dividend_yield := float(financials.get("dividendPerShare", 0.0)) / maxf(0.01, last) * 100.0
+		var live_cap := float(company.get("sharesOutstanding", company.get("shares", 0.0))) * last
+		if live_cap <= 0.0:
+			live_cap = float(company.get("marketCap", 0.0))
+		_profile_label.text = "%s %.2f%% · %s %s" % [
+			I18n.t("company.dividendYield"), dividend_yield,
+			I18n.t("company.marketCap"), SmaFormat.compact(live_cap),
+		]
 	var sensitivity := SmaIndustry.sector_sensitivity(String(company.get("sector", "")))
 	_sensitivity_label.text = "%s · %s / %s / %s" % [
 		I18n.t("exchange.macroSensitivity"),
@@ -1207,6 +1230,38 @@ func _update_available() -> void:
 		I18n.t("trade.buying_power"), SmaFormat.money(bp),
 		suffix,
 	]
+	var ticker := String(game.selected_ticker)
+	var company: Dictionary = game.exchange.company(ticker)
+	var quote: Dictionary = game.exchange.quote(ticker)
+	if _short_info_label != null:
+		var has_short := int(game.exchange.state["account"]["shorts"].get(ticker, {}).get("qty", 0)) > 0
+		if _side in ["short", "cover"] or has_short:
+			var borrow_rate := SmaMargin.borrow_fee_rate(company) * 100.0
+			var m_rate := SmaMargin.live_margin_rate(game.exchange.state) * 100.0
+			var si_pct := SmaMargin.short_interest_pct(company, game.get_day(),
+				String(game.exchange.state.get("seed", "sim-exchange-v1")))
+			var tier_key := "trade.htbExtreme" if borrow_rate >= 25.0 \
+				else ("trade.htbHard" if borrow_rate >= 10.0 else "trade.htbEasy")
+			_short_info_label.text = I18n.t("trade.shortInfo", {
+				"borrowRate": SmaFormat.pct_plain(borrow_rate, 1),
+				"tier": I18n.t(tier_key),
+				"shortInterest": SmaFormat.pct_plain(si_pct, 1),
+				"marginRate": SmaFormat.pct_plain(m_rate, 1),
+			})
+			_short_info_label.add_theme_color_override("font_color",
+				SmaKit.value_color(-1.0) if borrow_rate >= 25.0 else SmaUiTheme.GOLD)
+			_short_info_label.visible = true
+		else:
+			_short_info_label.visible = false
+	if _micro_warn_label != null:
+		var s_mult := float(quote.get("spreadMult", 1.0))
+		if s_mult >= 1.35:
+			_micro_warn_label.text = I18n.t("trade.liquidityStressWarn", {
+				"mult": SmaFormat.num(s_mult, 1),
+			})
+			_micro_warn_label.visible = true
+		else:
+			_micro_warn_label.visible = false
 
 
 func _oco_spin_row(box: VBoxContainer, label_text: String, minimum: float,
@@ -1317,6 +1372,7 @@ func _on_side(side: String) -> void:
 	_feedback.text = ""
 	if _order_type == "stop":
 		_reset_stop_price()
+	_update_available()
 	_update_estimate()
 
 

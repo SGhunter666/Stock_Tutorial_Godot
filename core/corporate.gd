@@ -21,6 +21,13 @@ const SPLITS := {
 	"NCRT": [{"quarter": 2, "ratio": 2.0}],
 	"VCFD": [{"quarter": 6, "ratio": 2.0}],
 	"QVAL": [{"quarter": 5, "ratio": 0.5}],
+	"ASMX": [{"quarter": 3, "ratio": 4.0}],
+	"CSTK": [{"quarter": 4, "ratio": 5.0}],
+	"AVGM": [{"quarter": 4, "ratio": 2.0}],
+	"NTFX": [{"quarter": 5, "ratio": 5.0}],
+	"EQNX": [{"quarter": 5, "ratio": 4.0}],
+	"LLLY": [{"quarter": 6, "ratio": 4.0}],
+	"BLKR": [{"quarter": 7, "ratio": 5.0}],
 }
 
 const CAPITAL := {
@@ -29,6 +36,17 @@ const CAPITAL := {
 	"MSFY": [{"quarter": 2, "type": "buyback", "ratio": 0.015},
 		{"quarter": 6, "type": "buyback", "ratio": 0.015}],
 	"JGCH": [{"quarter": 3, "type": "buyback", "ratio": 0.02}],
+	"BRKB": [{"quarter": 1, "type": "buyback", "ratio": 0.022},
+		{"quarter": 4, "type": "buyback", "ratio": 0.022}],
+	"GOGL": [{"quarter": 2, "type": "buyback", "ratio": 0.018},
+		{"quarter": 6, "type": "buyback", "ratio": 0.018}],
+	"VISO": [{"quarter": 1, "type": "buyback", "ratio": 0.016},
+		{"quarter": 5, "type": "buyback", "ratio": 0.016}],
+	"XOMN": [{"quarter": 2, "type": "buyback", "ratio": 0.025}],
+	"CVXN": [{"quarter": 4, "type": "buyback", "ratio": 0.024}],
+	"TSMX": [{"quarter": 3, "type": "buyback", "ratio": 0.015}],
+	"MCDO": [{"quarter": 3, "type": "buyback", "ratio": 0.018}],
+	"CATR": [{"quarter": 5, "type": "buyback", "ratio": 0.02}],
 	"TSLO": [{"quarter": 2, "type": "offering", "ratio": 0.10},
 		{"quarter": 6, "type": "offering", "ratio": 0.08}],
 	"QVAL": [{"quarter": 1, "type": "offering", "ratio": 0.15},
@@ -37,25 +55,42 @@ const CAPITAL := {
 	"HLXB": [{"quarter": 2, "type": "offering", "ratio": 0.12}],
 	"NGLB": [{"quarter": 1, "type": "offering", "ratio": 0.18},
 		{"quarter": 5, "type": "offering", "ratio": 0.15}],
+	"BOEN": [{"quarter": 1, "type": "offering", "ratio": 0.09},
+		{"quarter": 5, "type": "offering", "ratio": 0.08}],
+	"INTL": [{"quarter": 2, "type": "offering", "ratio": 0.08}],
+	"RDDX": [{"quarter": 3, "type": "offering", "ratio": 0.07}],
+	"CONB": [{"quarter": 4, "type": "offering", "ratio": 0.07}],
+	"SLDY": [{"quarter": 2, "type": "offering", "ratio": 0.10}],
 }
 
 const STRUCTURAL := {
 	"APLA": [{"quarter": 2, "type": "merger", "revenueShare": 0.02}],
 	"EMBO": [{"quarter": 2, "type": "merger", "revenueShare": 0.03}],
+	"UNHX": [{"quarter": 2, "type": "merger", "revenueShare": 0.025}],
 	"MSFY": [{"quarter": 3, "type": "spinoff", "assetShare": 0.10}],
+	"JNJX": [{"quarter": 3, "type": "spinoff", "assetShare": 0.11}],
+	"PFZR": [{"quarter": 3, "type": "merger", "revenueShare": 0.035}],
 	"NCRT": [{"quarter": 4, "type": "spinoff", "assetShare": 0.12}],
+	"INTL": [{"quarter": 4, "type": "spinoff", "assetShare": 0.14}],
+	"ORCO": [{"quarter": 4, "type": "merger", "revenueShare": 0.03}],
 	"JGCH": [{"quarter": 5, "type": "merger", "revenueShare": 0.015}],
+	"DSNX": [{"quarter": 5, "type": "spinoff", "assetShare": 0.09}],
+	"AMEZ": [{"quarter": 6, "type": "merger", "revenueShare": 0.02}],
 }
 
 const HALTS := {
 	"NGLB": [{"quarter": 1, "duration": 3}],
 	"VCFD": [{"quarter": 2, "duration": 2}],
+	"BOEN": [{"quarter": 2, "duration": 2}],
 	"TDFU": [{"quarter": 3, "duration": 4}],
+	"CONB": [{"quarter": 4, "duration": 2}],
 }
 
 const RIGHTS := {
 	"NGLB": [{"quarter": 2, "ratio": 0.20, "discount": 0.85, "duration": 5}],
 	"QVAL": [{"quarter": 3, "ratio": 0.25, "discount": 0.80, "duration": 5}],
+	"BOEN": [{"quarter": 4, "ratio": 0.15, "discount": 0.86, "duration": 5}],
+	"INTL": [{"quarter": 5, "ratio": 0.18, "discount": 0.84, "duration": 5}],
 }
 
 const BANKRUPTCY := {"TDFU": [{"quarter": 4}]}

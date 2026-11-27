@@ -393,3 +393,27 @@ func run() -> void:
 	check(bool(covered_sale.get("ok", false)), "100 shares allow a covered call")
 	approx(covered_exchange.option_collateral(), 0.0, 0.01,
 		"a covered call needs no cash collateral")
+
+	describe("options-iv-crush-and-put-skew")
+	var otm_put_iv := SmaOptions.smile_vol(0.30, 100.0, 85.0, "put")
+	var otm_call_iv := SmaOptions.smile_vol(0.30, 100.0, 115.0, "call")
+	check(otm_put_iv > otm_call_iv * 1.04,
+		"equidistant OTM put carries steeper crash-fear skew than OTM call")
+	var nvdo_rep_day := SmaFundamentals.report_day_for("NVDO", 0)
+	var pre_iv := SmaOptions.earnings_iv_state("NVDO", nvdo_rep_day - 1)
+	var crush_iv := SmaOptions.earnings_iv_state("NVDO", nvdo_rep_day)
+	eq(String(pre_iv["status"]), "preEarnings", "earnings eve is in pre-earnings IV surge")
+	ge(float(pre_iv["multiplier"]), 1.50, "earnings eve IV multiplier exceeds 1.5x")
+	eq(String(crush_iv["status"]), "ivCrush", "report morning triggers IV crush")
+	le(float(crush_iv["multiplier"]), 0.92, "post-earnings IV collapses below baseline")
+	var nvdo_comp := SmaCompanyCatalog.get_company("NVDO")
+	var eve_chain := SmaOptions.build_chain(nvdo_comp, "NVDO", {"last": 125.0}, nvdo_rep_day - 1)
+	var eve_call := SmaOptions.find_contract(eve_chain, "call",
+		float(eve_chain["strikes"][4]), int(eve_chain["expiries"][0]["expiryDay"]))
+	var crush_acct := SmaOptions.create_account_state()
+	crush_acct["cash"] = 50000.0
+	crush_acct["fees"] = 0.0
+	SmaOptions.buy_option(crush_acct, eve_call, 1, 0.0, nvdo_rep_day - 1, 0)
+	var rows_after := SmaOptions.option_rows(crush_acct, {"NVDO": 125.6}, nvdo_rep_day)
+	check(float(rows_after[0]["pnl"]) < -20.0,
+		"long OTM call bought on earnings eve loses money on modest +0.5% move due to IV Crush")
