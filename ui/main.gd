@@ -122,6 +122,8 @@ var _pause_button: Button
 var _speed_buttons: Dictionary = {}
 var _step_buttons: Array[Button] = []
 var _start_continue: Button
+var _brand_label: Label
+var _font_quick_btn: Button
 var _top_metrics: Dictionary = {}
 
 
@@ -452,10 +454,10 @@ func _build_topbar() -> Control:
 
 	var brand := VBoxContainer.new()
 	brand.add_theme_constant_override("separation", 1)
-	var brand_main := SmaKit.label(
+	_brand_label = SmaKit.label(
 		"%s [SMA]" % I18n.t("app.title") if SmaUiTheme.is_pixel() else "SMA",
 		18, SmaUiTheme.GOLD if SmaUiTheme.is_pixel() else SmaUiTheme.ACCENT)
-	brand.add_child(brand_main)
+	brand.add_child(_brand_label)
 	if not SmaUiTheme.is_pixel():
 		brand.add_child(SmaKit.caption(I18n.t("app.title")))
 	row.add_child(brand)
@@ -553,21 +555,38 @@ func _build_topbar() -> Control:
 	var save_button := SmaKit.button(I18n.t("header.save"), func(): Game.save_game(true))
 	actions.add_child(save_button)
 
+	_font_quick_btn = SmaKit.button("A+", _cycle_font_scale)
+	_font_quick_btn.tooltip_text = I18n.t("settings.fontScaleTitle")
+	actions.add_child(_font_quick_btn)
+
 	var language := SmaKit.button("中 / EN", _toggle_language)
 	actions.add_child(language)
 	return bar
+
+
+func _cycle_font_scale() -> void:
+	var presets := SmaUiTheme.FONT_PRESETS
+	var cur := maxi(0, presets.find(SmaUiTheme.font_preset))
+	var next_preset: String = String(presets[(cur + 1) % presets.size()])
+	Game.set_font_scale(next_preset)
+	show_toast("★ %s · %s" % [I18n.t("settings.fontScaleTitle"), I18n.t("settings.fontScale.%s" % next_preset)])
 
 
 func _sync_compact_layout() -> void:
 	if _sidebar == null:
 		return
 	var compact := size.x < COMPACT_WIDTH
+	var use_speed_menu := compact or SmaUiTheme.font_scale >= 1.15
 	var in_scenario: bool = Game.opening_gap_active or Game.black_friday_active
 	_topbar.visible = not in_scenario
 	_sidebar.visible = not compact and not in_scenario
 	_nav_menu.visible = compact
-	_speed_box.visible = not compact
-	_speed_picker.visible = compact
+	_speed_box.visible = not use_speed_menu
+	_speed_picker.visible = use_speed_menu
+	if _font_quick_btn != null:
+		_font_quick_btn.visible = not compact
+	if _brand_label != null and SmaUiTheme.is_pixel():
+		_brand_label.text = "SMA" if compact else ("%s [SMA]" % I18n.t("app.title"))
 	if _office_banner != null:
 		var want_office := bool(Game.settings.get("showPixelOffice", true))
 		var tall_enough := size.y >= COMPACT_HEIGHT or size.y <= 10.0
@@ -584,7 +603,7 @@ func _build_sidebar() -> Control:
 	style.border_width_right = 3
 	style.set_content_margin_all(10)
 	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size.x = 212
+	panel.custom_minimum_size.x = int(round(212.0 * clampf(SmaUiTheme.font_scale, 1.0, 1.24)))
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
@@ -608,8 +627,9 @@ func _build_sidebar() -> Control:
 		header.flat = true
 		header.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		if SmaUiTheme.is_pixel():
-			header.add_theme_font_override("font", SmaUiTheme.pixel_font_12())
-			header.add_theme_font_size_override("font_size", 12)
+			var hf := SmaUiTheme.resolve_font(12, true)
+			header.add_theme_font_override("font", hf["font"])
+			header.add_theme_font_size_override("font_size", int(hf["size"]))
 		else:
 			header.add_theme_font_size_override("font_size", 11)
 		header.add_theme_color_override("font_color", header_col)
@@ -1015,9 +1035,15 @@ func _on_layout_changed() -> void:
 
 func _on_theme_changed() -> void:
 	var start_visible := _start_overlay != null and _start_overlay.visible
+	var previous := _screens.get(_current_screen) as SmaScreen
+	var draft := previous.capture_draft() if previous != null and not start_visible else {}
 	_build_ui()
 	if not Game.started or start_visible:
 		_show_start_overlay()
+	elif not draft.is_empty():
+		var current := _screens.get(_current_screen) as SmaScreen
+		if current != null:
+			current.restore_draft(draft)
 
 
 # ---------------------------------------------------------------------------
@@ -1162,6 +1188,9 @@ func _show_start_overlay() -> void:
 		mode_label_key = "settings.themeDark"
 	var theme_btn := SmaKit.button(I18n.t(mode_label_key), func(): Game.set_theme(next_mode))
 	footer.add_child(theme_btn)
+	footer.add_child(SmaKit.button(
+		"A+ " + I18n.t("settings.fontScaleShort.%s" % SmaUiTheme.font_preset),
+		_cycle_font_scale))
 	footer.add_child(SmaKit.button(I18n.t("start.language"), _toggle_language))
 	box.add_child(footer)
 	var disclaimer := SmaKit.caption(I18n.t("app.disclaimer"))

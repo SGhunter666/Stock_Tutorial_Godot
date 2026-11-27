@@ -8,12 +8,12 @@ static func label(text: String, size: int = 13,
 		color: Color = Color(0, 0, 0, 0)) -> Label:
 	var node := Label.new()
 	node.text = text
-	var scaled := maxi(9, int(round(float(size) * SmaUiTheme.density)))
 	if SmaUiTheme.is_pixel():
-		var snapped := SmaUiTheme.pixel_snap_font(scaled)
+		var snapped := SmaUiTheme.resolve_font(size, true)
 		node.add_theme_font_override("font", snapped["font"])
 		node.add_theme_font_size_override("font_size", int(snapped["size"]))
 	else:
+		var scaled := maxi(9, int(round(float(size) * SmaUiTheme.density)))
 		node.add_theme_font_size_override("font_size", scaled)
 	node.add_theme_color_override("font_color",
 		SmaUiTheme.TEXT if color.a <= 0.0 else color)
@@ -64,12 +64,9 @@ static func modal_card(margin: int = 20) -> PanelContainer:
 
 static func set_small_font(node: Control, px: int = 10) -> void:
 	if SmaUiTheme.is_pixel():
-		if px <= 10:
-			node.add_theme_font_override("font", SmaUiTheme.pixel_font_10())
-			node.add_theme_font_size_override("font_size", 10)
-		else:
-			node.add_theme_font_override("font", SmaUiTheme.pixel_font_12())
-			node.add_theme_font_size_override("font_size", 12)
+		var snapped := SmaUiTheme.resolve_font(px, false)
+		node.add_theme_font_override("font", snapped["font"])
+		node.add_theme_font_size_override("font_size", int(snapped["size"]))
 	else:
 		node.add_theme_font_size_override("font_size", px)
 
@@ -104,8 +101,9 @@ static func button(text: String, callback: Callable = Callable(), primary: bool 
 	node.focus_mode = Control.FOCUS_NONE
 	node.pressed.connect(_play_click)
 	if SmaUiTheme.is_pixel():
-		node.add_theme_font_override("font", SmaUiTheme.pixel_font_12())
-		node.add_theme_font_size_override("font_size", 12)
+		var snapped := SmaUiTheme.resolve_font(12, true)
+		node.add_theme_font_override("font", snapped["font"])
+		node.add_theme_font_size_override("font_size", int(snapped["size"]))
 	else:
 		node.add_theme_font_size_override("font_size",
 			maxi(9, int(round(12.0 * SmaUiTheme.density))))
@@ -123,7 +121,7 @@ static func arcade_button(text: String, kind: String, callback: Callable = Calla
 	node.focus_mode = Control.FOCUS_NONE
 	node.pressed.connect(_play_click)
 	if SmaUiTheme.is_pixel():
-		var snapped := SmaUiTheme.pixel_snap_font(font_px)
+		var snapped := SmaUiTheme.resolve_font(font_px, true)
 		node.add_theme_font_override("font", snapped["font"])
 		node.add_theme_font_size_override("font_size", int(snapped["size"]))
 	else:

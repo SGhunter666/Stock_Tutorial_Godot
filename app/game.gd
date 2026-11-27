@@ -59,7 +59,7 @@ var speed := 1
 var selected_ticker := "APLA"
 var settings := {"locale": "zh_CN", "speed": 1, "layout": "beginner",
 	"theme": "pixel", "pixelMigrated": true, "showPixelOffice": true,
-	"chartPixelStepped": true,
+	"chartPixelStepped": true, "fontScale": "comfortable",
 	"colorScheme": "intl", "playerName": "", "displayMode": "windowed",
 	"windowPreset": "auto", "uiScale": "auto",
 	"masterVolume": 0.8, "musicVolume": 0.22, "sfxVolume": 0.75, "muted": false}
@@ -86,6 +86,7 @@ func _ready() -> void:
 	I18n.set_locale(String(settings.get("locale", "zh_CN")))
 	SmaUiTheme.set_theme_mode(String(settings.get("theme", "pixel")))
 	SmaUiTheme.set_color_scheme(String(settings.get("colorScheme", "intl")))
+	SmaUiTheme.set_font_preset(String(settings.get("fontScale", "comfortable")))
 	_apply_layout(String(settings.get("layout", "beginner")))
 	_apply_audio_settings()
 	if DisplayServer.get_name() != "headless":
@@ -577,6 +578,14 @@ func set_color_scheme(value: String) -> void:
 	var scheme := value if ["intl", "cn", "colorblind"].has(value) else "intl"
 	settings["colorScheme"] = scheme
 	SmaUiTheme.set_color_scheme(scheme)
+	theme_changed.emit()
+	save_game(false)
+
+
+func set_font_scale(value: String) -> void:
+	var preset := SmaUiTheme.normalise_font_preset(value)
+	settings["fontScale"] = preset
+	SmaUiTheme.set_font_preset(preset)
 	theme_changed.emit()
 	save_game(false)
 
@@ -2797,7 +2806,7 @@ func _decode_save(payload: Dictionary) -> Dictionary:
 	var saved_story: Dictionary = payload.get("narrative", {})
 	var saved_settings: Dictionary = payload.get("settings", {})
 	for key in ["locale", "layout", "theme", "colorScheme", "playerName", "displayMode",
-			"windowPreset", "uiScale", "chartTimeframe"]:
+			"windowPreset", "uiScale", "chartTimeframe", "fontScale"]:
 		if typeof(saved_settings.get(key, "")) != TYPE_STRING:
 			return {}
 	for key in ["speed", "masterVolume", "musicVolume", "sfxVolume"]:
@@ -2892,9 +2901,12 @@ func _apply_loaded_save(loaded: Dictionary) -> void:
 	if not bool(saved_settings.get("pixelMigrated", false)):
 		settings["theme"] = "pixel"
 		settings["pixelMigrated"] = true
+	if String(saved_settings.get("fontScale", "")) == "":
+		settings["fontScale"] = "comfortable"
 	I18n.set_locale(String(settings.get("locale", "zh_CN")))
 	SmaUiTheme.set_theme_mode(String(settings.get("theme", "pixel")))
 	SmaUiTheme.set_color_scheme(String(settings.get("colorScheme", "intl")))
+	SmaUiTheme.set_font_preset(String(settings.get("fontScale", "comfortable")))
 	_apply_layout(String(settings.get("layout", "beginner")))
 	_apply_audio_settings()
 	apply_display()

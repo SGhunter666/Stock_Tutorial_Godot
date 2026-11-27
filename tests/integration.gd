@@ -755,6 +755,15 @@ func _ready() -> void:
 	Game.set_theme("pixel")
 	if SmaUiTheme.mode != "pixel" or not SmaUiTheme.is_pixel():
 		failures.append("pixel theme not applied")
+	Game.set_font_scale("large")
+	if SmaUiTheme.font_preset != "large" or SmaUiTheme.font_scale < 1.30:
+		failures.append("large font scale not applied")
+	Game.set_font_scale("xlarge")
+	if SmaUiTheme.font_preset != "xlarge" or SmaUiTheme.font_scale < 1.45:
+		failures.append("xlarge font scale not applied")
+	Game.set_font_scale("comfortable")
+	if SmaUiTheme.font_preset != "comfortable":
+		failures.append("comfortable font scale not restored")
 	Game.set_color_scheme("cn")
 	if SmaUiTheme.color_scheme != "cn" or SmaUiTheme.POSITIVE.r <= SmaUiTheme.POSITIVE.g:
 		failures.append("CN color scheme not applied")

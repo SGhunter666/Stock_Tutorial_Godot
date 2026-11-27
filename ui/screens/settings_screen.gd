@@ -3,6 +3,7 @@
 class_name SmaSettingsScreen
 extends SmaScreen
 
+var _scroll: ScrollContainer
 var _body: VBoxContainer
 var _export_dialog: FileDialog
 var _import_dialog: FileDialog
@@ -14,10 +15,20 @@ func _build() -> void:
 	var root := SmaKit.vbox(10)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
-	var scroll := SmaKit.scroll()
-	root.add_child(scroll)
+	_scroll = SmaKit.scroll()
+	root.add_child(_scroll)
 	_body = SmaKit.vbox(12)
-	scroll.add_child(_body)
+	_scroll.add_child(_body)
+
+
+func capture_draft() -> Dictionary:
+	return {"scroll": _scroll.scroll_vertical if _scroll != null else 0}
+
+
+func restore_draft(draft: Dictionary) -> void:
+	if _scroll != null and draft.has("scroll"):
+		var target_y := int(draft["scroll"])
+		_scroll.set_deferred("scroll_vertical", target_y)
 
 
 func refresh(_reason: String = "") -> void:
@@ -141,6 +152,7 @@ func _render_simulation() -> void:
 	scheme_row.add_child(scheme_select)
 	box.add_child(scheme_row)
 	box.add_child(SmaKit.muted(I18n.t("settings.colorSchemeHint"), 10))
+	_append_font_scale_controls(box)
 	var motion := CheckBox.new()
 	motion.text = I18n.t("settings.reducedMotion")
 	motion.button_pressed = bool(game.settings.get("reducedMotion", false))
@@ -251,6 +263,7 @@ func _render_display() -> void:
 		game.set_ui_scale(String(scale_select.get_item_metadata(index))))
 	scale_row.add_child(scale_select)
 	box.add_child(scale_row)
+	_append_font_scale_controls(box)
 	var snapshot := SmaDisplay.display_snapshot()
 	var current := SmaKit.muted(I18n.t("settings.displayCurrent", {
 		"window": "%d×%d" % [int(snapshot["window"].x), int(snapshot["window"].y)],
@@ -429,6 +442,22 @@ func _render_boundaries() -> void:
 	box.add_child(SmaKit.muted(I18n.t("boundaries.intro"), 11))
 	box.add_child(SmaKit.button(I18n.t("boundaries.settingsLink"), _go_boundaries))
 	_body.add_child(card)
+
+
+func _append_font_scale_controls(box: VBoxContainer) -> void:
+	var font_row := SmaKit.flow(6)
+	font_row.add_child(SmaKit.label(I18n.t("settings.fontScaleTitle"), 11))
+	var cur_preset := SmaUiTheme.normalise_font_preset(
+		String(game.settings.get("fontScale", "comfortable")))
+	for preset in SmaUiTheme.FONT_PRESETS:
+		var pid := String(preset)
+		var btn := SmaKit.toggle(I18n.t("settings.fontScale.%s" % pid))
+		btn.button_pressed = (pid == cur_preset)
+		btn.pressed.connect(func():
+			game.set_font_scale(pid))
+		font_row.add_child(btn)
+	box.add_child(font_row)
+	box.add_child(SmaKit.muted(I18n.t("settings.fontScaleHint"), 10))
 
 
 func _go_boundaries() -> void:

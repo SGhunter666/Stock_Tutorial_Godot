@@ -4,7 +4,7 @@
 
 一个使用 **Godot 4** 开发的 **16-Bit 经典像素风**单机金融教学与交易模拟游戏。融合「开罗式动态像素交易室」与「PC-98 复古 CRT 交易终端」，内置 16-bit FM 芯片音乐合成器、可点击互动像素大厅与阶梯像素 K 线图。玩家从个人投资者起步，在确定性的模拟市场中学习交易、风控、期权、期货、多资产、量化、基金管理和职业决策，并在一段完整的职场剧情中从学徒成长为基金掌舵人。
 
-- 当前版本：`beta-13`（100% Full 16-Bit Pixel Edition · 支持 Web 网页免下载即点即玩）
+- 当前版本：`beta-14`（100% Full 16-Bit Pixel Edition · 五档字号自由调节 + 支持 Web 网页免下载即点即玩）
 - **🌐 在线即点即玩（Web HTML5 版）**：<https://sghunter666.github.io/Stock_Tutorial_Godot/>（浏览器自动通过 IndexedDB 保存进度，支持原生下载像素毕业海报 PNG 与导入/导出存档 JSON）
 - 引擎：Godot `4.7+`（已在 `4.7.2` 测试）
 - 渲染：GL Compatibility（全局整数像素倍率与 `NEAREST` 采样，WebGL 2 单线程 WASM 免跨域头直跑）

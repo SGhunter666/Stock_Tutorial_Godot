@@ -20,6 +20,30 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_FONT_CHECK") == "1":
+		Game.new_game("font-check")
+		await _settle(4)
+		_dismiss_story()
+		Game.submit_order({"ticker": "APLA", "side": "buy", "type": "market", "qty": 30})
+		_dismiss_story()
+		for i in 6:
+			Game.step_minute()
+		main.navigate("settings")
+		await _settle(5)
+		await _shot("beta14_settings_comfortable")
+		Game.set_font_scale("large")
+		main.navigate("trade")
+		await _settle(5)
+		await _shot("beta14_trade_large")
+		Game.set_font_scale("xlarge")
+		main.navigate("settings")
+		await _settle(5)
+		await _shot("beta14_settings_xlarge")
+		Game.set_font_scale("comfortable")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA12_ONLY") == "1":
 		await _capture_beta12_showcase()
 		SmaSaveService.clear(Game.save_path)

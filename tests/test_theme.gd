@@ -135,3 +135,18 @@ func run() -> void:
 	eq(SmaWebIo.prompt_json_upload(func(_s): pass),
 		false, "prompt_json_upload safely returns false outside web runtime")
 	SmaWebIo.flush_idb()
+
+	describe("pixel-beta14-font-scale")
+	eq(SmaUiTheme.normalise_font_preset("invalid"), "comfortable", "invalid font preset defaults to comfortable")
+	SmaUiTheme.set_density(1.0)
+	SmaUiTheme.set_font_preset("normal")
+	var f_norm := int(SmaUiTheme.resolve_font(13)["size"])
+	SmaUiTheme.set_font_preset("comfortable")
+	var f_comf := int(SmaUiTheme.resolve_font(13)["size"])
+	SmaUiTheme.set_font_preset("large")
+	var f_large := int(SmaUiTheme.resolve_font(13)["size"])
+	SmaUiTheme.set_font_preset("xlarge")
+	var f_xl := int(SmaUiTheme.resolve_font(13)["size"])
+	check(f_norm < f_comf and f_comf < f_large and f_large < f_xl,
+		"resolved body font size grows strictly across normal < comfortable < large < xlarge")
+	SmaUiTheme.set_font_preset("comfortable")

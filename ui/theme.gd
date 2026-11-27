@@ -34,8 +34,29 @@ static var color_scheme := "intl"
 ## Layout density: 1.0 for the beginner layout, a compact factor for advanced.
 static var density := 1.0
 
+const FONT_PRESETS := ["small", "normal", "comfortable", "large", "xlarge"]
+const FONT_MULTIPLIERS := {
+	"small": 0.90,
+	"normal": 1.00,
+	"comfortable": 1.18,
+	"large": 1.34,
+	"xlarge": 1.50,
+}
+static var font_preset := "comfortable"
+static var font_scale := 1.18
+
 static var _pixel_font_10: Font
 static var _pixel_font_12: Font
+static var _pixel_font_scaled: Font
+
+
+static func normalise_font_preset(value: String) -> String:
+	return value if FONT_PRESETS.has(value) else "comfortable"
+
+
+static func set_font_preset(value: String) -> void:
+	font_preset = normalise_font_preset(value)
+	font_scale = float(FONT_MULTIPLIERS.get(font_preset, 1.18))
 
 
 static func is_pixel() -> bool:
@@ -147,7 +168,7 @@ static func _load_pixel_font(res_path: String, sys_fallback: Font) -> Font:
 
 
 static func _ensure_pixel_fonts() -> void:
-	if _pixel_font_12 != null and _pixel_font_10 != null:
+	if _pixel_font_12 != null and _pixel_font_10 != null and _pixel_font_scaled != null:
 		return
 	var sys := SystemFont.new()
 	sys.font_names = PackedStringArray([
@@ -160,6 +181,18 @@ static func _ensure_pixel_fonts() -> void:
 		"res://assets/fonts/fusion-pixel-10px-proportional-zh_hans.ttf", sys)
 	_pixel_font_12 = _load_pixel_font(
 		"res://assets/fonts/fusion-pixel-12px-proportional-zh_hans.ttf", sys)
+
+	var sys_smooth := SystemFont.new()
+	sys_smooth.font_names = sys.font_names
+	sys_smooth.allow_system_fallback = true
+	sys_smooth.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	var smooth := _load_pixel_font(
+		"res://assets/fonts/fusion-pixel-12px-proportional-zh_hans.ttf", sys_smooth)
+	if smooth is FontFile:
+		var ff := smooth as FontFile
+		ff.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+		ff.oversampling = 2.0
+	_pixel_font_scaled = smooth
 
 
 static func pixel_font_10() -> Font:
@@ -189,6 +222,25 @@ static func pixel_snap_font(raw_size: int) -> Dictionary:
 	if raw_size <= 32:
 		return {"font": _pixel_font_10, "size": 30}
 	return {"font": _pixel_font_12, "size": 36}
+
+
+## Resolves the active pixel font & pixel size taking both layout density and
+## user-selected font_scale ("small".."xlarge") into account. Exact integer
+## multiples use 1-bit crisp bitmap rendering; intermediate sizes use 2x
+## oversampled Fusion Pixel so every CJK stroke keeps uniform weight.
+static func resolve_font(base_size: int, apply_density: bool = true) -> Dictionary:
+	_ensure_pixel_fonts()
+	var dens := density if apply_density else 1.0
+	if is_equal_approx(font_scale, 1.0):
+		return pixel_snap_font(maxi(9, int(round(float(base_size) * dens))))
+	var px := clampi(int(round(float(base_size) * dens * font_scale)), 10, 42)
+	if base_size >= 18:
+		px = maxi(px, 20)
+	if px in [10, 20, 30]:
+		return {"font": _pixel_font_10, "size": px}
+	if px in [12, 24, 36]:
+		return {"font": _pixel_font_12, "size": px}
+	return {"font": _pixel_font_scaled, "size": px}
 
 
 static func _box(color: Color, border_color: Color = Color(0, 0, 0, 0),
@@ -330,8 +382,10 @@ static func apply_arcade_button(node: Button, kind: String = "primary", margin: 
 static func build() -> Theme:
 	var theme := Theme.new()
 	_ensure_pixel_fonts()
-	theme.default_font = _pixel_font_12
-	theme.default_font_size = 12
+	var base_f := resolve_font(12, false)
+	var base_px := int(base_f["size"])
+	theme.default_font = base_f["font"]
+	theme.default_font_size = base_px
 	var light_mode := mode == "light"
 
 	theme.set_color("font_color", "Label", TEXT)
@@ -380,11 +434,11 @@ static func build() -> Theme:
 	if not light_mode:
 		theme.set_color("font_outline_color", "Button", Color("#04070e"))
 		theme.set_constant("outline_size", "Button", 2)
-	theme.set_font_size("font_size", "Button", 12)
-	theme.set_font_size("font_size", "OptionButton", 12)
-	theme.set_font_size("font_size", "LineEdit", 12)
-	theme.set_font_size("font_size", "PopupMenu", 12)
-	theme.set_font_size("font_size", "CheckBox", 12)
+	for ctrl_cls in ["Button", "OptionButton", "LineEdit", "PopupMenu", "CheckBox", "RichTextLabel"]:
+		theme.set_font("font", ctrl_cls, base_f["font"])
+		theme.set_font_size("font_size", ctrl_cls, base_px)
+	theme.set_font("normal_font", "RichTextLabel", base_f["font"])
+	theme.set_font_size("normal_font_size", "RichTextLabel", base_px)
 
 	var focus := _box(Color.TRANSPARENT, ACCENT, 0, 0)
 	focus.draw_center = false

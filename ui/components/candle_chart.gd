@@ -197,17 +197,20 @@ func _compute_bollinger() -> void:
 
 
 func _draw() -> void:
-	_font = SmaUiTheme.pixel_font_10()
-	var title_font := SmaUiTheme.pixel_font_12()
-	_font_size = 10
+	var use_12 := SmaUiTheme.font_scale >= 1.15
+	_font = SmaUiTheme.pixel_font_12() if use_12 else SmaUiTheme.pixel_font_10()
+	var title_f := SmaUiTheme.resolve_font(12, false)
+	var title_font: Font = title_f["font"]
+	var title_px := int(title_f["size"])
+	_font_size = 12 if use_12 else 10
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#04070e"))
 	draw_rect(Rect2(2, 2, maxf(0.0, size.x - 4.0), maxf(0.0, size.y - 4.0)), SmaUiTheme.CRT_BG)
 	if title_text != "":
 		draw_string(title_font, Vector2(12, 20), title_text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#b8d0eb"))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, title_px, Color("#b8d0eb"))
 	if candles.is_empty():
 		draw_string(title_font, Vector2(12, size.y * 0.5), I18n.t("chart.no_data"),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#88a8cc"))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, title_px, Color("#88a8cc"))
 		return
 	_ensure_series_cache()
 	var count := mini(visible_count, candles.size())
@@ -217,7 +220,7 @@ func _draw() -> void:
 	var start := clampi(max_start - pan_offset, 0, max_start)
 	_visible = candles.slice(start, start + count)
 	_left = 12.0
-	_right = size.x - 74.0
+	_right = size.x - (82.0 if use_12 else 74.0)
 	_top = 62.0
 	_price_bottom = size.y - 76.0
 	_volume_top = _price_bottom + 12.0
@@ -724,7 +727,7 @@ func _draw_crosshair() -> void:
 
 func _draw_axis_tag(position: Vector2, text: String, color: Color,
 		centered: bool = false) -> void:
-	var font_size := 10
+	var font_size := _font_size
 	var text_size := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	var box := Rect2(position.x, position.y - text_size.y + 2.0,
 		text_size.x + 8.0, text_size.y + 2.0)
