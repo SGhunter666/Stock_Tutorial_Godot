@@ -1084,10 +1084,50 @@ func _update_factors(rng: SmaRng) -> void:
 		cs["fairValue"] = clampf(fair, base * 0.15, base * 6.0)
 		_dirty_liquidity[ticker] = true
 		_resting_dirty[ticker] = true
+		if int(state["second"]) >= 3600:
+			var prev_c := maxf(0.01, float(cs.get("prevClose", base)))
+			var move_pct := (float(cs["last"]) - prev_c) / prev_c * 100.0
+			if absf(move_pct) >= 4.2:
+				_maybe_emit_intraday_flash(String(ticker), cs, move_pct)
 	for etf_sym in SmaEtfs.update_intraday(state["companies"], float(state["marketFactor"])):
 		if not is_trading_halted(String(etf_sym)):
 			_dirty_liquidity[String(etf_sym)] = true
 			_resting_dirty[String(etf_sym)] = true
+
+
+func _maybe_emit_intraday_flash(ticker: String, cs: Dictionary, move_pct: float) -> void:
+	var day := int(state.get("dayIndex", 0))
+	if int(cs.get("flashDay", -999)) == day:
+		return
+	var last_earn: Dictionary = cs.get("lastEarnings", {})
+	if not last_earn.is_empty() and int(last_earn.get("day", -999)) == day:
+		cs["flashDay"] = day
+		return
+	for item in state.get("news", []):
+		if int(item.get("day", -999)) == day and String(item.get("ticker", "")) == ticker:
+			cs["flashDay"] = day
+			return
+	for action in state.get("corporateActions", []):
+		if int(action.get("day", -999)) == day and String(action.get("ticker", "")) == ticker:
+			cs["flashDay"] = day
+			return
+	cs["flashDay"] = day
+	var tmpl := "intradaySelloff" if move_pct < 0.0 else "intradaySurge"
+	var entry := {
+		"id": int(state.get("newsSeq", 1)),
+		"day": day,
+		"tick": int(state.get("second", 0)),
+		"kind": "company",
+		"template": tmpl,
+		"ticker": ticker,
+		"pct": roundf(move_pct * 10.0) / 10.0,
+	}
+	state["newsSeq"] = int(state.get("newsSeq", 1)) + 1
+	var items: Array = state.get("news", [])
+	items.append(entry)
+	while items.size() > SmaNews.LIMIT:
+		items.pop_front()
+	state["news"] = items
 
 
 func _choose_simulated_order(ticker: String, rng: SmaRng) -> Variant:
@@ -2067,6 +2107,8 @@ func to_dict() -> Dictionary:
 		}
 		if cs.has("lastEarnings") and cs["lastEarnings"] is Dictionary:
 			companies[ticker]["lastEarnings"] = cs["lastEarnings"]
+		if cs.has("flashDay"):
+			companies[ticker]["flashDay"] = int(cs["flashDay"])
 	return {
 		"version": SAVE_VERSION,
 		"seed": state["seed"],
@@ -2202,6 +2244,8 @@ static func from_dict(data: Dictionary) -> SmaExchange:
 				cs[key] = saved[key]
 		if saved.has("lastEarnings") and saved["lastEarnings"] is Dictionary:
 			cs["lastEarnings"] = saved["lastEarnings"].duplicate(true)
+		if saved.has("flashDay"):
+			cs["flashDay"] = int(saved["flashDay"])
 		cs["series"] = saved.get("series", SmaMinuteSeries.create())
 		var book := SmaOrderBook.new(ticker)
 		var book_data: Dictionary = saved.get("book", {})

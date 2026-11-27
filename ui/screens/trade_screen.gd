@@ -30,10 +30,12 @@ var _ticker_badge: TextureRect
 var _meta_label: Label
 var _profile_label: Label
 var _sensitivity_label: Label
+var _reason_label: Label
 var _watch_button: Button
 var _indicators_card: PanelContainer
 var _indicator_labels: Dictionary = {}
 var _indicator_cache_key := ""
+var _catalyst_cache_key := ""
 var _last_label: Label
 var _change_label: Label
 var _stat_labels: Dictionary = {}
@@ -169,7 +171,12 @@ func _build() -> void:
 		_stat_labels[key] = value
 		quote_head.add_child(stat)
 	quote_head.add_child(quote_actions)
-	quote_card.add_child(quote_head)
+	var quote_vbox := SmaKit.vbox(5)
+	quote_vbox.add_child(quote_head)
+	_reason_label = SmaKit.label("", 11, SmaUiTheme.GOLD)
+	_reason_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	quote_vbox.add_child(_reason_label)
+	quote_card.add_child(quote_vbox)
 	root.add_child(quote_card)
 
 	_lock_card = SmaKit.card(10)
@@ -782,6 +789,11 @@ func _update_quote_numbers(quote: Dictionary) -> void:
 	_stat_labels["bid"].text = _price_text(quote.get("bid", null))
 	_stat_labels["ask"].text = _price_text(quote.get("ask", null))
 	_stat_labels["volume"].text = SmaFormat.compact(float(quote.get("volume", 0)))
+	if _reason_label != null and game != null and game.exchange != null:
+		var sym := String(quote.get("ticker", game.selected_ticker))
+		_reason_label.text = SmaKit.format_attribution(game.exchange.state, sym)
+		_reason_label.add_theme_color_override("font_color",
+			SmaUiTheme.GOLD if absf(change) >= 0.25 else SmaUiTheme.MUTED)
 
 
 func _update_tool_gates() -> void:
@@ -973,6 +985,15 @@ func _update_chart(ticker: String) -> void:
 		title += " · " + I18n.t("chart.referenceQuote")
 		title += " · " + I18n.t("chart.nextMinute", {"seconds": 60 - second})
 	_chart.set_candles(candles, _timeframe, title)
+	var cat_key := "%s|%d|%d|%d" % [
+		ticker,
+		int(game.exchange.state.get("dayIndex", 0)),
+		int(game.exchange.state.get("newsSeq", 0)),
+		int(game.exchange.state.get("corporateActions", []).size()),
+	]
+	if cat_key != _catalyst_cache_key:
+		_catalyst_cache_key = cat_key
+		_chart.set_candle_notes(SmaKit.format_candle_catalysts(game.exchange.state, ticker))
 	var account: Dictionary = game.exchange.state["account"]
 	var markers: Array = []
 	for trade in account.get("trades", []):

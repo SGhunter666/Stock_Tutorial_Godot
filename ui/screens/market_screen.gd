@@ -428,9 +428,10 @@ func _update_rows() -> void:
 		if locked:
 			locked_count += 1
 		panel.modulate = Color(1, 1, 1, 0.55) if locked else Color.WHITE
-		panel.tooltip_text = "" if not locked else I18n.t("market.lockedHint", {
-			"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
-		})
+		panel.tooltip_text = SmaKit.format_attribution(game.exchange.state, String(ticker)) \
+			if not locked else I18n.t("market.lockedHint", {
+				"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
+			})
 		var quote: Dictionary = game.exchange.quote(ticker)
 		var cells: Dictionary = entry["cells"]
 		var change := float(quote.get("changePct", 0.0))

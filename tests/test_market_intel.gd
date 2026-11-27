@@ -92,3 +92,39 @@ func run() -> void:
 	var cons_infl := SmaNews.macro_sector_multiplier("inflationHot", SmaCompanyCatalog.get_company("WMRT"))
 	check(oil_infl < 0.0 and cons_infl > 0.5,
 		"hot inflation lifts oil producers while pressuring consumer margins")
+
+	describe("full-spectrum-move-attribution")
+	var attr_ex := SmaExchange.new("attr-test", 100000.0)
+	for ticker in attr_ex.state["companies"].keys():
+		var info := SmaAttribution.explain_today(attr_ex.state, String(ticker))
+		check(String(info.get("key", "")).begins_with("attr."),
+			"every instrument has a causal move attribution: %s" % ticker)
+
+	# 1. ETF component drag attribution
+	attr_ex.state["companies"]["SEMI"]["prevClose"] = float(attr_ex.state["companies"]["SEMI"]["last"])
+	attr_ex.state["companies"]["NVDO"]["prevClose"] = float(attr_ex.state["companies"]["NVDO"]["last"])
+	attr_ex.state["companies"]["NVDO"]["last"] = float(attr_ex.state["companies"]["NVDO"]["prevClose"]) * 0.85
+	SmaEtfs.update_intraday(attr_ex.state["companies"], 0.0)
+	attr_ex.state["companies"]["SEMI"]["last"] = float(attr_ex.state["companies"]["SEMI"]["fairValue"])
+	var etf_attr := SmaAttribution.explain_today(attr_ex.state, "SEMI")
+	eq(String(etf_attr["key"]), "attr.etfDrag", "ETF drop cites component drag")
+	eq(String(etf_attr["params"].get("topTicker", "")), "NVDO", "SEMI drop cites NVDO as top drag")
+
+	# 2. Corporate offering dilution attribution
+	var day_now := int(attr_ex.state["dayIndex"])
+	attr_ex.state["companies"]["BOEN"]["last"] = float(attr_ex.state["companies"]["BOEN"]["prevClose"]) * 0.94
+	attr_ex.state["corporateActions"].push_front({
+		"type": "offering", "ticker": "BOEN", "day": day_now, "ratio": 0.09, "impact": -0.06,
+	})
+	var corp_attr := SmaAttribution.explain_today(attr_ex.state, "BOEN")
+	eq(String(corp_attr["key"]), "attr.corp.offering", "secondary offering drop cites dilution")
+
+	# 3. Sector rotation pullback attribution
+	attr_ex.state["companies"]["ADBA"]["last"] = float(attr_ex.state["companies"]["ADBA"]["prevClose"]) * 0.97
+	attr_ex.state["sectorFactors"]["technology"] = -0.002
+	var sec_attr := SmaAttribution.explain_today(attr_ex.state, "ADBA")
+	eq(String(sec_attr["key"]), "attr.sectorPullback", "sector selloff cites sector rotation pullback")
+
+	# 4. Historical candle catalyst map covers past earnings dates
+	var cat_map := SmaAttribution.candle_catalyst_map(attr_ex.state, "AMDO")
+	check(not cat_map.is_empty(), "historical K-line catalyst map contains past earnings dates")

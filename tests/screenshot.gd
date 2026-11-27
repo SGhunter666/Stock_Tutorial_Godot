@@ -20,6 +20,46 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA18_ONLY") == "1":
+		Game.new_game("beta18-attribution")
+		await _settle(4)
+		_dismiss_story()
+		for uid in Game.academy["units"].keys():
+			Game.academy["units"][uid]["completed"] = true
+			Game.academy_mark_section_read(String(uid), "s1")
+		var day_now: int = Game.get_day()
+		Game.exchange.state["companies"]["BOEN"]["last"] = float(Game.exchange.state["companies"]["BOEN"]["prevClose"]) * 0.935
+		Game.exchange.state["companies"]["BOEN"]["fairValue"] = Game.exchange.state["companies"]["BOEN"]["last"]
+		Game.exchange.state["corporateActions"].push_front({
+			"type": "offering", "ticker": "BOEN", "day": day_now, "ratio": 0.09, "impact": -0.065,
+		})
+		Game.exchange.refresh_liquidity("BOEN")
+		Game.exchange.state["quotes"].erase("BOEN")
+		Game.select_ticker("BOEN")
+		main.navigate("trade")
+		var ts18: SmaTradeScreen = main._screens["trade"]
+		ts18._on_timeframe("1D")
+		ts18.refresh()
+		await _settle(4)
+		var chart18: SmaCandleChart = ts18._chart
+		if chart18._visible.size() > 15:
+			var target_idx := chart18._visible.size() - 12
+			for idx in range(chart18._visible.size() - 1, 5, -1):
+				var d_key := String(chart18._visible[idx].get("d", ""))
+				if chart18.candle_notes.has(d_key):
+					target_idx = idx
+					break
+			chart18._hover_index = target_idx
+			chart18._hover_pos = Vector2(
+				chart18._left + chart18._slot * (float(target_idx) + 0.5),
+				(chart18._top + chart18._price_bottom) * 0.45)
+			chart18.queue_redraw()
+		await _settle(4)
+		await _shot("beta18_attribution_trade")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA17_ONLY") == "1":
 		Game.new_game("beta17-realism")
 		await _settle(4)

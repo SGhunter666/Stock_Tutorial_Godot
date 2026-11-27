@@ -159,6 +159,7 @@ func _render_research() -> void:
 		box.add_child(driver_lbl)
 	_research_chart = SmaCandleChart.new()
 	_research_chart.custom_minimum_size.y = 195
+	_research_chart.set_candle_notes(SmaKit.format_candle_catalysts(game.exchange.state, _selected_ticker))
 	box.add_child(_research_chart)
 	_body.add_child(card)
 	on_tick()

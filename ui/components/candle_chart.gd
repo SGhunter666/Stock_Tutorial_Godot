@@ -25,6 +25,7 @@ var show_boll := false
 var pixel_stepped := true
 var trade_markers: Array = []
 var price_lines: Array = []
+var candle_notes: Dictionary = {}
 var long_cost := 0.0
 var short_cost := 0.0
 
@@ -114,6 +115,11 @@ func is_panned() -> bool:
 
 func set_trade_markers(next_markers: Array) -> void:
 	trade_markers = next_markers
+	queue_redraw()
+
+
+func set_candle_notes(next_notes: Dictionary) -> void:
+	candle_notes = next_notes
 	queue_redraw()
 
 
@@ -746,15 +752,66 @@ func _draw_axis_tag(position: Vector2, text: String, color: Color,
 		text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 
 
+func _candle_driver_line(bar: Dictionary) -> String:
+	var date_key := String(bar.get("d", bar.get("date", "")))
+	if candle_notes.has(date_key):
+		return String(candle_notes[date_key])
+	if timeframe != "1D":
+		return ""
+	var o_val := maxf(0.01, float(bar.get("o", 1.0)))
+	var h_val := float(bar.get("h", o_val))
+	var l_val := float(bar.get("l", o_val))
+	var c_val := float(bar.get("c", o_val))
+	var prev_c := o_val
+	if _hover_index > 0 and _hover_index < _visible.size():
+		prev_c = maxf(0.01, float(_visible[_hover_index - 1].get("c", o_val)))
+	var chg_pct := (c_val - prev_c) / prev_c * 100.0
+	if absf(chg_pct) < 0.25:
+		return ""
+	var vol_val := float(bar.get("v", 0.0))
+	var avg_v := vol_val
+	if _hover_index >= 1 and _hover_index < _visible.size():
+		var v_sum := 0.0
+		var v_cnt := 0
+		for back in range(maxi(0, _hover_index - 5), _hover_index):
+			v_sum += float(_visible[back].get("v", 0.0))
+			v_cnt += 1
+		if v_cnt > 0:
+			avg_v = maxf(1.0, v_sum / float(v_cnt))
+	var body := maxf(0.01, absf(c_val - o_val))
+	if chg_pct < 0.0:
+		if vol_val >= avg_v * 1.38:
+			return I18n.t("attr.candle.heavyDistribution")
+		if _hover_index >= 5 and _hover_index < _visible.size():
+			var base5 := maxf(0.01, float(_visible[_hover_index - 5].get("c", prev_c)))
+			if (prev_c / base5 - 1.0) * 100.0 >= 3.5:
+				return I18n.t("attr.candle.profitTaking")
+		if (h_val - maxf(o_val, c_val)) > body * 1.35:
+			return I18n.t("attr.candle.upperRejection")
+		return I18n.t("attr.candle.normalPullback")
+	if vol_val >= avg_v * 1.38:
+		return I18n.t("attr.candle.volumeBreakout")
+	if (minf(o_val, c_val) - l_val) > body * 1.35:
+		return I18n.t("attr.candle.dipBuying")
+	return I18n.t("attr.candle.trendAdvance")
+
+
 func _draw_tooltip(bar: Dictionary) -> void:
+	var prev_c := maxf(0.01, float(bar.get("o", 1.0)))
+	if _hover_index > 0 and _hover_index < _visible.size():
+		prev_c = maxf(0.01, float(_visible[_hover_index - 1].get("c", prev_c)))
+	var chg_pct := (float(bar["c"]) - prev_c) / prev_c * 100.0
 	var lines := [
-		_bar_title(bar),
+		"%s  (%s)" % [_bar_title(bar), SmaFormat.pct(chg_pct, 2)],
 		"O %s   H %s" % [SmaFormat.num(float(bar["o"]), 2),
 			SmaFormat.num(float(bar["h"]), 2)],
 		"L %s   C %s" % [SmaFormat.num(float(bar["l"]), 2),
 			SmaFormat.num(float(bar["c"]), 2)],
 		"V %s" % SmaFormat.compact(float(bar.get("v", 0))),
 	]
+	var driver := _candle_driver_line(bar)
+	if driver != "":
+		lines.append(driver)
 	var width := 0.0
 	for line in lines:
 		width = maxf(width, _font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x)
@@ -773,7 +830,9 @@ func _draw_tooltip(bar: Dictionary) -> void:
 	draw_rect(box, Color(0.05, 0.10, 0.18, 0.96))
 	draw_rect(box, Color("#fbbf24"), false, 2.0)
 	for index in lines.size():
-		var color := Color("#9cb8d8") if index == 0 else Color("#f4f8fc")
+		var is_driver := (driver != "" and index == lines.size() - 1)
+		var color := Color("#fbbf24") if is_driver \
+			else (Color("#9cb8d8") if index == 0 else Color("#f4f8fc"))
 		draw_string(_font, Vector2(box.position.x + 8.0,
 			box.position.y + 14.0 + float(index) * 14.0), lines[index],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, color)

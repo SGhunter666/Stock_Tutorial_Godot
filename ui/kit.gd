@@ -271,6 +271,57 @@ static func style_label(style: String) -> String:
 	return style.capitalize()
 
 
+## Formats `SmaAttribution.explain_today` into localized human-readable prose so
+## no stock drop or surge ever appears unexplained.
+static func format_attribution(state: Dictionary, ticker: String) -> String:
+	var info := SmaAttribution.explain_today(state, ticker)
+	var key := String(info.get("key", "attr.flatConsolidation"))
+	var params: Dictionary = info.get("params", {}).duplicate()
+	if key == "attr.earningsToday":
+		var r := String(params.get("reason", "inlineDigest"))
+		params["short"] = I18n.t("earnings.reasonShort.%s" % r)
+		params["desc"] = I18n.t("earnings.reasonDesc.%s" % r)
+	elif key == "attr.companyNews":
+		var tmpl := String(params.get("template", "downgrade"))
+		var comp_name := String(SmaCompanyCatalog.get_company(ticker).get("name", ticker))
+		var chg := absf(float(info.get("changePct", 0.0)))
+		params["headline"] = I18n.t("news.template.%s" % tmpl, {
+			"company": comp_name,
+			"pct": SmaFormat.num(chg, 1) + "%",
+		})
+	elif params.has("sector"):
+		params["sector"] = sector_label(String(params["sector"]))
+	var body := I18n.t(key, params) if I18n.has_key(key) else I18n.t("attr.orderFlowSell")
+	return I18n.t("attr.prefix") + body
+
+
+## Formats `SmaAttribution.candle_catalyst_map` into date -> localized short tag
+## for `SmaCandleChart` crosshair hover tooltips.
+static func format_candle_catalysts(state: Dictionary, ticker: String) -> Dictionary:
+	var raw := SmaAttribution.candle_catalyst_map(state, ticker)
+	var out := {}
+	for date_key in raw.keys():
+		var item: Dictionary = raw[date_key]
+		var k := String(item.get("kind", ""))
+		if k == "earnings":
+			var r := String(item.get("reason", "inlineDigest"))
+			out[date_key] = I18n.t("attr.candle.earnings", {
+				"period": String(item.get("period", "")),
+				"short": I18n.t("earnings.reasonShort.%s" % r),
+			})
+		elif k == "corporate":
+			var act := String(item.get("type", ""))
+			var act_key := "corporate.type.%s" % act
+			out[date_key] = I18n.t("attr.candle.corp", {
+				"action": I18n.t(act_key) if I18n.has_key(act_key) else act,
+			})
+		elif k == "news":
+			out[date_key] = I18n.t("attr.candle.news")
+		elif k == "macro":
+			out[date_key] = I18n.t("attr.candle.macro")
+	return out
+
+
 ## UI sounds are optional: the autoload is absent in headless logic tests, so
 ## every helper fails quietly instead of requiring a running audio server.
 static func _play_click() -> void:
