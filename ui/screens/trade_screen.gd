@@ -704,10 +704,18 @@ func refresh(reason: String = "") -> void:
 	if _lock_card != null:
 		_lock_card.visible = locked
 		_lock_title.text = I18n.t("trade.lockedTitle")
-		_lock_body.text = I18n.t("trade.lockedBody", {
-			"ticker": ticker,
-			"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
-		})
+		var unlock_day := int(lock.get("unlockDay", 0))
+		if unlock_day > 0:
+			_lock_body.text = I18n.t("trade.lockedBodyDual", {
+				"ticker": ticker,
+				"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
+				"day": unlock_day + 1,
+			})
+		else:
+			_lock_body.text = I18n.t("trade.lockedBody", {
+				"ticker": ticker,
+				"unit": I18n.t(String(lock.get("unitTitleKey", ""))),
+			})
 	var company: Dictionary = game.exchange.company(ticker)
 	var quote: Dictionary = game.exchange.quote(ticker)
 	var last := float(quote.get("last", 0.0))

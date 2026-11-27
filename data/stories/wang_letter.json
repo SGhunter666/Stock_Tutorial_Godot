@@ -1,0 +1,146 @@
+{
+  "id": "wang_letter",
+  "title": {
+    "zh_CN": "王老师的来信",
+    "en": "Mr. Wang's Letter"
+  },
+  "start": "mail_arrives",
+  "nodes": {
+    "mail_arrives": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "前台刚送来一封手写挂号信和一只牛皮纸包裹，寄件人是远望一期的首位个人委托人——退休教师王先生。",
+        "en": "Reception just brought up a handwritten registered letter and a kraft-paper parcel from Farview I's very first individual LP — retired teacher Mr. Wang."
+      },
+      "next": "letter_content"
+    },
+    "letter_content": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "王先生 · 情景客户",
+        "en": "Mr. Wang · Scenario Client"
+      },
+      "text": {
+        "zh_CN": "小友见字如面。这阵子大盘上上下下，我老伴每天看财经新闻都替我捏把汗，但我睡觉倒是很踏实。",
+        "en": "Dear friend, the market has been tossing up and down lately. My wife worries every evening watching financial TV, yet I've been sleeping soundly."
+      },
+      "text_by_flag": [
+        {
+          "condition": {
+            "flag": "client_trust",
+            "value": "low"
+          },
+          "text": {
+            "zh_CN": "小友，这阵子基金净值一波动我就整宿睡不着。当初签约时你说过回撤很小、几乎稳赚不赔，可前两天账面浮亏吓得我老伴差点让我直接填赎回单……",
+            "en": "Dear manager, every dip in the fund's NAV has kept me awake all night. When we signed, you assured me drawdowns would be tiny and practically smooth — two days ago my wife nearly had me submit an immediate redemption..."
+          }
+        },
+        {
+          "condition": {
+            "flag": "client_trust",
+            "value": "high"
+          },
+          "text": {
+            "zh_CN": "小友见字如面！这阵子大盘颠簸，多亏签约那天你把‘最坏可能回撤两成’的丑话说在最前头，我心里早有准备，一点没慌。包裹里是老家今年新晒的桂花茶，给你们投研台提提神；另外我同教研组的周老师听说了你的实在作风，也想把他的养老闲钱托付给你。",
+            "en": "Dear friend! Markets have been bumpy lately, and thank goodness you laid out the honest '20% worst-case drawdown' upfront on day one — I was mentally prepared and didn't panic a bit. Inside the parcel is fresh Osmanthus tea from my hometown for your desk; my retired colleague Teacher Zhou heard how candid you are and wants to invest with you too."
+          }
+        }
+      ],
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "合上王先生的来信，你准备如何回信与跟进客户沟通？",
+        "en": "Closing Mr. Wang's letter, how do you reply and manage LP relations?"
+      },
+      "choices": [
+        {
+          "condition": {
+            "flag": "client_trust",
+            "value": "high"
+          },
+          "text": {
+            "zh_CN": "附上详尽月度持仓风控简报，并审慎接纳周老师的低风险申购（+$30,000 AUM）。",
+            "en": "Send a transparent monthly risk letter & onboard Teacher Zhou's conservative mandate (+$30,000 AUM)."
+          },
+          "next": "trust_reward",
+          "effects": [
+            {
+              "set_flag": "wang_followup",
+              "value": "referred"
+            },
+            {
+              "add_fund_client": {
+                "name": "周老师",
+                "principal": 30000.0,
+                "tag": "wang_referral",
+                "risk": "low"
+              }
+            },
+            {
+              "toast": {
+                "zh_CN": "口碑复利：王先生引荐周老师申购基金 $30,000",
+                "en": "Trust compounds: Teacher Zhou subscribed $30,000 via referral"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "如实披露当前组合最大回撤与流动性缓冲，重申受托人风控红线。",
+            "en": "Send full drawdown & liquidity-buffer disclosure, reaffirming fiduciary guardrails."
+          },
+          "next": "honest_letter",
+          "effects": [
+            {
+              "set_flag": "wang_followup",
+              "value": "disclosed"
+            },
+            {
+              "toast": {
+                "zh_CN": "投后沟通：发出透明月度受托人报告",
+                "en": "Investor relations: Sent transparent monthly fiduciary letter"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "trust_reward": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "看见了吗？在资产管理行业，诚实从来不是吃亏。你在顺境时少吹一句牛，危机来临时就少一张恐慌赎回单，多一份愿意陪你穿越牛熊的长钱。",
+        "en": "See that? In asset management, candor is never a disadvantage. Every boast you hold back in good times saves you a panic redemption in bad times — and earns patient capital that stays through the cycle."
+      },
+      "next": "end"
+    },
+    "honest_letter": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "亡羊补牢还不算晚。把真实波动率和止损底线写进每一封投资人月报里——只有把预期拉回地面，风暴真正来临时基金才不会被挤兑压垮。",
+        "en": "Never too late to mend expectations. Put real volatility and drawdown guardrails into every LP letter — grounding expectations now is what keeps redemptions from breaking the fund in a storm."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

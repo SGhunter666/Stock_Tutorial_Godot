@@ -560,6 +560,9 @@ func _render_unlocks(entry: Dictionary) -> void:
 	var box := SmaKit.vbox(6)
 	card.add_child(box)
 	box.add_child(SmaKit.label(I18n.t("lesson.unlocks"), 15))
+	box.add_child(SmaKit.caption(I18n.t("academy.scholarshipHint", {
+		"amount": SmaFormat.money(SmaAcademy.SCHOLARSHIP_CASH),
+	})))
 	if unlocks.is_empty():
 		box.add_child(SmaKit.muted(I18n.t("lesson.unlockNote")))
 	else:
@@ -570,9 +573,12 @@ func _render_unlocks(entry: Dictionary) -> void:
 			var row := SmaKit.hbox(8)
 			row.add_child(SmaKit.label(I18n.t("unlock.%s.title" % tool_key), 13))
 			row.add_child(SmaKit.hspacer())
-			var unlocked := SmaAcademy.is_tool_unlocked(game.academy, String(tool_id))
+			var unlocked: bool = bool(game.academy_is_tool_unlocked(String(tool_id)))
+			var auto_day := SmaAcademy.tool_unlock_day(String(tool_id))
+			var lock_hint := I18n.t("academy.unlockHintDual", {"day": auto_day + 1}) \
+				if auto_day > 0 else I18n.t("academy.unlockHint")
 			row.add_child(SmaKit.label(I18n.t("unlock.unlockedLabel") if unlocked
-				else I18n.t("academy.unlockHint"), 11,
+				else lock_hint, 11,
 				SmaUiTheme.POSITIVE if unlocked else SmaUiTheme.WARNING))
 			box.add_child(row)
 			var desc := SmaKit.muted(I18n.t("unlock.%s.desc" % tool_key), 11)

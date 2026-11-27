@@ -13,6 +13,7 @@ const XP_UNIT_COMPLETE := 20
 const XP_PER_LEVEL := 150
 const PASS_SCORE := 80
 const TEST_OUT_SCORE := 85
+const SCHOLARSHIP_CASH := 500.0
 
 const TOOL_RULES := {
 	"order.limit": {"unitId": "u4", "sectionId": "s3"},
@@ -25,15 +26,37 @@ const TOOL_RULES := {
 	"trade.futures": {"unitId": "u29", "sectionId": "s1"},
 }
 
+## Dual-track live seat progression: tools & sectors unlock immediately when
+## studying their Academy lesson, OR automatically as the player gains live
+## trading days on the desk.
+const TOOL_UNLOCK_DAYS := {
+	"order.limit": 2,
+	"order.stop": 4,
+	"market.depth": 4,
+	"trade.short": 8,
+	"trade.margin": 8,
+	"options.trade": 12,
+	"options.sell": 12,
+	"trade.futures": 12,
+}
+
 ## Progressive market access. Core sectors are available from the first day;
-## later sectors open with the units that teach their risks.
+## later sectors open with the units that teach their risks or by trading day.
 const SECTOR_UNLOCK := {
 	"technology": "", "communication": "", "consumer": "", "financials": "",
 	"healthcare": "u4", "industrials": "u4",
 	"energy": "u7", "materials": "u7",
 	"realestate": "u13", "utilities": "u13", "telecom": "u13",
 }
+const SECTOR_UNLOCK_DAYS := {
+	"technology": 0, "communication": 0, "consumer": 0, "financials": 0,
+	"healthcare": 2, "industrials": 2,
+	"energy": 4, "materials": 4,
+	"realestate": 6, "utilities": 6, "telecom": 6,
+}
 const ETF_UNLOCK_UNIT := "u7"
+const ETF_UNLOCK_DAY := 4
+const MULTIASSET_UNLOCK_DAY := 6
 
 ## Single source of truth for the achievement gallery. Categories are only a
 ## display hint; evaluation lives in evaluate_achievements().
@@ -1182,10 +1205,13 @@ static func sector_unlock_unit(sector: String) -> String:
 	return String(SECTOR_UNLOCK.get(sector, ""))
 
 
-## Returns {"locked": false} or the unit that still has to be completed.
+## Returns {"locked": false} or the unit / live trading day that unlocks it.
 static func market_lock_info(state: Dictionary, ticker: String, sector: String,
-		is_etf: bool = false) -> Dictionary:
+		is_etf: bool = false, day: int = 0) -> Dictionary:
 	if state.is_empty() or typeof(state.get("units")) != TYPE_DICTIONARY:
+		return {"locked": false, "ticker": ticker}
+	var unlock_day := ETF_UNLOCK_DAY if is_etf else int(SECTOR_UNLOCK_DAYS.get(sector, 0))
+	if unlock_day > 0 and day >= unlock_day:
 		return {"locked": false, "ticker": ticker}
 	var required := ETF_UNLOCK_UNIT if is_etf else sector_unlock_unit(sector)
 	if required == "" or is_unit_complete(state, required):
@@ -1196,6 +1222,7 @@ static func market_lock_info(state: Dictionary, ticker: String, sector: String,
 		"ticker": ticker,
 		"unitId": required,
 		"unitTitleKey": String(entry.get("titleKey", "")),
+		"unlockDay": unlock_day,
 	}
 
 
@@ -1227,7 +1254,14 @@ static func _all_stage_one_complete(state: Dictionary) -> bool:
 	return true
 
 
-static func is_tool_unlocked(state: Dictionary, tool_id: String) -> bool:
+static func tool_unlock_day(tool_id: String) -> int:
+	return int(TOOL_UNLOCK_DAYS.get(tool_id, 0))
+
+
+static func is_tool_unlocked(state: Dictionary, tool_id: String, day: int = 0) -> bool:
+	var auto_day := int(TOOL_UNLOCK_DAYS.get(tool_id, -1))
+	if auto_day >= 0 and day >= auto_day:
+		return true
 	var rule: Dictionary = TOOL_RULES.get(tool_id, {})
 	if rule.is_empty():
 		return true

@@ -20,6 +20,34 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA19_ONLY") == "1":
+		Game.new_game("beta19-rivals")
+		await _settle(4)
+		_dismiss_story()
+		Game.submit_order({"ticker": "NVDO", "side": "buy", "type": "market", "qty": 60})
+		_dismiss_story()
+		Game.submit_order({"ticker": "MSFY", "side": "buy", "type": "market", "qty": 30})
+		for d in 5:
+			Game._advance_steps(SmaExchange.SESSION_SECONDS, false)
+			_dismiss_story()
+		Game._advance_steps(900, true)
+		Game.intro["complete"] = true
+		if main._pixel_fx != null:
+			main._pixel_fx._popups.clear()
+			main._pixel_fx._sparks.clear()
+			main._pixel_fx.queue_redraw()
+		main.navigate("dashboard")
+		main._screens["dashboard"].refresh()
+		await _settle(5)
+		await _shot("beta19_rivals_dashboard")
+		Game.narrative.start_story("earnings_paradox")
+		Game.narrative.advance()
+		await _settle(5)
+		await _shot("beta19_earnings_story")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA18_ONLY") == "1":
 		Game.new_game("beta18-attribution")
 		await _settle(4)

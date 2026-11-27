@@ -36,7 +36,47 @@
       "story": "dividend",
       "once": true,
       "condition": {
-        "unit_complete": "u5"
+        "any": [
+          {
+            "unit_complete": "u5"
+          },
+          {
+            "all": [
+              {
+                "day_gte": 4
+              },
+              {
+                "trade_count_gte": 2
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "rival_mania_live",
+      "event": "day_closed",
+      "story": "rival_mania",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "day_gte": 5
+          },
+          {
+            "trade_count_gte": 2
+          },
+          {
+            "any": [
+              {
+                "rival_gu_ahead": true
+              },
+              {
+                "day_gte": 6
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -54,7 +94,40 @@
       "story": "diversify",
       "once": true,
       "condition": {
-        "unit_complete": "u7"
+        "any": [
+          {
+            "unit_complete": "u7"
+          },
+          {
+            "all": [
+              {
+                "day_gte": 7
+              },
+              {
+                "trade_count_gte": 3
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "tilt_drawdown",
+      "event": "day_closed",
+      "story": "tilt_intervention",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "day_gte": 3
+          },
+          {
+            "trade_count_gte": 2
+          },
+          {
+            "equity_lte": 96500.0
+          }
+        ]
       }
     },
     {
@@ -79,7 +152,21 @@
       "story": "research",
       "once": true,
       "condition": {
-        "unit_complete": "u11"
+        "any": [
+          {
+            "unit_complete": "u11"
+          },
+          {
+            "all": [
+              {
+                "day_gte": 10
+              },
+              {
+                "trade_count_gte": 4
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -97,7 +184,37 @@
       "story": "macro_shock",
       "once": true,
       "condition": {
-        "unit_complete": "u13"
+        "any": [
+          {
+            "unit_complete": "u13"
+          },
+          {
+            "all": [
+              {
+                "day_gte": 13
+              },
+              {
+                "trade_count_gte": 4
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "earnings_paradox_season",
+      "event": "day_closed",
+      "story": "earnings_paradox",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "day_gte": 15
+          },
+          {
+            "trade_count_gte": 2
+          }
+        ]
       }
     },
     {
@@ -106,7 +223,14 @@
       "story": "short_mirror",
       "once": true,
       "condition": {
-        "unit_complete": "u17"
+        "any": [
+          {
+            "unit_complete": "u17"
+          },
+          {
+            "day_gte": 8
+          }
+        ]
       }
     },
     {
@@ -124,7 +248,21 @@
       "story": "short_mirror",
       "once": true,
       "condition": {
-        "unit_complete": "u17"
+        "any": [
+          {
+            "unit_complete": "u17"
+          },
+          {
+            "all": [
+              {
+                "day_gte": 18
+              },
+              {
+                "trade_count_gte": 5
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -133,7 +271,14 @@
       "story": "leverage_night",
       "once": true,
       "condition": {
-        "unit_complete": "u18"
+        "any": [
+          {
+            "unit_complete": "u18"
+          },
+          {
+            "day_gte": 1
+          }
+        ]
       }
     },
     {
@@ -151,7 +296,31 @@
       "story": "leverage_night",
       "once": true,
       "condition": {
-        "unit_complete": "u18"
+        "any": [
+          {
+            "unit_complete": "u18"
+          },
+          {
+            "all": [
+              {
+                "day_gte": 22
+              },
+              {
+                "trade_count_gte": 6
+              }
+            ]
+          },
+          {
+            "all": [
+              {
+                "day_gte": 8
+              },
+              {
+                "rival_gu_margin_called": true
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -160,7 +329,14 @@
       "story": "options_expiry",
       "once": true,
       "condition": {
-        "unit_complete": "u21"
+        "any": [
+          {
+            "unit_complete": "u21"
+          },
+          {
+            "day_gte": 12
+          }
+        ]
       }
     },
     {
@@ -178,7 +354,21 @@
       "story": "options_expiry",
       "once": true,
       "condition": {
-        "unit_complete": "u21"
+        "any": [
+          {
+            "unit_complete": "u21"
+          },
+          {
+            "all": [
+              {
+                "day_gte": 26
+              },
+              {
+                "trade_count_gte": 6
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -194,6 +384,51 @@
       "once": true,
       "condition": {
         "fund_active": true
+      }
+    },
+    {
+      "id": "wang_letter_followup",
+      "event": "day_closed",
+      "story": "wang_letter",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          },
+          {
+            "day_gte": 8
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "wang_letter_redemption",
+      "event": "redemption_requested",
+      "story": "wang_letter",
+      "once": true,
+      "condition": {
+        "all": [
+          {
+            "fund_active": true
+          },
+          {
+            "story_seen": "client_trust"
+          },
+          {
+            "not": {
+              "story_seen": "epilogue"
+            }
+          }
+        ]
       }
     },
     {
@@ -252,7 +487,14 @@
       "condition": {
         "all": [
           {
-            "unit_complete": "u29"
+            "any": [
+              {
+                "unit_complete": "u29"
+              },
+              {
+                "day_gte": 30
+              }
+            ]
           },
           {
             "fund_active": true
@@ -330,7 +572,14 @@
       "condition": {
         "all": [
           {
-            "unit_complete": "u31"
+            "any": [
+              {
+                "unit_complete": "u31"
+              },
+              {
+                "day_gte": 35
+              }
+            ]
           },
           {
             "fund_active": true

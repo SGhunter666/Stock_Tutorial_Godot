@@ -4,20 +4,23 @@ class_name SmaStoryScreen
 extends SmaScreen
 
 const CHAPTER_ORDER := [
-	"opening", "first_trade", "day_one", "dividend", "diversify", "research",
-	"macro_shock", "short_mirror", "leverage_night", "options_expiry",
-	"client_trust", "crisis_eve", "black_friday", "graduation",
-	"graduation_unfunded", "epilogue",
+	"opening", "first_trade", "day_one", "dividend", "rival_mania",
+	"diversify", "tilt_intervention", "research", "macro_shock",
+	"earnings_paradox", "short_mirror", "leverage_night", "options_expiry",
+	"client_trust", "wang_letter", "crisis_eve", "black_friday",
+	"graduation", "graduation_unfunded", "epilogue",
 ]
 const CHARACTER_ORDER := ["lin_lan", "gu_yan", "su_he", "zhou_heng", "chen_xi", "wang", "lao_chen"]
 const DECISION_FLAGS := [
-	"path", "discipline", "mission_day1", "income_style", "diversify",
-	"research", "risk_response", "ethics", "leverage", "option_style",
-	"client_trust", "hedge", "crisis_choice", "ending_path",
+	"path", "discipline", "mission_day1", "income_style", "rival_stance",
+	"diversify", "tilt_response", "research", "risk_response",
+	"earnings_mindset", "ethics", "leverage", "option_style",
+	"client_trust", "wang_followup", "hedge", "crisis_choice", "ending_path",
 ]
 
 var _active_box: VBoxContainer
 var _objective_box: VBoxContainer
+var _rivals_box: VBoxContainer
 var _catalog_box: VBoxContainer
 var _flags_box: VBoxContainer
 var _characters_box: VBoxContainer
@@ -50,6 +53,11 @@ func _build() -> void:
 	_objective_box = SmaKit.vbox(6)
 	objective_card.add_child(_objective_box)
 	root.add_child(objective_card)
+
+	var rivals_card := SmaKit.card(12)
+	_rivals_box = SmaKit.vbox(6)
+	rivals_card.add_child(_rivals_box)
+	root.add_child(rivals_card)
 
 	var columns := SmaKit.hbox(12)
 	root.add_child(columns)
@@ -117,6 +125,7 @@ func refresh(_reason: String = "") -> void:
 		return
 	_update_active()
 	_update_objective()
+	_update_rivals()
 	_update_catalog()
 	_update_flags()
 	_update_history()
@@ -143,6 +152,30 @@ func _update_objective() -> void:
 	var detail := SmaKit.muted(String(obj.get("detail", "")), 12)
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_objective_box.add_child(detail)
+
+
+func _update_rivals() -> void:
+	SmaKit.clear_children(_rivals_box)
+	var head := SmaKit.hbox(8)
+	head.add_child(SmaKit.label(I18n.t("rivals.title"), 14, SmaUiTheme.ACCENT))
+	head.add_child(SmaKit.muted(I18n.t("rivals.storySubtitle"), 11))
+	_rivals_box.add_child(head)
+	for entry in game.rival_leaderboard():
+		var is_player := bool(entry.get("isPlayer", false))
+		var trader_name: String = String(game.display_player_name()) if is_player \
+			else I18n.t(String(entry.get("nameKey", "")))
+		var ret := float(entry.get("returnPct", 0.0))
+		var qk := String(entry.get("quoteKey", ""))
+		var quote := I18n.t(qk) if (qk != "" and I18n.has_key(qk)) else ""
+		_rivals_box.add_child(SmaKit.data_row([
+			"#%d %s" % [int(entry.get("rank", 1)), trader_name],
+			"%s (%s)" % [SmaFormat.money(float(entry.get("equity", 0.0))), SmaFormat.pct(ret)],
+			quote,
+		], [0.85, 0.85, 1.9], [
+			SmaUiTheme.ACCENT if is_player else SmaUiTheme.TEXT,
+			SmaKit.value_color(ret),
+			SmaUiTheme.MUTED,
+		], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_LEFT]))
 
 
 func _update_notes() -> void:

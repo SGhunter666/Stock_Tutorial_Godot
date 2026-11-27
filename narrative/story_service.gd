@@ -295,10 +295,26 @@ func evaluate(condition: Variant) -> bool:
 		return false
 	if data.has("equity_gte") and _host_number("get_equity") < float(data["equity_gte"]):
 		return false
+	if data.has("equity_lte") and _host_number("get_equity") > float(data["equity_lte"]):
+		return false
 	if data.has("day_gte") and _host_number("get_day") < float(data["day_gte"]):
 		return false
 	if data.has("trade_count_gte") and _host_number("get_trade_count") < float(data["trade_count_gte"]):
 		return false
+	if data.has("rival_gu_ahead"):
+		var expected_ahead := bool(data["rival_gu_ahead"])
+		var is_ahead := false
+		if host != null and host.has_method("is_rival_gu_ahead"):
+			is_ahead = bool(host.is_rival_gu_ahead())
+		if is_ahead != expected_ahead:
+			return false
+	if data.has("rival_gu_margin_called"):
+		var expected_mc := bool(data["rival_gu_margin_called"])
+		var is_mc := false
+		if host != null and host.has_method("is_rival_gu_margin_called"):
+			is_mc = bool(host.is_rival_gu_margin_called())
+		if is_mc != expected_mc:
+			return false
 	if data.has("position_qty_gte"):
 		var spec: Dictionary = data["position_qty_gte"]
 		var held := 0

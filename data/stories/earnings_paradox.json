@@ -1,0 +1,136 @@
+{
+  "id": "earnings_paradox",
+  "title": {
+    "zh_CN": "好财报的陷阱",
+    "en": "The Good-Earnings Trap"
+  },
+  "start": "shock",
+  "nodes": {
+    "shock": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "这市场疯了吧？！营收同比增长两成、EPS 明明超出华尔街一致预期，结果开盘冲高两分钟就一路砸出长上影大阴线！好财报凭什么暴跌？！",
+        "en": "Is this tape insane?! Revenue grew 20% YoY and EPS beat Wall Street consensus — yet it spiked for two minutes at the open and slammed down into an ugly upper-wick red candle! How does a beat crash?!"
+      },
+      "next": "lao_chen_tea"
+    },
+    "lao_chen_tea": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "老陈 · 交易大厅前辈",
+        "en": "Lao Chen · Floor Veteran"
+      },
+      "text": {
+        "zh_CN": "（拧开保温杯吹了吹茶叶）新人都觉得股价考的是‘及格没有’。错啦！如果全市场提前一个月把股价推涨了 25%，赌它能考 98 分，结果它只考了 92 分——哪怕 92 分是优等生，那多出来的预期也得当场吐回去。行话叫：买预期，卖事实（Sell the News）。",
+        "en": "(Unscrewing his thermos) Rookies think stocks are graded pass-or-fail. Wrong! If the street bid a stock up 25% all month pricing in a 98, and it prints a 92 — even if 92 is an A, that excess expectation gets puked right back at the open. Buy the rumor, sell the news."
+      },
+      "next": "lin_lan_guidance"
+    },
+    "lin_lan_guidance": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "还不止如此。翻开财报中心的管理层指引（Guidance）和毛利率细项看看：上季度的利润只是后视镜，下季度指引下调、毛利率滑坡、或是资本开支（CapEx）激增吞噬自由现金流，任何一项都会触发机构估值模型重算。",
+        "en": "And look deeper in the Earnings Center at forward Guidance and Gross Margin: last quarter's EPS is the rearview mirror. A guidance cut, margin slip, or CapEx surge eating free cash flow forces institutional DCF models to re-price immediately."
+      },
+      "next": "chen_xi_iv"
+    },
+    "chen_xi_iv": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "陈曦 · 量化研究员",
+        "en": "Chen Xi · Quantitative Researcher"
+      },
+      "text": {
+        "zh_CN": "如果你在财报前追高买了虚值期权就更痛了。财报落地瞬间，隐含波动率从 1.5 倍瞬间坍塌（IV Crush）——就算方向猜对但涨幅不够大，看涨期权照样亏钱。",
+        "en": "And if you bought expensive OTM options right before earnings, it hurts twice. The second numbers drop, implied volatility collapses — IV Crush. Even if you guess the direction right, a modest move still loses money on calls."
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "经历首个财报季的‘预期差洗礼’后，你在财报季的交易准则是：",
+        "en": "After witnessing expectations-vs-reality in Earnings Season, what rule do you adopt?"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "先看前期涨幅与下季指引毛利，绝不单看标题盲目追高。",
+            "en": "Check prior run-up, forward guidance & margins first — never chase headlines."
+          },
+          "next": "guidance_reply",
+          "effects": [
+            {
+              "set_flag": "earnings_mindset",
+              "value": "expectations"
+            },
+            {
+              "toast": {
+                "zh_CN": "研究进化：建立‘预期差 + 前瞻指引’财报框架",
+                "en": "Framework unlocked: Expectations gap + forward guidance"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "警惕财报前高昂隐波，善用交易台‘今日动因’复盘每根K线。",
+            "en": "Respect pre-earnings IV surge & use the 'Why Moving' banner to audit candles."
+          },
+          "next": "iv_reply",
+          "effects": [
+            {
+              "set_flag": "earnings_mindset",
+              "value": "iv_respect"
+            },
+            {
+              "toast": {
+                "zh_CN": "研究进化：掌握波动率回落（IV Crush）与动因溯源",
+                "en": "Framework unlocked: IV Crush defense & causal attribution"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "guidance_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "当你开始问‘市场已经把多少好消息计入价格（Priced In）了’，你就真正跨过了散户与专业投资者的分水岭。",
+        "en": "The day you start asking 'how much good news is already priced in?' is the day you cross the divide from retail spectator to real investor."
+      },
+      "next": "end"
+    },
+    "iv_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "老陈 · 交易大厅前辈",
+        "en": "Lao Chen · Floor Veteran"
+      },
+      "text": {
+        "zh_CN": "懂盘口的人从不怪市场‘无端下跌’。把鼠标移到 K 线图每一根异动蜡烛上看看动因，每一滴眼泪背后都有账可查。",
+        "en": "Tape readers never blame 'random drops'. Hover any big candle on the chart to read its causal attribution — every drop of blood on Wall Street leaves a receipt."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

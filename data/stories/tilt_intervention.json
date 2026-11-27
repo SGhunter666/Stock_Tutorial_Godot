@@ -1,0 +1,124 @@
+{
+  "id": "tilt_intervention",
+  "title": {
+    "zh_CN": "连亏之夜：苏禾的热咖啡",
+    "en": "Drawdown Night: Su He's Hot Coffee"
+  },
+  "start": "coffee",
+  "nodes": {
+    "coffee": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "（一杯温热的黑咖啡轻轻放在你的键盘旁）先别急着敲回车下单。我刚从后台风控屏看到你的账户净值出现了明显回撤——这个时候人的手指会比脑子快，最容易犯的致命错误叫‘报复性翻本（Revenge Trading）’。",
+        "en": "(A warm mug of black coffee is set gently beside your keyboard) Hold off on hitting Submit. I saw the drawdown on your account monitor — right now fingers move faster than judgment, and the deadliest trap is Revenge Trading."
+      },
+      "next": "chen_xi_rule"
+    },
+    "chen_xi_rule": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "陈曦 · 量化研究员",
+        "en": "Chen Xi · Quantitative Researcher"
+      },
+      "text": {
+        "zh_CN": "回撤数学很残酷：亏掉 5% 只需要涨 5.3% 就能回本；但如果你上头满仓赌一把亏到 30%，就必须暴涨 42.9% 才能回到原点。我们量化台有一条铁律：净值跌破水线时，单笔风险预算自动减半，绝不逆势加码摊平亏损。",
+        "en": "Drawdown math is unforgiving: a 5% loss needs +5.3% to recover, but tilt into a 30% hole and you need +42.9% just to break even. On our quant desk the rule is mechanical: below watermark, cut per-trade risk in half — never average down into a loser."
+      },
+      "next": "lin_lan_calm"
+    },
+    "lin_lan_calm": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "亏损本身并不可耻，它是交易这门生意的正常营业成本。真正区分职业交易员和赌徒的，是你亏钱之后下一单的仓位大小。",
+        "en": "Taking a loss isn't shameful — it's the normal cost of doing business in markets. What separates a professional from a gambler is the size of the very next order after a loss."
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "喝口咖啡缓一缓，你打算如何执行接下来的回撤修复计划？",
+        "en": "Take a sip of coffee and reset — how will you manage your drawdown recovery?"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "主动缩减单笔仓位并挂好止损单，用小步胜率慢慢修复净值。",
+            "en": "Cut position size and attach hard stops; rebuild equity step by step."
+          },
+          "next": "halve_reply",
+          "effects": [
+            {
+              "set_flag": "tilt_response",
+              "value": "halve"
+            },
+            {
+              "toast": {
+                "zh_CN": "风控纪律：启动减半仓位回撤修复模式",
+                "en": "Risk discipline: Half-size recovery protocol engaged"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "先转向宽基 ETF（MKT/DIV）稳住底仓，暂停高波动个股追涨杀跌。",
+            "en": "Rotate into broad ETFs (MKT/DIV) to stabilize; pause high-beta chasing."
+          },
+          "next": "etf_reply",
+          "effects": [
+            {
+              "set_flag": "tilt_response",
+              "value": "stabilize"
+            },
+            {
+              "toast": {
+                "zh_CN": "风控纪律：以稳健指数底仓重建节奏",
+                "en": "Risk discipline: Stabilizing book with core ETFs"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "halve_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "很好。只要本金还在牌桌上，复利永远站在守规矩的人这一边。早点休息，明天开盘前先看一眼持仓体检。",
+        "en": "Good. As long as your capital stays at the table, compounding favors the disciplined. Get some rest, and check your portfolio risk diagnostics before tomorrow's bell."
+      },
+      "next": "end"
+    },
+    "etf_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "很聪明的降维处理。看不清个股暗流时，退回低费率指数基金让时间帮你缓冲，是成熟基金经理最常用的防守动作。",
+        "en": "Smart de-escalation. When single-name currents get choppy, stepping back into low-cost index ETFs to regain rhythm is a classic portfolio manager defense."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

@@ -28,6 +28,8 @@ class FakeHost:
 	var career_rank: int = 1
 	var fund_active: bool = false
 	var fund_drawdown: float = 0.0
+	var rival_gu_ahead: bool = false
+	var rival_gu_mc: bool = false
 
 	func is_unit_complete(unit_id: String) -> bool:
 		return bool(completed_units.get(unit_id, false))
@@ -40,6 +42,12 @@ class FakeHost:
 
 	func get_fund_drawdown() -> float:
 		return fund_drawdown
+
+	func is_rival_gu_ahead() -> bool:
+		return rival_gu_ahead
+
+	func is_rival_gu_margin_called() -> bool:
+		return rival_gu_mc
 
 	func story_add_cash(amount: float, memo: String) -> void:
 		cash += amount
@@ -81,8 +89,8 @@ func run() -> void:
 	describe("story-load")
 	var host := FakeHost.new()
 	var service := _make_service(host)
-	eq(service.stories.size(), 16, "sixteen stories registered")
-	eq(service.triggers.size(), 36, "thirty-six trigger definitions registered")
+	eq(service.stories.size(), 20, "twenty stories registered")
+	eq(service.triggers.size(), 41, "forty-one trigger definitions registered")
 	eq(service.characters.size(), 7, "seven character portraits registered")
 	check(service.speaker_lookup.has("Lin Lan"), "english character alias registered")
 	check(service.speaker_lookup.has("Mr. Wang"), "client character alias registered")
@@ -191,7 +199,7 @@ func run() -> void:
 	service5.from_dict(saved)
 	eq(String(service5.flags.get("path", "")), "value", "flags survive restore")
 	check(bool(service5.seen.get("opening", false)), "seen stories survive restore")
-	eq(service5.stories.size(), 16, "stories are re-registered on load")
+	eq(service5.stories.size(), 20, "stories are re-registered on load")
 
 	describe("story-new-conditions")
 	var host8 := FakeHost.new()
@@ -470,3 +478,79 @@ func run() -> void:
 	check(multi_text.contains("收租"), "multi-flag epilogue includes option_style block")
 	check(multi_text.contains("复利"), "multi-flag epilogue includes income_style block")
 	check(multi_text.contains("换成现金"), "multi-flag epilogue includes risk_response block")
+
+	describe("story-beta19-dual-track-and-encounters")
+	var dual_host := FakeHost.new()
+	var dual_service := _make_service(dual_host)
+	dual_service.seen["day_one"] = true
+	dual_host.day = 4
+	dual_host.trades = 2
+	dual_service.handle_event("day_closed", {"day": 4})
+	eq(dual_service.active_id, "dividend", "dual-track play unlocks dividend story without u5")
+
+	var tilt_host := FakeHost.new()
+	var tilt_service := _make_service(tilt_host)
+	tilt_service.seen["day_one"] = true
+	tilt_host.day = 3
+	tilt_host.trades = 2
+	tilt_host.cash = 94800.0
+	tilt_service.handle_event("day_closed", {"day": 3})
+	eq(tilt_service.active_id, "tilt_intervention", "drawdown triggers Su He coffee intervention")
+	var tilt_choice := _advance_to_choice(tilt_service)
+	eq(tilt_choice["choices"].size(), 2, "tilt intervention offers two recovery protocols")
+	check(tilt_service.choose(0), "half-size recovery accepted")
+	eq(String(tilt_service.flags.get("tilt_response", "")), "halve", "tilt_response flag recorded")
+
+	var earn_host := FakeHost.new()
+	var earn_service := _make_service(earn_host)
+	for sid in ["day_one", "dividend", "rival_mania", "diversify", "research", "macro_shock"]:
+		earn_service.seen[sid] = true
+	earn_host.day = 15
+	earn_host.trades = 3
+	earn_service.handle_event("day_closed", {"day": 15})
+	eq(earn_service.active_id, "earnings_paradox", "earnings season triggers beat-but-drop story")
+
+	var wang_host := FakeHost.new()
+	var wang_service := _make_service(wang_host)
+	wang_service.seen["day_one"] = true
+	wang_service.seen["client_trust"] = true
+	wang_service.flags["client_trust"] = "high"
+	wang_host.fund_active = true
+	wang_host.day = 10
+	wang_service.handle_event("day_closed", {"day": 10})
+	eq(wang_service.active_id, "wang_letter", "active fund triggers Mr. Wang follow-up letter")
+	var wang_choice := _advance_to_choice(wang_service)
+	eq(wang_choice["choices"].size(), 2, "high-trust Mr. Wang letter unlocks Teacher Zhou referral")
+	check(wang_service.choose(0), "referral subscription accepted")
+	eq(wang_host.story_clients.size(), 1, "Teacher Zhou added to fund clients")
+	eq(String(wang_host.story_clients[0][0]), "周老师", "referral client name matches")
+	approx(float(wang_host.story_clients[0][1]), 30000.0, 0.001, "referral AUM matches")
+
+	describe("rivals-and-dual-unlock")
+	var acad_state := SmaAcademy.create_state()
+	check(not SmaAcademy.is_tool_unlocked(acad_state, "order.limit", 0), "limit locked on day 0")
+	check(SmaAcademy.is_tool_unlocked(acad_state, "order.limit", 2), "limit auto-unlocks on day 2")
+	check(SmaAcademy.is_tool_unlocked(acad_state, "order.stop", 4), "stop auto-unlocks on day 4")
+	check(SmaAcademy.is_tool_unlocked(acad_state, "trade.short", 8), "short auto-unlocks on day 8")
+	check(SmaAcademy.is_tool_unlocked(acad_state, "options.trade", 12), "options auto-unlock on day 12")
+	check(bool(SmaAcademy.market_lock_info(acad_state, "SLDY", "energy", false, 0).get("locked", false)),
+		"energy locked on day 0")
+	check(not bool(SmaAcademy.market_lock_info(acad_state, "SLDY", "energy", false, 4).get("locked", false)),
+		"energy auto-unlocks on day 4")
+	check(not bool(SmaAcademy.market_lock_info(acad_state, "MKT", "etf", true, 4).get("locked", false)),
+		"ETFs auto-unlock on day 4")
+
+	var ex := SmaExchange.new("rival-test-seed", 100000.0, 1.0)
+	var board := SmaRivals.leaderboard(ex.state, ex.equity(), 100000.0)
+	eq(board.size(), 4, "four traders in Farview Cohort Arena")
+	var day0_iso := SmaCalendar.iso_date(0)
+	for sym in ["NVDO", "CONB", "TSLO", "RDDX"]:
+		var cs: Dictionary = ex.state["companies"][sym]
+		var p0 := float(cs["last"])
+		cs["series"]["daily"].append({"t": day0_iso, "o": p0, "h": p0, "l": p0 * 0.85, "c": p0 * 0.88, "v": 10000})
+		cs["prevClose"] = p0 * 0.88
+		cs["last"] = p0 * 0.88
+	ex.state["dayIndex"] = 1
+	var gu_crash := SmaRivals.gu_yan_snapshot(ex.state, 100000.0)
+	check(bool(gu_crash.get("marginCalled", false)), "Gu Yan triggers margin call on -12% basket crash")
+	approx(float(gu_crash.get("leverage", 0.0)), 0.85, 0.01, "Gu Yan leverage cut to 0.85x after blow-up")

@@ -1,0 +1,136 @@
+{
+  "id": "rival_mania",
+  "title": {
+    "zh_CN": "顾言的狂欢与暗雷",
+    "en": "Gu Yan's Mania & Hidden Mine"
+  },
+  "start": "taunt",
+  "nodes": {
+    "taunt": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "喂，看见仪表盘上的远望同期实盘榜了吗？NVDO、CONB 加 TSLO，2.2 倍融资满上！你们还在那儿一分钱一分钱算限价单价差，我的净值曲线已经起飞了。",
+        "en": "Hey, did you check the Farview Cohort Leaderboard on the dashboard? NVDO, CONB, and TSLO — 2.2x margin, full throttle! While you're counting pennies on limit spreads, my equity curve is already in orbit."
+      },
+      "next": "chen_xi_math"
+    },
+    "chen_xi_math": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "陈曦 · 量化研究员",
+        "en": "Chen Xi · Quantitative Researcher"
+      },
+      "text": {
+        "zh_CN": "我刚跑完你那组高 Beta 篮子的蒙特卡洛路径，顾言。2.2 倍杠杆叠加每日融资计息，只要遇到一次单日 6% 的行业共振回撤，你的净值就会瞬间回吐超过 13%，再跌一天就会直接触发维持保证金强平。",
+        "en": "I just ran a Monte Carlo path on your high-beta basket, Gu Yan. At 2.2x leverage plus daily margin interest, a single 6% sector air-pocket wipes over 13% of your equity — one more down day triggers forced liquidation."
+      },
+      "next": "gu_yan_laugh"
+    },
+    "gu_yan_laugh": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "顾言 · 明星学员",
+        "en": "Gu Yan · Star Trainee"
+      },
+      "text": {
+        "zh_CN": "量化模型永远算不出牛市的想象力！在趋势最强的时候不敢重仓，等老了拿每年 4% 的红利养老吗？怎么样，要不要跟上我的节奏干一票大的？",
+        "en": "Quant models never capture bull-market imagination! If you don't size up when momentum is roaring, what's the plan — retire on 4% dividends? Well? Coming along for a real trade?"
+      },
+      "next": "su_he_warning"
+    },
+    "su_he_warning": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "苏禾 · 风控合规官",
+        "en": "Su He · Risk & Compliance Officer"
+      },
+      "text": {
+        "zh_CN": "每年春天排行榜最顶端的名字几乎都在换人，因为顺风期排名奖励的是杠杆倍数，而不是交易水平。你看着别人的暴利心动时，往往正是风险敞口失控的第一步。",
+        "en": "Every spring the names atop the leaderboard change, because bull-market rankings reward raw leverage, not skill. The moment someone else's windfall gives you FOMO is step one toward blowing your risk budget."
+      },
+      "next": "choice"
+    },
+    "choice": {
+      "type": "choice",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "面对同期榜单上的短期暴利诱惑，你的实盘应对原则是：",
+        "en": "Facing FOMO from a peer's leveraged streak on the leaderboard, how do you respond?"
+      },
+      "choices": [
+        {
+          "text": {
+            "zh_CN": "屏蔽短期排名噪音，只赚自己风控体系内的钱。",
+            "en": "Tune out leaderboard FOMO; only take risk inside my own sizing rules."
+          },
+          "next": "steady_reply",
+          "effects": [
+            {
+              "set_flag": "rival_stance",
+              "value": "steady"
+            },
+            {
+              "toast": {
+                "zh_CN": "心法记录：拒绝踏空焦虑，坚守风控边界",
+                "en": "Mindset logged: Rejected FOMO, kept risk discipline"
+              }
+            }
+          ]
+        },
+        {
+          "text": {
+            "zh_CN": "适度跟踪强势龙头动量，但绝不裸奔加满融资。",
+            "en": "Ride strong sector leaders selectively, but never go unhedged max-margin."
+          },
+          "next": "selective_reply",
+          "effects": [
+            {
+              "set_flag": "rival_stance",
+              "value": "selective"
+            },
+            {
+              "toast": {
+                "zh_CN": "心法记录：顺势捕捉动量，严控杠杆上限",
+                "en": "Mindset logged: Ride momentum with strict leverage caps"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "steady_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "老陈 · 交易大厅前辈",
+        "en": "Lao Chen · Floor Veteran"
+      },
+      "text": {
+        "zh_CN": "这就对了。我在交易席上坐了二十年，见过太多前半场香槟开得最响、后半场连工牌都没来得及收的年轻人。慢，有时候就是最快。",
+        "en": "Now you're talking. Twenty years on the floor, I've seen plenty of kids pop the loudest champagne in Q1 and clear out their desks before Q3. Slow is smooth, and smooth is fast."
+      },
+      "next": "end"
+    },
+    "selective_reply": {
+      "type": "line",
+      "speaker": {
+        "zh_CN": "林岚 · 首席导师",
+        "en": "Lin Lan · Lead Mentor"
+      },
+      "text": {
+        "zh_CN": "可以进攻，但永远给自己留好退路。盯紧仪表盘上的同期实盘榜吧——等市场第一次真正变天的时候，你会亲眼看到杠杆这把双刃剑是怎么挥向它主人的。",
+        "en": "Offense is fine as long as your exit is mapped. Keep watching the Cohort Leaderboard on your dashboard — when the tape turns for the first time, you'll see firsthand how leverage cuts its own master."
+      },
+      "next": "end"
+    },
+    "end": {
+      "type": "end"
+    }
+  }
+}

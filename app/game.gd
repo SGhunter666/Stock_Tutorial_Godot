@@ -256,6 +256,9 @@ func _advance_steps(steps: int, sample_quotes: bool = true) -> void:
 		if earnings_count > 0:
 			toast_requested.emit(I18n.t("toast.earningsToday", {
 				"count": earnings_count}))
+		if not sandbox_mode and day_after in [2, 4, 6, 8, 12]:
+			toast_requested.emit(I18n.t("toast.seatUpgrade.day%d" % day_after))
+			academy_changed.emit()
 		if narrative != null:
 			narrative.handle_event("day_closed", {"day": day_after})
 		save_game(false)
@@ -758,13 +761,14 @@ func market_lock_info(ticker: String) -> Dictionary:
 	if exchange == null or sandbox_mode:
 		return {"locked": false, "ticker": ticker}
 	var symbol := ticker.to_upper()
+	var day := get_day()
 	if SmaEtfs.is_etf(symbol):
-		return SmaAcademy.market_lock_info(academy, symbol, SmaEtfs.ETF_SECTOR, true)
+		return SmaAcademy.market_lock_info(academy, symbol, SmaEtfs.ETF_SECTOR, true, day)
 	var company := SmaCompanyCatalog.get_company(symbol)
 	if company.is_empty():
 		return {"locked": false, "ticker": symbol}
 	return SmaAcademy.market_lock_info(academy, symbol,
-		String(company.get("sector", "")), false)
+		String(company.get("sector", "")), false, day)
 
 
 func _tool_lock_error(error_key: String) -> Dictionary:
@@ -2173,6 +2177,22 @@ func _sync_achievements() -> void:
 	_record_achievements(SmaAcademy.evaluate_achievements(academy, academy_snapshot()))
 
 
+func _award_unit_scholarship(unit_id: String) -> void:
+	if exchange == null or academy.is_empty() or sandbox_mode or unit_id == "":
+		return
+	var milestones: Dictionary = academy.get("milestones", {})
+	var key := "scholarship:%s" % unit_id
+	if bool(milestones.get(key, false)):
+		return
+	milestones[key] = true
+	academy["milestones"] = milestones
+	exchange.apply_cash_adjustment(SmaAcademy.SCHOLARSHIP_CASH, key)
+	toast_requested.emit(I18n.t("toast.unitScholarship", {
+		"amount": SmaFormat.money(SmaAcademy.SCHOLARSHIP_CASH),
+	}))
+	state_changed.emit("scholarship")
+
+
 func academy_sync_practice() -> void:
 	if exchange == null or academy.is_empty():
 		return
@@ -2183,9 +2203,11 @@ func academy_sync_practice() -> void:
 		return
 	for entry in completed:
 		if bool(entry.get("completed", false)):
+			var done_id := String(entry.get("unitId", ""))
 			toast_requested.emit(I18n.t("toast.unitComplete"))
+			_award_unit_scholarship(done_id)
 			if narrative != null:
-				narrative.handle_event("unit_completed", {"unit_id": String(entry.get("unitId", ""))})
+				narrative.handle_event("unit_completed", {"unit_id": done_id})
 	_record_achievements(achievements)
 	academy_changed.emit()
 	save_game(false)
@@ -2199,6 +2221,7 @@ func academy_mark_section_read(unit_id: String, section_id: String) -> Dictionar
 		academy_changed.emit()
 		if bool(result.get("completed", false)):
 			toast_requested.emit(I18n.t("toast.unitComplete"))
+			_award_unit_scholarship(unit_id)
 			if narrative != null:
 				narrative.handle_event("unit_completed", {"unit_id": unit_id})
 		save_game(false)
@@ -2214,6 +2237,7 @@ func academy_submit_quiz(unit_id: String, session: Dictionary, answers: Dictiona
 	academy_changed.emit()
 	if bool(record.get("completed", false)):
 		toast_requested.emit(I18n.t("toast.unitComplete"))
+		_award_unit_scholarship(unit_id)
 		if narrative != null:
 			narrative.handle_event("unit_completed", {"unit_id": unit_id})
 	save_game(false)
@@ -2233,6 +2257,7 @@ func academy_submit_test_out(unit_id: String, session: Dictionary,
 		toast_requested.emit(I18n.t("academy.testOutPassedToast", {
 			"unit": I18n.t(String(SmaAcademy.unit(unit_id).get("titleKey", unit_id))),
 		}))
+		_award_unit_scholarship(unit_id)
 		if narrative != null:
 			narrative.handle_event("unit_completed", {"unit_id": unit_id})
 	save_game(false)
@@ -2390,11 +2415,35 @@ func academy_record_financials(ticker: String) -> void:
 func academy_is_tool_unlocked(tool_id: String) -> bool:
 	if sandbox_mode:
 		return true
-	return SmaAcademy.is_tool_unlocked(academy, tool_id)
+	return SmaAcademy.is_tool_unlocked(academy, tool_id, get_day())
 
 
 func multiasset_unlocked() -> bool:
-	return sandbox_mode or SmaAcademy.is_unit_complete(academy, "u13")
+	return sandbox_mode or SmaAcademy.is_unit_complete(academy, "u13") \
+		or get_day() >= SmaAcademy.MULTIASSET_UNLOCK_DAY
+
+
+func rival_leaderboard() -> Array:
+	if exchange == null:
+		return []
+	var start_cash := float(exchange.state["account"].get("initialCash", START_CASH))
+	return SmaRivals.leaderboard(exchange.state, exchange.equity(), start_cash)
+
+
+func is_rival_gu_ahead() -> bool:
+	if exchange == null:
+		return false
+	var start_cash := float(exchange.state["account"].get("initialCash", START_CASH))
+	var gu := SmaRivals.gu_yan_snapshot(exchange.state, start_cash)
+	return not bool(gu.get("marginCalled", false)) \
+		and float(gu.get("equity", 0.0)) > exchange.equity() * 1.015
+
+
+func is_rival_gu_margin_called() -> bool:
+	if exchange == null:
+		return false
+	var start_cash := float(exchange.state["account"].get("initialCash", START_CASH))
+	return bool(SmaRivals.gu_yan_snapshot(exchange.state, start_cash).get("marginCalled", false))
 
 
 func academy_mark_language_switched() -> void:

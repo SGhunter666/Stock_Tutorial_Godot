@@ -26,6 +26,7 @@ func refresh(_reason: String = "") -> void:
 		return
 	_render_header()
 	_body.add_child(_render_objective())
+	_body.add_child(_render_rivals())
 	if game.has_intro_task():
 		_body.add_child(_render_intro())
 	elif game.opening_gap_unlocked():
@@ -113,6 +114,142 @@ func _render_objective() -> Control:
 			"name": I18n.t(String(def.get("titleKey", ""))),
 			"days": int(ch.get("daysLeft", 0)),
 		}), 12, SmaUiTheme.INFO))
+	return card
+
+
+func _seat_next_unlock_text(day: int) -> String:
+	if day < 2:
+		return I18n.t("rivals.nextUnlock.day2", {"left": 2 - day})
+	if day < 4:
+		return I18n.t("rivals.nextUnlock.day4", {"left": 4 - day})
+	if day < 6:
+		return I18n.t("rivals.nextUnlock.day6", {"left": 6 - day})
+	if day < 8:
+		return I18n.t("rivals.nextUnlock.day8", {"left": 8 - day})
+	if day < 12:
+		return I18n.t("rivals.nextUnlock.day12", {"left": 12 - day})
+	return I18n.t("rivals.nextUnlock.allOpen")
+
+
+func _render_rivals() -> Control:
+	var card := SmaKit.card(12)
+	var box := SmaKit.vbox(8)
+	card.add_child(box)
+	var head := SmaKit.hbox(8)
+	head.add_child(SmaKit.label(I18n.t("rivals.title"), 15, SmaUiTheme.ACCENT))
+	head.add_child(SmaKit.muted(I18n.t("rivals.subtitle"), 11))
+	head.add_child(SmaKit.hspacer())
+	head.add_child(SmaKit.label(_seat_next_unlock_text(game.get_day()), 11, SmaUiTheme.INFO))
+	box.add_child(head)
+
+	var board: Array = game.rival_leaderboard()
+	var featured_quote := ""
+	var featured_speaker := ""
+	var featured_color := SmaUiTheme.MUTED
+	for entry in board:
+		var is_player := bool(entry.get("isPlayer", false))
+		var rank := int(entry.get("rank", 1))
+		var row_panel := PanelContainer.new()
+		var border_col := SmaUiTheme.ACCENT if is_player else SmaUiTheme.BORDER
+		row_panel.add_theme_stylebox_override("panel",
+			SmaUiTheme.panel_style(SmaUiTheme.PANEL_ALT, border_col, 6, false))
+		var row := SmaKit.hbox(10)
+		row_panel.add_child(row)
+
+		var rank_col := SmaUiTheme.WARNING if rank == 1 else (
+			SmaUiTheme.ACCENT if is_player else SmaUiTheme.MUTED)
+		var rank_lbl := SmaKit.label("#%d" % rank, 14, rank_col)
+		rank_lbl.custom_minimum_size.x = 28
+		row.add_child(rank_lbl)
+
+		if not is_player:
+			var portrait_path := String(entry.get("portrait", ""))
+			if SmaUiTheme.is_pixel():
+				var px := String(entry.get("pixelPortrait", ""))
+				if px != "" and ResourceLoader.exists(px):
+					portrait_path = px
+			if portrait_path != "" and ResourceLoader.exists(portrait_path):
+				var tex := load(portrait_path) as Texture2D
+				if tex != null:
+					var rect := TextureRect.new()
+					rect.texture = tex
+					rect.custom_minimum_size = Vector2(30, 40)
+					rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST \
+						if SmaUiTheme.is_pixel() else CanvasItem.TEXTURE_FILTER_LINEAR
+					row.add_child(rect)
+		else:
+			var you_icon := SmaKit.label("★", 16, SmaUiTheme.WARNING)
+			you_icon.custom_minimum_size = Vector2(30, 36)
+			you_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			you_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			row.add_child(you_icon)
+
+		var name_col := SmaUiTheme.ACCENT
+		var hex := String(entry.get("color", ""))
+		if hex != "" and Color.html_is_valid(hex):
+			name_col = Color.html(hex)
+		var trader_name: String = String(game.display_player_name()) if is_player \
+			else I18n.t(String(entry.get("nameKey", "")))
+		var meta_box := SmaKit.vbox(1)
+		meta_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var name_row := SmaKit.hbox(6)
+		name_row.add_child(SmaKit.label(trader_name, 13, name_col))
+		name_row.add_child(SmaKit.muted("· %s" % I18n.t(String(entry.get("styleKey", ""))), 11))
+		var status_key := String(entry.get("statusKey", ""))
+		if status_key != "" and I18n.has_key(status_key):
+			var st_col := SmaKit.value_color(-1.0) if bool(entry.get("marginCalled", false)) \
+				else (SmaUiTheme.WARNING if rank == 1 else SmaUiTheme.MUTED)
+			name_row.add_child(SmaKit.label("[%s]" % I18n.t(status_key), 10, st_col))
+		meta_box.add_child(name_row)
+
+		var holdings: Array = entry.get("holdings", [])
+		var hold_text := I18n.t("rivals.cashOnly") if holdings.is_empty() \
+			else I18n.t("rivals.holdingsPrefix", {"tickers": " · ".join(holdings)})
+		meta_box.add_child(SmaKit.caption(hold_text))
+		row.add_child(meta_box)
+
+		if not is_player and not holdings.is_empty():
+			var first_ticker := String(holdings[0]).trim_prefix("-")
+			var peek_btn := SmaKit.button(first_ticker, func():
+				var main := get_tree().get_first_node_in_group("main")
+				if main != null and main.has_method("open_ticker"):
+					main.open_ticker(first_ticker))
+			SmaKit.set_small_font(peek_btn, 10)
+			row.add_child(peek_btn)
+
+		var ret_pct := float(entry.get("returnPct", 0.0))
+		var today_pct := float(entry.get("todayPct", 0.0))
+		var stats_box := SmaKit.vbox(1)
+		stats_box.custom_minimum_size.x = 150
+		var eq_lbl := SmaKit.label(SmaFormat.money(float(entry.get("equity", 0.0))), 13)
+		eq_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		stats_box.add_child(eq_lbl)
+		var ret_lbl := SmaKit.label("%s (%s)" % [
+			SmaFormat.pct(ret_pct),
+			I18n.t("rivals.todayTag", {"pct": SmaFormat.pct(today_pct)}),
+		], 11, SmaKit.value_color(ret_pct))
+		ret_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		stats_box.add_child(ret_lbl)
+		row.add_child(stats_box)
+		box.add_child(row_panel)
+
+		if not is_player and (featured_quote == "" or String(entry.get("id", "")) == "gu_yan"):
+			var qk := String(entry.get("quoteKey", ""))
+			if qk != "" and I18n.has_key(qk):
+				featured_speaker = trader_name
+				featured_quote = I18n.t(qk)
+				featured_color = name_col
+
+	if featured_quote != "":
+		var quote_row := SmaKit.hbox(6)
+		quote_row.add_child(SmaKit.label("%s:" % featured_speaker, 11, featured_color))
+		var q_lbl := SmaKit.muted(featured_quote, 11)
+		q_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		q_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		quote_row.add_child(q_lbl)
+		box.add_child(quote_row)
 	return card
 
 
