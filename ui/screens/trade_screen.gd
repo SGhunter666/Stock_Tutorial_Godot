@@ -48,6 +48,10 @@ var _ma_toggle: Button
 var _boll_toggle: Button
 var _px_step_toggle: Button
 var _reset_pan_button: Button
+var _subpane_group := ButtonGroup.new()
+var _subpane_buttons: Dictionary = {}
+var _tool_buttons: Dictionary = {}
+var _drawn_hlines: Dictionary = {}
 var _book_rows: Array = []
 var _book_meta: Label
 var _book_depth_hint: Label
@@ -256,21 +260,41 @@ func _build() -> void:
 			game.settings["chartPixelStepped"] = on
 		_sync_chart_overlays())
 	range_row.add_child(_px_step_toggle)
+	for sub_spec in [["volume", "VOL"], ["macd", "MACD"], ["rsi", "RSI"]]:
+		var sid := String(sub_spec[0])
+		var sbtn := SmaKit.toggle(String(sub_spec[1]), _subpane_group)
+		SmaKit.set_small_font(sbtn, 11)
+		sbtn.button_pressed = sid == "volume"
+		sbtn.pressed.connect(_on_subpane.bind(sid))
+		_subpane_buttons[sid] = sbtn
+		range_row.add_child(sbtn)
+	for tool_spec in [["hline", "chart.toolHline"], ["ruler", "chart.toolRuler"]]:
+		var tid := String(tool_spec[0])
+		var tbtn := SmaKit.toggle(I18n.t(String(tool_spec[1])))
+		SmaKit.set_small_font(tbtn, 11)
+		tbtn.toggled.connect(_on_chart_tool_toggled.bind(tid))
+		_tool_buttons[tid] = tbtn
+		range_row.add_child(tbtn)
+	var clear_lines_btn := SmaKit.button(I18n.t("chart.clearLines"), _on_clear_chart_lines)
+	SmaKit.set_small_font(clear_lines_btn, 11)
+	range_row.add_child(clear_lines_btn)
 	_reset_pan_button = SmaKit.button(I18n.t("chart.latest"), _reset_chart_pan)
 	SmaKit.set_small_font(_reset_pan_button, 11)
 	_reset_pan_button.visible = false
 	range_row.add_child(_reset_pan_button)
-	range_row.add_child(SmaKit.caption(I18n.t("chart.hint")))
+	range_row.add_child(SmaKit.caption(I18n.t("chart.hintPro")))
 	chart_box.add_child(range_row)
 	_start_chart = SmaKit.button(I18n.t("header.play"), game.toggle_pause)
 	_start_chart.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	chart_box.add_child(_start_chart)
 	_chart = SmaCandleChart.new()
-	_chart.custom_minimum_size.y = 300
+	_chart.custom_minimum_size.y = 320
 	_chart.visible_count_changed.connect(_on_chart_range_changed)
 	_chart.pan_changed.connect(func(panned: bool):
 		if _reset_pan_button != null:
 			_reset_pan_button.visible = panned)
+	_chart.chart_price_action.connect(_on_chart_price_action)
+	_chart.user_lines_changed.connect(_on_user_lines_changed)
 	chart_box.add_child(_chart)
 	_sync_chart_overlays()
 	left.add_child(chart_card)
@@ -799,6 +823,8 @@ func refresh(reason: String = "") -> void:
 		_position_key = ""
 		_indicator_cache_key = ""
 		_ticker_news_key = ""
+		if _chart != null:
+			_chart.set_user_hlines(_drawn_hlines.get(ticker, []))
 	_update_tool_gates()
 	_update_book(ticker)
 	_update_chart(ticker)
@@ -1164,6 +1190,74 @@ func _on_range(count: int) -> void:
 func _on_chart_range_changed(count: int) -> void:
 	for value in _range_buttons.keys():
 		_range_buttons[value].button_pressed = int(value) == int(count)
+
+
+func _on_subpane(mode: String) -> void:
+	if _chart != null:
+		_chart.set_subpane_mode(mode)
+
+
+func _on_chart_tool_toggled(pressed: bool, tid: String) -> void:
+	if _chart == null:
+		return
+	if pressed:
+		for other_id in _tool_buttons.keys():
+			if String(other_id) != tid:
+				_tool_buttons[other_id].set_pressed_no_signal(false)
+		_chart.set_tool_mode(tid)
+	else:
+		var any_on := false
+		for other_id in _tool_buttons.keys():
+			if bool(_tool_buttons[other_id].button_pressed):
+				any_on = true
+		if not any_on:
+			_chart.set_tool_mode("pan")
+
+
+func _on_clear_chart_lines() -> void:
+	if _chart != null:
+		_chart.clear_user_hlines()
+
+
+func _on_user_lines_changed(lines: Array) -> void:
+	if game != null and game.selected_ticker != "":
+		_drawn_hlines[String(game.selected_ticker)] = lines.duplicate()
+
+
+func _on_chart_price_action(price: float, action: String) -> void:
+	if game == null:
+		return
+	var p := SmaFormat.round_to(maxf(0.01, price), 2)
+	if action == "limit_buy" or action == "limit_sell":
+		if not bool(game.academy_is_tool_unlocked("order.limit")):
+			_feedback.text = I18n.t("order.limitLocked")
+			_feedback.add_theme_color_override("font_color", SmaUiTheme.WARNING)
+			return
+		_on_side("buy" if action == "limit_buy" else "sell")
+		_on_type("limit")
+		_limit.value = p
+		_update_estimate()
+		_feedback.text = I18n.t("chart.prefilledOrder", {
+			"side": I18n.t("trade.%s" % ("buy" if action == "limit_buy" else "sell")),
+			"type": I18n.t("trade.limit"),
+			"price": SmaFormat.money(p),
+		})
+		_feedback.add_theme_color_override("font_color", SmaUiTheme.INFO)
+	elif action == "stop_sell":
+		if not bool(game.academy_is_tool_unlocked("order.stop")):
+			_feedback.text = I18n.t("order.stopLocked")
+			_feedback.add_theme_color_override("font_color", SmaUiTheme.WARNING)
+			return
+		_on_side("sell")
+		_on_type("stop")
+		_stop_price.value = p
+		_update_estimate()
+		_feedback.text = I18n.t("chart.prefilledOrder", {
+			"side": I18n.t("trade.sell"),
+			"type": I18n.t("trade.stop"),
+			"price": SmaFormat.money(p),
+		})
+		_feedback.add_theme_color_override("font_color", SmaUiTheme.INFO)
 
 
 func _update_indicators(ticker: String, last: float) -> void:

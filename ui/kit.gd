@@ -322,6 +322,90 @@ static func format_candle_catalysts(state: Dictionary, ticker: String) -> Dictio
 	return out
 
 
+## Builds the interactive High-Stakes Market Event Decision Card (IPO,
+## Earnings Call Q&A, FOMC Rate Night) shared by Dashboard and News screens.
+static func build_market_event_card(game_ref: Variant, on_resolved: Callable) -> Control:
+	if game_ref == null or not game_ref.started:
+		return null
+	var evt: Dictionary = game_ref.active_market_event()
+	if evt.is_empty():
+		return null
+	var kind := String(evt.get("kind", "ipo"))
+	var resolved := bool(evt.get("resolved", false))
+	var card := PanelContainer.new()
+	var border_col := SmaUiTheme.POSITIVE if resolved else SmaUiTheme.GOLD
+	card.add_theme_stylebox_override("panel",
+		SmaUiTheme.panel_style(SmaUiTheme.PANEL_ALT, border_col, 12, false))
+	var box := vbox(7)
+	card.add_child(box)
+
+	var head := hbox(8)
+	head.add_child(label(I18n.t("events.kind.%s" % kind), 11, SmaUiTheme.GOLD))
+	head.add_child(label(I18n.t(String(evt.get("titleKey", "")), {
+		"ticker": String(evt.get("ticker", "")),
+		"issuer": String(evt.get("issuer", "")),
+	}), 15))
+	head.add_child(hspacer())
+	var status_txt := I18n.t("events.statusDone") if resolved else I18n.t("events.statusLive", {
+		"days": maxi(1, int(evt.get("expiresDay", 0)) - int(evt.get("day", 0)) + 1),
+	})
+	head.add_child(label(status_txt, 11, SmaUiTheme.POSITIVE if resolved else SmaUiTheme.WARNING))
+	box.add_child(head)
+
+	var m: Dictionary = evt.get("metrics", {})
+	var clue_txt := I18n.t(String(evt.get("clueKey", "")), {
+		"issuer": String(evt.get("issuer", "")),
+		"ticker": String(evt.get("ticker", "")),
+		"revGrowth": SmaFormat.pct(float(m.get("revGrowth", 0.0)), 0),
+		"netMargin": SmaFormat.pct(float(m.get("netMargin", 0.0)), 0),
+		"ps": "%.1fx" % float(m.get("psMultiple", 0.0)),
+		"oversub": "%.1fx" % float(m.get("oversub", 0.0)),
+		"surprise": SmaFormat.pct(float(m.get("surprisePct", 0.0)), 1),
+		"runup": SmaFormat.pct(float(m.get("runupPct", 0.0)), 1),
+		"rate": "%.2f%%" % float(m.get("policyRate", 0.0)),
+		"inflation": "%.2f%%" % float(m.get("inflation", 0.0)),
+	})
+	var clue := muted(clue_txt, 12)
+	clue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(clue)
+
+	if not resolved:
+		var actions := flow(8)
+		for choice in evt.get("choices", []):
+			var cid := String(choice.get("id", ""))
+			var stake := float(choice.get("stake", 0.0))
+			var btn_lbl := I18n.t(String(choice.get("labelKey", "")), {
+				"stake": SmaFormat.money(stake),
+			})
+			var primary := cid in ["light", "drop", "rally", "hedge"]
+			var btn := button(btn_lbl, func():
+				var res: Dictionary = game_ref.resolve_market_event(cid)
+				if bool(res.get("ok", false)) and on_resolved.is_valid():
+					on_resolved.call(), primary)
+			actions.add_child(btn)
+		box.add_child(actions)
+	else:
+		var res: Dictionary = evt.get("resolution", {})
+		var delta := float(res.get("cashDelta", 0.0))
+		var tone := String(res.get("tone", "neutral"))
+		var tone_col := SmaUiTheme.POSITIVE if tone == "win" else (
+			SmaUiTheme.NEGATIVE if tone == "loss" else SmaUiTheme.ACCENT)
+		var metric_raw := String(res.get("metricText", ""))
+		var metric_disp := I18n.t(metric_raw) if I18n.has_key(metric_raw) else metric_raw
+		var verdict_line := label("%s · %s · %s (+%d XP)" % [
+			I18n.t(String(res.get("verdictKey", "events.verdict.neutral"))),
+			metric_disp,
+			SmaFormat.signed_money(delta),
+			int(res.get("xp", 0)),
+		], 13, tone_col)
+		verdict_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(verdict_line)
+		var exp_lbl := muted(I18n.t(String(res.get("explainKey", ""))), 11)
+		exp_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(exp_lbl)
+	return card
+
+
 ## UI sounds are optional: the autoload is absent in headless logic tests, so
 ## every helper fails quietly instead of requiring a running audio server.
 static func _play_click() -> void:

@@ -38,7 +38,8 @@ func refresh(_reason: String = "") -> void:
 			_draft["ticker"] = game.selected_ticker
 		_mode = String(_draft["mode"])
 	_render_header()
-	if not SmaAcademy.is_unit_complete(game.academy, "u16"):
+	if not (game.sandbox_mode or SmaAcademy.is_unit_complete(game.academy, "u16") \
+			or int(game.get_day()) >= 10):
 		_render_locked()
 		return
 	_render_modes()
@@ -65,7 +66,9 @@ func _render_locked() -> void:
 	var box := SmaKit.vbox(6)
 	card.add_child(box)
 	box.add_child(SmaKit.label(I18n.t("quant.lockedTitle"), 15))
-	box.add_child(SmaKit.muted(I18n.t("quant.lockedText"), 12))
+	var lock_txt := SmaKit.muted(I18n.t("quant.lockedTextDual", {"day": 11}), 12)
+	lock_txt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(lock_txt)
 	box.add_child(SmaKit.button(I18n.t("quant.goAcademy"), _go_academy, true))
 	_body.add_child(card)
 

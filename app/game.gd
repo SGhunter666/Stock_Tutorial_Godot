@@ -1294,6 +1294,49 @@ func portfolio_risk() -> Dictionary:
 		exchange.position_rows(), exchange.short_rows())
 
 
+func behavioral_diagnostics() -> Dictionary:
+	if exchange == null:
+		return {}
+	return SmaReview.behavioral_diagnostics(exchange.state["account"], exchange.equity(),
+		int(exchange.state["dayIndex"]), exchange.state.get("companies", {}))
+
+
+func active_market_event() -> Dictionary:
+	if exchange == null or sandbox_mode:
+		return {}
+	return SmaMarketEvents.active_event(exchange.state, academy)
+
+
+func has_pending_market_event() -> bool:
+	if exchange == null or sandbox_mode:
+		return false
+	return SmaMarketEvents.has_pending_event(exchange.state, academy)
+
+
+func resolve_market_event(choice_id: String) -> Dictionary:
+	if not started or exchange == null:
+		return {"ok": false, "error": "game.notStarted"}
+	var result := SmaMarketEvents.resolve(exchange.state, academy, choice_id,
+		exchange.available_cash())
+	if not bool(result.get("ok", false)):
+		last_error = String(result.get("error", "events.errorChoice"))
+		order_rejected.emit(last_error)
+		return result
+	var res: Dictionary = result["resolution"]
+	var delta := float(res.get("cashDelta", 0.0))
+	if not is_zero_approx(delta):
+		exchange.apply_cash_adjustment(delta, String(res.get("eventId", "mkt_event")))
+	toast_requested.emit(I18n.t("events.resolvedToast", {
+		"verdict": I18n.t(String(res.get("verdictKey", "events.verdict.neutral"))),
+		"pnl": SmaFormat.signed_money(delta),
+		"xp": int(res.get("xp", 0)),
+	}))
+	save_game(false)
+	academy_changed.emit()
+	state_changed.emit("market_event")
+	return result
+
+
 func review_timeline(limit: int = 12) -> Array:
 	if exchange == null:
 		return []

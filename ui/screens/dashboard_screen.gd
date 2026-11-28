@@ -27,6 +27,9 @@ func refresh(_reason: String = "") -> void:
 	_render_header()
 	if not game.last_close_recap.is_empty():
 		_body.add_child(_render_close_recap())
+	var mkt_evt_card := SmaKit.build_market_event_card(game, func(): refresh("market_event"))
+	if mkt_evt_card != null:
+		_body.add_child(mkt_evt_card)
 	_body.add_child(_render_objective())
 	_body.add_child(_render_rivals())
 	if game.has_intro_task():

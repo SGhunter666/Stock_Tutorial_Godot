@@ -20,6 +20,58 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA21_ONLY") == "1":
+		Game.new_game("beta21-pro")
+		await _settle(4)
+		_dismiss_story()
+		Game.submit_order({"ticker": "NVDO", "side": "buy", "type": "market", "qty": 320})
+		_dismiss_story()
+		Game.submit_order({"ticker": "APLA", "side": "buy", "type": "market", "qty": 40})
+		Game._advance_steps(SmaExchange.SESSION_SECONDS, false)
+		_dismiss_story()
+		Game.submit_order({"ticker": "APLA", "side": "sell", "type": "market", "qty": 40})
+		Game.submit_order({"ticker": "MSFY", "side": "buy", "type": "market", "qty": 25})
+		for d in 3:
+			Game._advance_steps(SmaExchange.SESSION_SECONDS, false)
+			_dismiss_story()
+		Game.intro["complete"] = true
+		if main._pixel_fx != null:
+			main._pixel_fx._popups.clear()
+			main._pixel_fx._sparks.clear()
+			main._pixel_fx.queue_redraw()
+		main._refresh_nav()
+		main.navigate("dashboard")
+		main._screens["dashboard"].refresh()
+		await _settle(5)
+		await _shot("beta21_event_desk")
+		main.navigate("portfolio")
+		main._screens["portfolio"].refresh("shot")
+		await _settle(5)
+		await _shot("beta21_behavioral_lab")
+		Game.select_ticker("NVDO")
+		main.navigate("trade")
+		var ts21: SmaTradeScreen = main._screens["trade"]
+		ts21._on_timeframe("1D")
+		ts21._on_subpane("macd")
+		ts21._subpane_buttons["macd"].set_pressed_no_signal(true)
+		var c21: SmaCandleChart = ts21._chart
+		var last_p := float(Game.exchange.quote("NVDO").get("last", 120.0))
+		c21.add_user_hline(last_p * 1.07)
+		c21.add_user_hline(last_p * 0.93)
+		if c21.candles.size() > 30:
+			c21._ruler_active = true
+			c21._ruler_start_abs = c21.candles.size() - 24
+			c21._ruler_end_abs = c21.candles.size() - 4
+			c21._ruler_start_price = float(c21.candles[c21._ruler_start_abs]["l"])
+			c21._ruler_end_price = float(c21.candles[c21._ruler_end_abs]["h"])
+		c21.queue_redraw()
+		ts21.refresh()
+		await _settle(5)
+		await _shot("beta21_chart_macd_draw")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA20_ONLY") == "1":
 		Game.new_game("beta20-smooth")
 		await _settle(4)

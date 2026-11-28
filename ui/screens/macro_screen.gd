@@ -24,7 +24,8 @@ func refresh(_reason: String = "") -> void:
 	SmaKit.clear_children(_body)
 	if game == null or not game.started:
 		return
-	if not SmaAcademy.is_unit_complete(game.academy, "u13"):
+	if not (game.sandbox_mode or SmaAcademy.is_unit_complete(game.academy, "u13") \
+			or int(game.get_day()) >= SmaAcademy.MULTIASSET_UNLOCK_DAY):
 		_render_locked()
 		return
 	var world: Dictionary = game.macro_snapshot()
@@ -44,7 +45,9 @@ func _render_locked() -> void:
 	var text := SmaKit.muted(I18n.t("macroPage.lockedText"), 13)
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(text)
-	box.add_child(SmaKit.muted(I18n.t("macroPage.lockedHint"), 12))
+	box.add_child(SmaKit.muted(I18n.t("macroPage.lockedHintDual", {
+		"day": SmaAcademy.MULTIASSET_UNLOCK_DAY + 1,
+	}), 12))
 	box.add_child(SmaKit.button(I18n.t("macroPage.goAcademy"), _go_to_u13, true))
 	_body.add_child(card)
 

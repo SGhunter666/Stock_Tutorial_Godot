@@ -71,3 +71,64 @@ func run() -> void:
 	approx(float(risk["hhi"]), (pow(12000.0 / 105000.0, 2.0)
 		+ pow(4500.0 / 105000.0, 2.0)) * 10000.0, 0.1, "concentration HHI")
 	eq(String(risk["riskLevel"]), "high", "large daily moves map to high risk")
+
+	describe("behavioral-diagnostics")
+	var disp_account := {
+		"initialCash": 100000.0,
+		"fees": 45.0,
+		"equityHistory": [{"day": 0, "equity": 100000.0}, {"day": 14, "equity": 96000.0}],
+		"positions": {"NVDO": {"qty": 450, "avgCost": 130.0, "last": 116.0}},
+		"shorts": {},
+		"trades": [
+			{"ticker": "APLA", "side": "buy", "action": "openLong", "qty": 50, "price": 100.0, "realized": 0.0, "day": 1},
+			{"ticker": "APLA", "side": "sell", "action": "closeLong", "qty": 50, "price": 102.0, "realized": 100.0, "day": 2},
+			{"ticker": "BOEN", "side": "buy", "action": "openLong", "qty": 50, "price": 100.0, "realized": 0.0, "day": 1},
+			{"ticker": "BOEN", "side": "sell", "action": "closeLong", "qty": 50, "price": 86.0, "realized": -700.0, "day": 10},
+		],
+		"optionTrades": [],
+		"futuresTrades": [],
+	}
+	var diag := SmaReview.behavioral_diagnostics(disp_account, 96000.0, 14)
+	check(bool(diag["hasEnoughData"]), "diagnostics activates with >= 2 fills")
+	check(float(diag["metrics"]["avgLossHoldDays"]) > float(diag["metrics"]["avgWinHoldDays"]),
+		"detects longer loss hold than win hold")
+	var bias_ids: Array = []
+	for b in diag["biases"]:
+		bias_ids.append(String(b["id"]))
+	check(bias_ids.has("disposition"), "detects Disposition Effect bias")
+	check(bias_ids.has("concentration"), "detects high single-name concentration")
+
+	describe("market-events-desk")
+	var ex := SmaExchange.new("beta21-event-seed", 100000.0, 1.0)
+	var acad := SmaAcademy.create_state()
+	eq(SmaMarketEvents.active_event(ex.state, acad).is_empty(), true, "no event on day 0")
+	ex.state["dayIndex"] = 1
+	var evt := SmaMarketEvents.active_event(ex.state, acad)
+	check(not evt.is_empty(), "IPO event active on day 1")
+	eq(String(evt["kind"]), "ipo", "slot 0 is Unicorn IPO event")
+	check(SmaMarketEvents.has_pending_event(ex.state, acad), "event starts pending")
+	var res := SmaMarketEvents.resolve(ex.state, acad, "light", 100000.0)
+	check(bool(res.get("ok", false)), "IPO light stake resolves cleanly")
+	check(not SmaMarketEvents.has_pending_event(ex.state, acad), "resolved event no longer pending")
+	var dup := SmaMarketEvents.resolve(ex.state, acad, "heavy", 100000.0)
+	eq(bool(dup.get("ok", false)), false, "cannot resolve same event twice")
+	ex.state["dayIndex"] = 4
+	var call_evt := SmaMarketEvents.active_event(ex.state, acad)
+	eq(String(call_evt["kind"]), "earnings_call", "slot 1 is Earnings Call Q&A")
+	var call_res := SmaMarketEvents.resolve(ex.state, acad, "drop", 100000.0)
+	check(bool(call_res.get("ok", false)) and float(call_res["resolution"]["cashDelta"]) > 0.0,
+		"correct NVDO sell-the-news earnings call awards research alpha")
+
+	describe("indicators-macd-rsi-series")
+	var up_closes: Array = []
+	for i in 60:
+		up_closes.append(100.0 + float(i) * 1.4 + sin(float(i) * 0.4) * 2.0)
+	var macd := SmaIndicators.macd_series(up_closes, 12, 26, 9)
+	eq(macd["dif"].size(), 60, "MACD dif matches length")
+	check(not is_nan(float(macd["hist"][59])), "MACD histogram valid after warmup")
+	approx(float(macd["hist"][59]), (float(macd["dif"][59]) - float(macd["dea"][59])) * 2.0,
+		0.0001, "MACD hist equals 2*(DIF-DEA)")
+	var rsi_arr := SmaIndicators.rsi_series(up_closes, 14)
+	eq(rsi_arr.size(), 60, "RSI series matches length")
+	check(float(rsi_arr[59]) > 60.0 and float(rsi_arr[59]) <= 100.0,
+		"RSI reflects persistent uptrend in [60, 100]")

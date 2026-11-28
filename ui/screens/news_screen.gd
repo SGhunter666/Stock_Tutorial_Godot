@@ -26,6 +26,9 @@ func refresh(_reason: String = "") -> void:
 	if game == null or not game.started:
 		return
 	_render_header()
+	var mkt_evt_card := SmaKit.build_market_event_card(game, func(): refresh("market_event"))
+	if mkt_evt_card != null:
+		_body.add_child(mkt_evt_card)
 	_render_filters()
 	_render_corporate()
 	_render_earnings_calendar()

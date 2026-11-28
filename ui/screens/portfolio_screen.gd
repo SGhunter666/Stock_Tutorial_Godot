@@ -8,6 +8,11 @@ const REFRESH_INTERVAL_MS := 350
 var _stat_values: Dictionary = {}
 var _risk_values: Dictionary = {}
 var _risk_level_label: Label
+var _diag_radar: SmaRadarChart
+var _diag_archetype: Label
+var _diag_metrics: Label
+var _diag_biases_box: FlowContainer
+var _diag_comment: Label
 var _equity_chart: SmaLineChart
 var _equity_meta: Label
 var _long_box: VBoxContainer
@@ -92,6 +97,30 @@ func _build() -> void:
 	risk_box.add_child(risk_note)
 	content.add_child(risk_card)
 
+	var diag_card := SmaKit.card(12)
+	var diag_root := SmaKit.hbox(14)
+	diag_card.add_child(diag_root)
+	_diag_radar = SmaRadarChart.new()
+	diag_root.add_child(_diag_radar)
+	var diag_info := SmaKit.vbox(6)
+	diag_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var diag_head := SmaKit.hbox(8)
+	diag_head.add_child(SmaKit.label(I18n.t("diag.title"), 15, SmaUiTheme.GOLD))
+	diag_head.add_child(SmaKit.hspacer())
+	_diag_archetype = SmaKit.label("—", 13, SmaUiTheme.ACCENT)
+	diag_head.add_child(_diag_archetype)
+	diag_info.add_child(diag_head)
+	_diag_metrics = SmaKit.caption("")
+	_diag_metrics.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	diag_info.add_child(_diag_metrics)
+	_diag_biases_box = SmaKit.flow(6)
+	diag_info.add_child(_diag_biases_box)
+	_diag_comment = SmaKit.muted("", 12)
+	_diag_comment.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	diag_info.add_child(_diag_comment)
+	diag_root.add_child(diag_info)
+	content.add_child(diag_card)
+
 	var long_section := _table_section("portfolio.positions", ["market.ticker", "market.company",
 		"common.qty", "portfolio.avg_cost", "market.last", "portfolio.market_value",
 		"portfolio.unrealized"], [0.7, 1.8, 0.8, 0.9, 0.9, 1.1, 1.1], true)
@@ -151,6 +180,7 @@ func refresh(reason: String = "") -> void:
 	_update_stats()
 	_update_equity_curve()
 	_update_risk()
+	_update_diagnostics()
 	_update_long()
 	_update_short()
 	_update_other_assets()
@@ -232,6 +262,53 @@ func _update_risk() -> void:
 		_risk_level_label.add_theme_color_override("font_color", SmaUiTheme.WARNING)
 	else:
 		_risk_level_label.add_theme_color_override("font_color", SmaUiTheme.POSITIVE)
+
+
+func _update_diagnostics() -> void:
+	if _diag_radar == null or game == null:
+		return
+	var diag: Dictionary = game.behavioral_diagnostics()
+	if diag.is_empty():
+		return
+	var sc: Dictionary = diag.get("scores", {})
+	var m: Dictionary = diag.get("metrics", {})
+	var grade := String(diag.get("grade", "B"))
+	var overall := float(diag.get("overallScore", 75.0))
+	_diag_radar.set_data([
+		{"label": I18n.t("diag.axis.disposition"), "value": float(sc.get("disposition", 75.0))},
+		{"label": I18n.t("diag.axis.chaseControl"), "value": float(sc.get("chaseControl", 75.0))},
+		{"label": I18n.t("diag.axis.overtrading"), "value": float(sc.get("overtrading", 75.0))},
+		{"label": I18n.t("diag.axis.sizing"), "value": float(sc.get("sizing", 75.0))},
+		{"label": I18n.t("diag.axis.risk"), "value": float(sc.get("risk", 75.0))},
+	], grade, overall)
+	_diag_archetype.text = "%s · %s (%d)" % [
+		I18n.t(String(diag.get("archetypeKey", "diag.archetype.calmObserver"))),
+		grade, int(round(overall)),
+	]
+	_diag_metrics.text = I18n.t("diag.metricsLine", {
+		"winDays": SmaFormat.num(float(m.get("avgWinHoldDays", 0.0)), 1),
+		"lossDays": SmaFormat.num(float(m.get("avgLossHoldDays", 0.0)), 1),
+		"payoff": SmaFormat.num(float(m.get("payoffRatio", 1.0)), 2),
+		"feeDrag": SmaFormat.pct_plain(float(m.get("feeDragPct", 0.0)), 2),
+		"tpd": SmaFormat.num(float(m.get("tradesPerDay", 0.0)), 1),
+	})
+	SmaKit.clear_children(_diag_biases_box)
+	var biases: Array = diag.get("biases", [])
+	if biases.is_empty():
+		_diag_biases_box.add_child(SmaKit.badge(I18n.t("diag.noBiases"),
+			Color("#063322"), SmaUiTheme.POSITIVE))
+	else:
+		for b in biases:
+			var bid := String(b.get("id", ""))
+			var high := String(b.get("severity", "medium")) == "high"
+			_diag_biases_box.add_child(SmaKit.badge(
+				I18n.t("diag.bias.%s" % bid),
+				Color("#3b1219") if high else Color("#3b2c0c"),
+				SmaUiTheme.NEGATIVE if high else SmaUiTheme.WARNING))
+	_diag_comment.text = "%s：%s" % [
+		I18n.t(String(diag.get("mentorSpeakerKey", "story.char.lin_lan.name"))),
+		I18n.t(String(diag.get("mentorCommentKey", "diag.comment.calmObserver"))),
+	]
 
 
 func _day_start_equity() -> float:

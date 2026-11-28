@@ -807,6 +807,9 @@ func _nav_badge_for(screen_id: String) -> String:
 					er_today += 1
 			if er_today > 0:
 				return "[%d]" % er_today
+		"news":
+			if Game.has_pending_market_event():
+				return I18n.t("nav.badge.event")
 		"story":
 			if Game.narrative != null and Game.narrative.is_active():
 				return "●"

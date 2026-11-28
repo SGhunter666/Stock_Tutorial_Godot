@@ -1,5 +1,13 @@
 # Changelog
 
+## beta-21
+
+- **三大高含金量新系统 + 扫清最后两处残留课锁（`core/market_events.gd` + `core/review.gd` + `core/indicators.gd` + `radar_chart.gd` + `candle_chart.gd` + `trade_screen.gd` + `portfolio_screen.gd` + `dashboard_screen.gd` + `news_screen.gd`）**：
+  1. **🎙️「实盘重磅事件决策台」（`core/market_events.gd` + `ui/kit.gd`）**：每 3 个交易日轮换弹出真实资本市场高博弈互动事件——**独角兽 IPO 打新申购**（结合营收增速、盈利能力、市销率与机构超购倍数决定重仓/轻仓/放弃躲破发）、**财报电话会 Q&A 实时听译**（拆解 CEO 弦外之音预判“买预期卖事实 / 利空出尽 / 指引杀估值”赢取研究奖金）、**央行 FOMC 议息夜**（联动实时 `SmaMacro` 利率通胀决定偏鸽/偏鹰/均衡对冲）；同步在仪表盘、市场新闻页与左侧导航 `[★事件]` 角标展示。
+  2. **🧠「个人交易行为体检室 & 16-bit 五维心理雷达图」（`core/review.gd` + `ui/components/radar_chart.gd` + `portfolio_screen.gd`）**：基于真实成交账本自动计算 **抗处置效应、控追高杀跌、克制过度交易、稳健仓位与风控纪律** 五大维度得分与 `S/A/B/C/D` 评级，精准检出「盈利均持天数 vs 亏损均持天数」「手续费侵蚀」「逆势摊平」「重仓赌财报」等 6 大散户心魔，并输出林岚/苏禾/老陈/陈曦的专属毒舌点评。
+  3. **📈 专业级交互 K 线看盘引擎（`core/indicators.gd` + `ui/components/candle_chart.gd` + `trade_screen.gd`）**：新增 **副图一键切换（`VOL` 成交量 / `MACD(12,26,9)` 红绿柱与双线 / `RSI(14)` 70/30 超买超卖区）**、**手动画水平支撑/阻力线（`S/R`，按标的记忆）**、**拖拽波段测距尺（实时显示涨跌额、涨跌幅与根数）** 以及 **右键 K 线任意价位快捷填入限价单/止损单**！
+  4. **彻底扫清全游戏最后两处硬课锁**：`ui/screens/macro_screen.gd`（宏观世界，第 7 天或沙盒自动开放）与 `ui/screens/quant_screen.gd`（量化实验室，第 11 天或沙盒自动开放）全面纳入双轨解锁。
+
 ## beta-20
 
 - **五大玩家全流程丝滑度与容错升级（`core/career.gd` + `core/challenges.gd` + `core/earnings.gd` + `trade_screen.gd` + `portfolio_screen.gd` + `dashboard_screen.gd` + `main.gd` + `bailout_rescue.json`）**：

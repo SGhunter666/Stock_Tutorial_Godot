@@ -7,6 +7,8 @@ extends Control
 
 signal visible_count_changed(count: int)
 signal pan_changed(panned: bool)
+signal chart_price_action(price: float, action: String)
+signal user_lines_changed(lines: Array)
 
 const MA_PERIODS := [5, 10, 20, 60]
 const VMA_PERIOD := 5
@@ -23,6 +25,9 @@ var pan_offset := 0
 var show_ma := true
 var show_boll := false
 var pixel_stepped := true
+var subpane_mode := "volume"
+var tool_mode := "pan"
+var user_hlines: Array = []
 var trade_markers: Array = []
 var price_lines: Array = []
 var candle_notes: Dictionary = {}
@@ -36,6 +41,15 @@ var _hover_pos := Vector2(-1, -1)
 var _dragging := false
 var _drag_start_x := 0.0
 var _drag_start_pan := 0
+var _ruler_dragging := false
+var _ruler_active := false
+var _ruler_start_abs := -1
+var _ruler_end_abs := -1
+var _ruler_start_price := 0.0
+var _ruler_end_price := 0.0
+var _visible_start := 0
+var _ctx_menu: PopupMenu = null
+var _ctx_price := 0.0
 var _plot := Rect2()
 var _left := 0.0
 var _right := 0.0
@@ -53,6 +67,10 @@ var _ma_cache: Dictionary = {}
 var _vma_cache: Array = []
 var _boll_upper: Array = []
 var _boll_lower: Array = []
+var _macd_dif: Array = []
+var _macd_dea: Array = []
+var _macd_hist: Array = []
+var _rsi_cache: Array = []
 
 
 func _init() -> void:
@@ -101,6 +119,45 @@ func set_pixel_stepped(enabled: bool) -> void:
 	if pixel_stepped == enabled:
 		return
 	pixel_stepped = enabled
+	queue_redraw()
+
+
+func set_subpane_mode(mode: String) -> void:
+	var clean := mode if mode in ["volume", "macd", "rsi"] else "volume"
+	if subpane_mode == clean:
+		return
+	subpane_mode = clean
+	queue_redraw()
+
+
+func set_tool_mode(mode: String) -> void:
+	var clean := mode if mode in ["pan", "hline", "ruler"] else "pan"
+	tool_mode = clean
+	if clean != "ruler":
+		_ruler_dragging = false
+		_ruler_active = false
+	queue_redraw()
+
+
+func set_user_hlines(lines: Array) -> void:
+	user_hlines = lines.duplicate()
+	queue_redraw()
+
+
+func add_user_hline(price: float) -> void:
+	var p := SmaFormat.round_to(maxf(0.01, price), 2)
+	user_hlines.append(p)
+	if user_hlines.size() > 8:
+		user_hlines = user_hlines.slice(user_hlines.size() - 8)
+	user_lines_changed.emit(user_hlines.duplicate())
+	queue_redraw()
+
+
+func clear_user_hlines() -> void:
+	user_hlines.clear()
+	_ruler_active = false
+	_ruler_dragging = false
+	user_lines_changed.emit([])
 	queue_redraw()
 
 
@@ -174,12 +231,24 @@ func _ensure_series_cache() -> void:
 	_vma_cache.clear()
 	_boll_upper.clear()
 	_boll_lower.clear()
+	_macd_dif.clear()
+	_macd_dea.clear()
+	_macd_hist.clear()
+	_rsi_cache.clear()
 	if candles.is_empty():
 		return
 	for period in MA_PERIODS:
 		_ma_cache[period] = _moving_average(period, "c")
 	_vma_cache = _moving_average(VMA_PERIOD, "v")
 	_compute_bollinger()
+	var closes: Array = []
+	for bar in candles:
+		closes.append(float(bar.get("c", 0.0)))
+	var macd := SmaIndicators.macd_series(closes, 12, 26, 9)
+	_macd_dif = macd["dif"]
+	_macd_dea = macd["dea"]
+	_macd_hist = macd["hist"]
+	_rsi_cache = SmaIndicators.rsi_series(closes, 14)
 
 
 func _compute_bollinger() -> void:
@@ -224,12 +293,13 @@ func _draw() -> void:
 		return
 	var max_start := maxi(0, candles.size() - count)
 	var start := clampi(max_start - pan_offset, 0, max_start)
+	_visible_start = start
 	_visible = candles.slice(start, start + count)
 	_left = 12.0
 	_right = size.x - (82.0 if use_12 else 74.0)
 	_top = 62.0
-	_price_bottom = size.y - 76.0
-	_volume_top = _price_bottom + 12.0
+	_price_bottom = size.y - (94.0 if subpane_mode != "volume" else 76.0)
+	_volume_top = _price_bottom + 14.0
 	_volume_bottom = size.y - 22.0
 	if _right <= _left or _price_bottom <= _top:
 		return
@@ -278,15 +348,22 @@ func _draw() -> void:
 	if timeframe == "1m":
 		body_width = minf(body_width, 24.0)
 	_draw_grid()
-	_draw_volume(max_volume, body_width)
+	if subpane_mode == "macd":
+		_draw_macd(start, body_width)
+	elif subpane_mode == "rsi":
+		_draw_rsi(start)
+	else:
+		_draw_volume(max_volume, body_width)
+		_draw_vma(start, max_volume)
 	if show_boll:
 		_draw_bollinger(start)
 	_draw_candles(body_width)
 	if show_ma:
 		_draw_ma_lines(start)
-	_draw_vma(start, max_volume)
 	_draw_cost_lines()
 	_draw_price_lines()
+	_draw_user_hlines()
+	_draw_ruler(start)
 	_draw_trade_markers(start)
 	_draw_last_price()
 	_draw_legend(start)
@@ -364,6 +441,120 @@ func _draw_volume(max_volume: float, body_width: float) -> void:
 		draw_rect(Rect2(_left, roundf(_volume_top), _right - _left, 1.0), sep_col)
 	else:
 		draw_line(Vector2(_left, _volume_top), Vector2(_right, _volume_top), sep_col, 1.0)
+
+
+func _draw_macd(start: int, body_width: float) -> void:
+	var pixel := SmaUiTheme.is_pixel()
+	var sep_col := Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.5)
+	draw_rect(Rect2(_left, roundf(_volume_top), _right - _left, 1.0), sep_col)
+	var max_abs := 0.05
+	for i in _visible.size():
+		var idx := start + i
+		if idx >= _macd_dif.size():
+			break
+		for arr in [_macd_dif, _macd_dea, _macd_hist]:
+			var v := float(arr[idx])
+			if not is_nan(v):
+				max_abs = maxf(max_abs, absf(v))
+	max_abs *= 1.12
+	var y_zero := lerpf(_volume_bottom, _volume_top, 0.5)
+	draw_line(Vector2(_left, roundf(y_zero)), Vector2(_right, roundf(y_zero)),
+		Color("#4a6b94", 0.55), 1.0)
+	draw_string(_font, Vector2(_right + 6, y_zero + 3), "0.00",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#88a8cc"))
+
+	var dif_pts := PackedVector2Array()
+	var dea_pts := PackedVector2Array()
+	for i in _visible.size():
+		var idx := start + i
+		if idx >= _macd_dif.size():
+			break
+		var x := _left + _slot * (float(i) + 0.5)
+		var h_val := float(_macd_hist[idx])
+		if not is_nan(h_val):
+			var y_h := y_zero - (h_val / max_abs) * ((_volume_bottom - _volume_top) * 0.46)
+			var col := SmaUiTheme.POSITIVE if h_val >= 0.0 else SmaUiTheme.NEGATIVE
+			var w := maxf(2.0, roundf(body_width * 0.72)) if pixel else maxf(1.5, body_width * 0.68)
+			var top_y := minf(y_zero, y_h)
+			var bh := maxf(1.0, absf(y_h - y_zero))
+			draw_rect(Rect2(roundf(x - w * 0.5), roundf(top_y), w, roundf(bh)),
+				Color(col.r, col.g, col.b, 0.65))
+		var d_val := float(_macd_dif[idx])
+		if not is_nan(d_val):
+			var yd := y_zero - (d_val / max_abs) * ((_volume_bottom - _volume_top) * 0.46)
+			dif_pts.append(Vector2(x, clampf(yd, _volume_top + 1.0, _volume_bottom - 1.0)))
+		var s_val := float(_macd_dea[idx])
+		if not is_nan(s_val):
+			var ys := y_zero - (s_val / max_abs) * ((_volume_bottom - _volume_top) * 0.46)
+			dea_pts.append(Vector2(x, clampf(ys, _volume_top + 1.0, _volume_bottom - 1.0)))
+	_draw_series(dif_pts, Color("#38bdf8"), 1.3)
+	_draw_series(dea_pts, Color("#fbbf24"), 1.2)
+
+
+func _draw_rsi(start: int) -> void:
+	var sep_col := Color(SmaUiTheme.BORDER.r, SmaUiTheme.BORDER.g, SmaUiTheme.BORDER.b, 0.5)
+	draw_rect(Rect2(_left, roundf(_volume_top), _right - _left, 1.0), sep_col)
+	var y70 := lerpf(_volume_bottom, _volume_top, 0.70)
+	var y30 := lerpf(_volume_bottom, _volume_top, 0.30)
+	draw_rect(Rect2(_left, _volume_top, _right - _left, y70 - _volume_top),
+		Color(SmaUiTheme.NEGATIVE.r, SmaUiTheme.NEGATIVE.g, SmaUiTheme.NEGATIVE.b, 0.08))
+	draw_rect(Rect2(_left, y30, _right - _left, _volume_bottom - y30),
+		Color(SmaUiTheme.POSITIVE.r, SmaUiTheme.POSITIVE.g, SmaUiTheme.POSITIVE.b, 0.08))
+	draw_line(Vector2(_left, roundf(y70)), Vector2(_right, roundf(y70)),
+		Color(SmaUiTheme.NEGATIVE.r, SmaUiTheme.NEGATIVE.g, SmaUiTheme.NEGATIVE.b, 0.55), 1.0)
+	draw_line(Vector2(_left, roundf(y30)), Vector2(_right, roundf(y30)),
+		Color(SmaUiTheme.POSITIVE.r, SmaUiTheme.POSITIVE.g, SmaUiTheme.POSITIVE.b, 0.55), 1.0)
+	draw_string(_font, Vector2(_right + 6, y70 + 3), "70",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, SmaUiTheme.NEGATIVE)
+	draw_string(_font, Vector2(_right + 6, y30 + 3), "30",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, SmaUiTheme.POSITIVE)
+	var pts := PackedVector2Array()
+	for i in _visible.size():
+		var idx := start + i
+		if idx >= _rsi_cache.size():
+			break
+		var r := float(_rsi_cache[idx])
+		if is_nan(r):
+			continue
+		var x := _left + _slot * (float(i) + 0.5)
+		var yr := lerpf(_volume_bottom, _volume_top, clampf(r, 0.0, 100.0) / 100.0)
+		pts.append(Vector2(x, yr))
+	_draw_series(pts, Color("#c084fc"), 1.5)
+
+
+func _draw_user_hlines() -> void:
+	for raw_p in user_hlines:
+		var price := float(raw_p)
+		_draw_dashed_line(price, Color("#f472b6"), "S/R", false)
+
+
+func _draw_ruler(start: int) -> void:
+	if not _ruler_active or _ruler_start_abs < 0 or _ruler_end_abs < 0:
+		return
+	var vis_a := clampi(_ruler_start_abs - start, 0, maxi(0, _visible.size() - 1))
+	var vis_b := clampi(_ruler_end_abs - start, 0, maxi(0, _visible.size() - 1))
+	var x1 := _left + _slot * (float(vis_a) + 0.5)
+	var x2 := _left + _slot * (float(vis_b) + 0.5)
+	var y1 := clampf(_price_y(_ruler_start_price), _top, _price_bottom)
+	var y2 := clampf(_price_y(_ruler_end_price), _top, _price_bottom)
+	var diff := _ruler_end_price - _ruler_start_price
+	var pct := (diff / maxf(0.01, _ruler_start_price)) * 100.0
+	var bars := absi(_ruler_end_abs - _ruler_start_abs) + 1
+	var col := SmaKit.value_color(diff)
+	var rect := Rect2(minf(x1, x2), minf(y1, y2), maxf(2.0, absf(x2 - x1)), maxf(2.0, absf(y2 - y1)))
+	draw_rect(rect, Color(col.r, col.g, col.b, 0.16))
+	draw_rect(rect, col, false, 1.5)
+	draw_line(Vector2(x1, y1), Vector2(x2, y2), col, 1.5)
+	var tag := "%s (%s) · %d" % [
+		SmaFormat.signed_money(diff), SmaFormat.pct(pct, 2), bars,
+	]
+	var tag_w := _font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 12.0
+	var bx := clampf((x1 + x2) * 0.5 - tag_w * 0.5, _left + 4.0, _right - tag_w - 4.0)
+	var by := clampf(minf(y1, y2) - 20.0, _top + 4.0, _price_bottom - 20.0)
+	draw_rect(Rect2(roundf(bx), roundf(by), roundf(tag_w), 17.0), Color(0.05, 0.10, 0.18, 0.94))
+	draw_rect(Rect2(roundf(bx), roundf(by), roundf(tag_w), 17.0), col, false, 1.5)
+	draw_string(_font, Vector2(roundf(bx) + 6.0, roundf(by) + 12.0), tag,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, col)
 
 
 func _draw_candles(body_width: float) -> void:
@@ -637,7 +828,32 @@ func _draw_legend(start: int) -> void:
 	var change := (float(bar["c"]) / open_price - 1.0) * 100.0 if open_price > 0.0 else 0.0
 	x = _draw_metric(x, y, "", SmaFormat.pct(change, 2), SmaKit.value_color(change))
 	_draw_ma_legend(abs_index, 48.0)
-	if abs_index < _vma_cache.size():
+	if subpane_mode == "macd" and abs_index < _macd_dif.size():
+		var d_val := float(_macd_dif[abs_index])
+		var s_val := float(_macd_dea[abs_index])
+		var h_val := float(_macd_hist[abs_index])
+		var txt := "MACD(12,26,9)  DIF %s  DEA %s  HIST %s" % [
+			"—" if is_nan(d_val) else SmaFormat.num(d_val, 2),
+			"—" if is_nan(s_val) else SmaFormat.num(s_val, 2),
+			"—" if is_nan(h_val) else SmaFormat.num(h_val, 2),
+		]
+		draw_string(_font, Vector2(_left, _volume_top - 4), txt,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#38bdf8"))
+	elif subpane_mode == "rsi" and abs_index < _rsi_cache.size():
+		var r_val := float(_rsi_cache[abs_index])
+		var zone := ""
+		var r_col := Color("#c084fc")
+		if not is_nan(r_val):
+			if r_val >= 70.0:
+				zone = " · " + I18n.t("chart.rsiOverbought")
+				r_col = SmaUiTheme.NEGATIVE
+			elif r_val <= 30.0:
+				zone = " · " + I18n.t("chart.rsiOversold")
+				r_col = SmaUiTheme.POSITIVE
+		draw_string(_font, Vector2(_left, _volume_top - 4),
+			"RSI(14) %s%s" % ["—" if is_nan(r_val) else SmaFormat.num(r_val, 1), zone],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, r_col)
+	elif abs_index < _vma_cache.size():
 		var vma_value := float(_vma_cache[abs_index])
 		if not is_nan(vma_value):
 			draw_string(_font, Vector2(_left, _volume_top - 4),
@@ -870,7 +1086,14 @@ func _bar_title(bar: Dictionary) -> String:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		if _dragging and _slot > 0.0:
+		if _ruler_dragging and _slot > 0.0:
+			var idx := clampi(int(floor((event.position.x - _left) / _slot)), 0, maxi(0, _visible.size() - 1))
+			_ruler_end_abs = _visible_start + idx
+			_ruler_end_price = _price_from_y(clampf(event.position.y, _top, _price_bottom))
+			_hover_pos = event.position
+			_hover_index = idx
+			queue_redraw()
+		elif _dragging and _slot > 0.0:
 			var delta_bars := int(round((event.position.x - _drag_start_x) / _slot))
 			_set_pan(_drag_start_pan + delta_bars)
 			_hover_pos = event.position
@@ -883,19 +1106,71 @@ func _gui_input(event: InputEvent) -> void:
 			if event.pressed:
 				if event.double_click:
 					reset_pan()
+				elif tool_mode == "hline" and event.position.y >= _top and event.position.y <= _price_bottom \
+						and event.position.x >= _left and event.position.x <= _right:
+					add_user_hline(_price_from_y(event.position.y))
+				elif tool_mode == "ruler" and event.position.y >= _top and event.position.y <= _price_bottom \
+						and event.position.x >= _left and event.position.x <= _right and _slot > 0.0:
+					var idx := clampi(int(floor((event.position.x - _left) / _slot)), 0, maxi(0, _visible.size() - 1))
+					_ruler_dragging = true
+					_ruler_active = true
+					_ruler_start_abs = _visible_start + idx
+					_ruler_end_abs = _ruler_start_abs
+					_ruler_start_price = _price_from_y(event.position.y)
+					_ruler_end_price = _ruler_start_price
+					queue_redraw()
 				else:
 					_dragging = true
 					_drag_start_x = event.position.x
 					_drag_start_pan = pan_offset
 			else:
 				_dragging = false
+				_ruler_dragging = false
 			accept_event()
+		elif event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			if event.position.y >= _top and event.position.y <= _price_bottom \
+					and event.position.x >= _left and event.position.x <= _right:
+				_open_context_menu(_price_from_y(event.position.y))
+				accept_event()
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			set_visible_count(visible_count - 10)
 			accept_event()
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			set_visible_count(visible_count + 10)
 			accept_event()
+
+
+func _open_context_menu(price: float) -> void:
+	_ctx_price = SmaFormat.round_to(maxf(0.01, price), 2)
+	if _ctx_menu == null or not is_instance_valid(_ctx_menu):
+		_ctx_menu = PopupMenu.new()
+		_ctx_menu.id_pressed.connect(_on_context_menu_id)
+		add_child(_ctx_menu)
+	_ctx_menu.clear()
+	var p_txt := SmaFormat.money(_ctx_price)
+	_ctx_menu.add_item(I18n.t("chart.ctx.limitBuy", {"price": p_txt}), 0)
+	_ctx_menu.add_item(I18n.t("chart.ctx.limitSell", {"price": p_txt}), 1)
+	_ctx_menu.add_item(I18n.t("chart.ctx.stopSell", {"price": p_txt}), 2)
+	_ctx_menu.add_separator()
+	_ctx_menu.add_item(I18n.t("chart.ctx.drawHline", {"price": p_txt}), 3)
+	if not user_hlines.is_empty():
+		_ctx_menu.add_item(I18n.t("chart.ctx.clearHlines"), 4)
+	_ctx_menu.position = Vector2i(get_global_mouse_position())
+	_ctx_menu.popup()
+
+
+func _on_context_menu_id(id: int) -> void:
+	match id:
+		0:
+			chart_price_action.emit(_ctx_price, "limit_buy")
+		1:
+			chart_price_action.emit(_ctx_price, "limit_sell")
+		2:
+			chart_price_action.emit(_ctx_price, "stop_sell")
+		3:
+			add_user_hline(_ctx_price)
+		4:
+			clear_user_hlines()
 
 
 func _update_hover(position: Vector2) -> void:
