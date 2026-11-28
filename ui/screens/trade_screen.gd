@@ -32,6 +32,7 @@ var _profile_label: Label
 var _sensitivity_label: Label
 var _reason_label: Label
 var _earnings_badge_label: Label
+var _desk_sentiment_label: Label
 var _ticker_news_box: VBoxContainer
 var _ticker_news_key := ""
 var _watch_button: Button
@@ -86,6 +87,18 @@ var _orders_box: VBoxContainer
 var _orders_key := ""
 var _order_buttons: Dictionary = {}
 var _right_scroll: ScrollContainer
+var _rr_active := false
+var _rr_risk_pct := 1.0
+var _rr_ticker := ""
+var _rr_side := ""
+var _rr_toggle: Button
+var _rr_risk_buttons: Dictionary = {}
+var _rr_stop_spin: SpinBox
+var _rr_tp_spin: SpinBox
+var _rr_summary_label: Label
+var _rr_apply_btn: Button
+var _rr_bracket_btn: Button
+var _rr_body: VBoxContainer
 
 
 class SmaPixelDepthBar extends Control:
@@ -186,6 +199,10 @@ func _build() -> void:
 	_earnings_badge_label = SmaKit.label("", 11, SmaUiTheme.INFO)
 	_earnings_badge_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	quote_vbox.add_child(_earnings_badge_label)
+	_desk_sentiment_label = SmaKit.label("", 11, SmaUiTheme.ACCENT)
+	_desk_sentiment_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_desk_sentiment_label.visible = false
+	quote_vbox.add_child(_desk_sentiment_label)
 	quote_card.add_child(quote_vbox)
 	root.add_child(quote_card)
 
@@ -492,6 +509,58 @@ func _build() -> void:
 	_intro_review.visible = false
 	ticket.add_child(_intro_review)
 	right.add_child(ticket_card)
+
+	var rr_card := SmaKit.card(10)
+	var rr_wrap := SmaKit.vbox(6)
+	rr_card.add_child(rr_wrap)
+	var rr_head := SmaKit.hbox(6)
+	rr_head.add_child(SmaKit.label(I18n.t("riskSizer.title"), 13, SmaUiTheme.GOLD))
+	rr_head.add_child(SmaKit.hspacer())
+	_rr_toggle = SmaKit.toggle(I18n.t("riskSizer.togglePlot"))
+	_rr_toggle.button_pressed = _rr_active
+	SmaKit.set_small_font(_rr_toggle, 10)
+	_rr_toggle.toggled.connect(func(on: bool):
+		_rr_active = on
+		if _rr_body != null:
+			_rr_body.visible = on
+		_update_risk_sizer(true))
+	rr_head.add_child(_rr_toggle)
+	rr_wrap.add_child(rr_head)
+	_rr_body = SmaKit.vbox(6)
+	_rr_body.visible = _rr_active
+	rr_wrap.add_child(_rr_body)
+	var risk_row := SmaKit.hbox(4)
+	risk_row.add_child(SmaKit.caption(I18n.t("riskSizer.riskLabel")))
+	var risk_grp := ButtonGroup.new()
+	for rp in SmaRiskSizer.RISK_PRESETS:
+		var rval := float(rp)
+		var rbtn := SmaKit.toggle("%s%%" % SmaFormat.num(rval, 1 if rval < 1.0 else 0), risk_grp)
+		rbtn.button_pressed = is_equal_approx(rval, _rr_risk_pct)
+		SmaKit.set_small_font(rbtn, 10)
+		rbtn.pressed.connect(func():
+			_rr_risk_pct = rval
+			_update_risk_sizer(false))
+		_rr_risk_buttons[rval] = rbtn
+		risk_row.add_child(rbtn)
+	_rr_body.add_child(risk_row)
+	_rr_stop_spin = _oco_spin_row(_rr_body, I18n.t("riskSizer.stopPrice"), 0.01, 0.05)
+	_rr_tp_spin = _oco_spin_row(_rr_body, I18n.t("riskSizer.targetPrice"), 0.01, 0.05)
+	_rr_stop_spin.value_changed.connect(func(_v): _update_risk_sizer(false))
+	_rr_tp_spin.value_changed.connect(func(_v): _update_risk_sizer(false))
+	_rr_summary_label = SmaKit.label("", 11, SmaUiTheme.ACCENT)
+	_rr_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_rr_body.add_child(_rr_summary_label)
+	var rr_actions := SmaKit.hbox(6)
+	_rr_apply_btn = SmaKit.button(I18n.t("riskSizer.applyQty"), _apply_risk_qty, true)
+	SmaKit.set_small_font(_rr_apply_btn, 11)
+	_rr_apply_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rr_actions.add_child(_rr_apply_btn)
+	_rr_bracket_btn = SmaKit.arcade_button(I18n.t("riskSizer.buyBracket"), "amber", _submit_risk_bracket)
+	SmaKit.set_small_font(_rr_bracket_btn, 10)
+	_rr_bracket_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rr_actions.add_child(_rr_bracket_btn)
+	_rr_body.add_child(rr_actions)
+	right.add_child(rr_card)
 
 	_oco_card = SmaKit.card(12)
 	var oco_box := SmaKit.vbox(6)
@@ -875,6 +944,23 @@ func _update_quote_numbers(quote: Dictionary) -> void:
 						"period": period, "days": d_left,
 					})
 					_earnings_badge_label.add_theme_color_override("font_color", SmaUiTheme.INFO)
+		if _desk_sentiment_label != null:
+			var perks: Dictionary = game.office_perks()
+			if bool(perks.get("hasDeskSentiment", false)) and game.exchange.state["companies"].has(sym):
+				var comp: Dictionary = game.exchange.state["companies"][sym]
+				var fv := float(comp.get("fairValue", last))
+				var gap := (fv - last) / maxf(0.01, last) * 100.0
+				var tone_key := "trade.deskBull" if gap >= 4.0 else ("trade.deskBear" if gap <= -4.0 else "trade.deskNeutral")
+				_desk_sentiment_label.text = I18n.t("trade.deskSentiment", {
+					"tone": I18n.t(tone_key),
+					"gap": SmaFormat.pct(gap, 1),
+				})
+				_desk_sentiment_label.add_theme_color_override("font_color",
+					SmaKit.value_color(gap) if absf(gap) >= 4.0 else SmaUiTheme.ACCENT)
+				_desk_sentiment_label.visible = true
+			else:
+				_desk_sentiment_label.visible = false
+	_update_risk_sizer(false)
 
 
 func _update_ticker_news(ticker: String) -> void:
@@ -1695,3 +1781,112 @@ func _submit_oco() -> void:
 	var error_key := String(result.get("error", "order.oco"))
 	_oco_feedback.text = I18n.t("error.%s" % error_key)
 	_oco_feedback.add_theme_color_override("font_color", SmaUiTheme.NEGATIVE)
+
+
+func set_risk_sizer_open(open: bool) -> void:
+	_rr_active = open
+	if _rr_toggle != null:
+		_rr_toggle.set_pressed_no_signal(open)
+	if _rr_body != null:
+		_rr_body.visible = open
+	_update_risk_sizer(true)
+
+
+func _current_risk_calc() -> Dictionary:
+	if game == null or not game.started or game.exchange == null:
+		return {}
+	var price := _current_price()
+	var equity: float = float(game.get_equity())
+	var bp: float = float(game.effective_buying_power())
+	var side_for_calc := "short" if _side == "short" else "buy"
+	return SmaRiskSizer.calculate(price, _rr_stop_spin.value, _rr_tp_spin.value,
+		equity, _rr_risk_pct, side_for_calc, bp)
+
+
+func _update_risk_sizer(reset_levels: bool) -> void:
+	if _rr_stop_spin == null or game == null or not game.started or game.exchange == null:
+		return
+	var ticker: String = String(game.selected_ticker)
+	var calc_side := "short" if _side == "short" else "buy"
+	if reset_levels or ticker != _rr_ticker or calc_side != _rr_side:
+		var q: Dictionary = game.exchange.quote(ticker)
+		var last := float(q.get("last", 0.0))
+		if last > 0.0:
+			var defs := SmaRiskSizer.default_levels(last, calc_side)
+			_rr_ticker = ticker
+			_rr_side = calc_side
+			_rr_stop_spin.set_value_no_signal(float(defs["stop"]))
+			_rr_tp_spin.set_value_no_signal(float(defs["target"]))
+	if not _rr_active:
+		if _chart != null and not _chart.rr_plan.is_empty():
+			_chart.set_rr_plan({})
+		return
+	var calc := _current_risk_calc()
+	if calc.is_empty():
+		return
+	if bool(calc.get("ok", false)):
+		_rr_summary_label.text = I18n.t("riskSizer.summary", {
+			"budget": SmaFormat.money(float(calc["riskBudget"])),
+			"qty": int(calc["qty"]),
+			"rr": "1 : %.2f" % float(calc["rrRatio"]),
+			"weight": SmaFormat.pct_plain(float(calc["weightPct"]), 1),
+		})
+		_rr_summary_label.add_theme_color_override("font_color",
+			SmaUiTheme.POSITIVE if float(calc["rrRatio"]) >= 2.0 else SmaUiTheme.GOLD)
+		_rr_apply_btn.disabled = false
+		var oco_ok: bool = game.academy_is_tool_unlocked("order.limit") and game.academy_is_tool_unlocked("order.stop")
+		_rr_bracket_btn.disabled = not (oco_ok and bool(calc.get("validTarget", false)))
+		if _chart != null:
+			_chart.set_rr_plan(calc)
+	else:
+		_rr_summary_label.text = I18n.t("riskSizer.invalidStop")
+		_rr_summary_label.add_theme_color_override("font_color", SmaUiTheme.NEGATIVE)
+		_rr_apply_btn.disabled = true
+		_rr_bracket_btn.disabled = true
+		if _chart != null:
+			_chart.set_rr_plan({})
+
+
+func _apply_risk_qty() -> void:
+	var calc := _current_risk_calc()
+	var q := int(calc.get("qty", 0))
+	if q > 0 and _qty != null:
+		_qty.value = float(q)
+		_update_estimate()
+
+
+func _submit_risk_bracket() -> void:
+	var calc := _current_risk_calc()
+	if not bool(calc.get("ok", false)) or not bool(calc.get("validTarget", false)):
+		return
+	var qty := int(calc["qty"])
+	var entry_side := "short" if _side == "short" else "buy"
+	var res: Dictionary = game.submit_order({
+		"ticker": game.selected_ticker,
+		"side": entry_side,
+		"type": "market",
+		"qty": qty,
+	})
+	if not bool(res.get("ok", false)):
+		_feedback.text = I18n.t("error.%s" % String(res.get("error", "order.invalid")))
+		_feedback.add_theme_color_override("font_color", SmaUiTheme.NEGATIVE)
+		refresh()
+		return
+	var filled := int(res.get("order", {}).get("filledQty", 0))
+	if filled > 0:
+		var oco_res: Dictionary = game.submit_oco({
+			"ticker": game.selected_ticker,
+			"action": "closeShort" if entry_side == "short" else "closeLong",
+			"qty": filled,
+			"takeProfitPrice": float(calc["target"]),
+			"stopPrice": float(calc["stop"]),
+		})
+		if bool(oco_res.get("ok", false)):
+			game.toast(I18n.t("riskSizer.bracketDone", {
+				"qty": filled,
+				"tp": SmaFormat.money(float(calc["target"])),
+				"sl": SmaFormat.money(float(calc["stop"])),
+			}))
+	_orders_key = ""
+	_position_key = ""
+	refresh()

@@ -20,6 +20,72 @@ func _ready() -> void:
 	main = scene.instantiate()
 	add_child(main)
 	await _settle(8)
+	if OS.get_environment("SMA_BETA22_ONLY") == "1":
+		Game.new_game("beta22-flagship")
+		await _settle(4)
+		_dismiss_story()
+		Game.office["owned"] = ["espresso_bar", "research_board", "bloomberg_rig", "server_rack"]
+		Game.submit_order({"ticker": "NVDO", "side": "buy", "type": "market", "qty": 120})
+		_dismiss_story()
+		Game.submit_order({"ticker": "MSFY", "side": "buy", "type": "market", "qty": 40})
+		for d in 10:
+			Game._advance_steps(SmaExchange.SESSION_SECONDS, false)
+			_dismiss_story()
+		Game.submit_order({"ticker": "MSFY", "side": "sell", "type": "market", "qty": 40})
+		Game.intro["complete"] = true
+		var tr_list: Array = Game.exchange.state["account"]["trades"]
+		if tr_list.size() >= 2:
+			Game.set_journal_entry(SmaJournal.fill_key(tr_list[0], 0), "dip_buy", "EMA20 bounce")
+			Game.set_journal_entry(SmaJournal.fill_key(tr_list[1], 1), "trend", "Cloud momentum")
+		Game.deploy_quant_bot("NVDO", "ma_cross", 15000.0, 6.0)
+		Game.deploy_quant_bot("APLA", "rsi_rebound", 10000.0, 8.0)
+		Game.run_quant_bots_step(-1, true)
+		if main._pixel_fx != null:
+			main._pixel_fx._popups.clear()
+			main._pixel_fx._sparks.clear()
+			main._pixel_fx.queue_redraw()
+		main._refresh_nav()
+		main.navigate("quant")
+		main._screens["quant"].refresh("shot")
+		await _settle(5)
+		await _shot("beta22_quant_bots")
+		Game.select_ticker("NVDO")
+		main.navigate("trade")
+		var ts22: SmaTradeScreen = main._screens["trade"]
+		ts22._on_timeframe("1D")
+		ts22.set_risk_sizer_open(true)
+		ts22.refresh()
+		await _settle(5)
+		await _shot("beta22_risk_sizer")
+		var pal: SmaCommandPalette = main.open_command_palette()
+		if pal != null:
+			pal._search.text = ""
+			pal._refresh_results("")
+		await _settle(4)
+		await _shot("beta22_cmd_palette")
+		if pal != null and is_instance_valid(pal):
+			pal._close()
+		main.navigate("flash_trainer")
+		var fl22: SmaFlashTrainerScreen = main._screens["flash_trainer"]
+		fl22.refresh("shot")
+		await _settle(5)
+		await _shot("beta22_flash_trainer")
+		main.navigate("portfolio")
+		var pf22: SmaPortfolioScreen = main._screens["portfolio"]
+		pf22.refresh("shot")
+		await _settle(4)
+		var pf_scroll := pf22.get_child(0).get_child(0) as ScrollContainer
+		if pf_scroll != null:
+			pf_scroll.scroll_vertical = 1200
+		await _settle(4)
+		await _shot("beta22_journal")
+		main._on_office_hotspot("shop", {})
+		await _settle(5)
+		await _shot("beta22_office_perks")
+		SmaSaveService.clear(Game.save_path)
+		Game.save_path = SmaSaveService.SAVE_PATH
+		get_tree().quit(0)
+		return
 	if OS.get_environment("SMA_BETA21_ONLY") == "1":
 		Game.new_game("beta21-pro")
 		await _settle(4)

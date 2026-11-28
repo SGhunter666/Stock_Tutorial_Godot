@@ -11,9 +11,11 @@ signal navigate_requested(screen_id: String)
 const PROP_ICONS := {
 	"espresso_bar": "prop_espresso",
 	"lucky_cat": "prop_cat",
+	"research_board": "quant",
 	"bloomberg_rig": "prop_bloomberg",
 	"world_clocks": "prop_clocks",
 	"server_rack": "prop_server",
+	"vip_lounge": "fund",
 	"bull_statue": "prop_bull",
 }
 
@@ -216,8 +218,32 @@ func _build_shop(root: VBoxContainer) -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(hint)
 
+	var perks: Dictionary = SmaOffice.active_perks(office_state)
+	var perk_bar := SmaKit.flow(6)
+	perk_bar.add_child(SmaKit.badge(
+		I18n.t("office.perkBarBots", {"slots": int(perks.get("botSlots", 1))}),
+		SmaUiTheme.PANEL_ALT, SmaUiTheme.ACCENT))
+	perk_bar.add_child(SmaKit.badge(
+		I18n.t("office.perkBarXp", {"pct": int(perks.get("xpBonusPct", 0))}),
+		SmaUiTheme.PANEL_ALT, SmaUiTheme.POSITIVE if int(perks.get("xpBonusPct", 0)) > 0 else SmaUiTheme.MUTED))
+	if bool(perks.get("hasDeskSentiment", false)):
+		perk_bar.add_child(SmaKit.badge(I18n.t("office.perkBarDesk"), SmaUiTheme.PANEL_ALT, SmaUiTheme.GOLD))
+	if bool(perks.get("hasDailyCoffee", false)) and game != null:
+		perk_bar.add_child(SmaKit.arcade_button(I18n.t("office.dailyCoffeeBtn"), "amber", func():
+			var res: Dictionary = game.claim_office_interaction("coffee")
+			if bool(res.get("ok", false)):
+				_play_sfx("pixel_coffee")
+				game.toast(I18n.t("office.coffeeClaimed", {"xp": int(res.get("xp", 20))}))
+			else:
+				game.toast(I18n.t("office.coffeeAlready"))
+			_rebuild_panel()))
+	root.add_child(perk_bar)
+
+	var grid_scroll := SmaKit.scroll(410)
+	grid_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 8)
 	for item in SmaOffice.ITEMS:
@@ -240,6 +266,11 @@ func _build_shop(root: VBoxContainer) -> void:
 		var desc := SmaKit.muted(I18n.t(String(item["descKey"])), 10)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		titles.add_child(desc)
+		var perk_k := String(item.get("perkKey", ""))
+		if perk_k != "" and I18n.has_key(perk_k):
+			var perk_lbl := SmaKit.label(I18n.t(perk_k), 10, SmaUiTheme.POSITIVE if owned else SmaUiTheme.ACCENT)
+			perk_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			titles.add_child(perk_lbl)
 		top.add_child(titles)
 		box.add_child(top)
 
@@ -269,7 +300,8 @@ func _build_shop(root: VBoxContainer) -> void:
 					_buy_item(iid)))
 		box.add_child(foot)
 		grid.add_child(card)
-	root.add_child(grid)
+	grid_scroll.add_child(grid)
+	root.add_child(grid_scroll)
 
 	var staff_foot := SmaKit.hbox(8)
 	var staff_note := I18n.t("office.staffHintNone") if staff_list.is_empty() else I18n.t(

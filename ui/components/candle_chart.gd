@@ -47,6 +47,7 @@ var _ruler_start_abs := -1
 var _ruler_end_abs := -1
 var _ruler_start_price := 0.0
 var _ruler_end_price := 0.0
+var rr_plan: Dictionary = {}
 var _visible_start := 0
 var _ctx_menu: PopupMenu = null
 var _ctx_price := 0.0
@@ -324,6 +325,15 @@ func _draw() -> void:
 		var half_range := maxf(0.06, opening_price * 0.003)
 		_low = minf(_low, maxf(0.0, opening_price - half_range))
 		_high = maxf(_high, opening_price + half_range)
+	if not rr_plan.is_empty():
+		var rr_s := float(rr_plan.get("stop", 0.0))
+		var rr_t := float(rr_plan.get("target", 0.0))
+		if rr_s > 0.0:
+			_low = minf(_low, rr_s)
+			_high = maxf(_high, rr_s)
+		if rr_t > 0.0:
+			_low = minf(_low, rr_t)
+			_high = maxf(_high, rr_t)
 	if _high - _low < 0.0001:
 		_high += 0.5
 		_low -= 0.5
@@ -362,6 +372,7 @@ func _draw() -> void:
 		_draw_ma_lines(start)
 	_draw_cost_lines()
 	_draw_price_lines()
+	_draw_rr_zone()
 	_draw_user_hlines()
 	_draw_ruler(start)
 	_draw_trade_markers(start)
@@ -520,6 +531,65 @@ func _draw_rsi(start: int) -> void:
 		var yr := lerpf(_volume_bottom, _volume_top, clampf(r, 0.0, 100.0) / 100.0)
 		pts.append(Vector2(x, yr))
 	_draw_series(pts, Color("#c084fc"), 1.5)
+
+
+func set_rr_plan(plan: Dictionary) -> void:
+	rr_plan = plan.duplicate(true)
+	queue_redraw()
+
+
+func _draw_rr_zone() -> void:
+	if rr_plan.is_empty():
+		return
+	var entry := float(rr_plan.get("entry", 0.0))
+	var stop := float(rr_plan.get("stop", 0.0))
+	var target := float(rr_plan.get("target", 0.0))
+	if entry <= 0.0 or stop <= 0.0 or target <= 0.0:
+		return
+	var span_bars := mini(22, maxi(6, _visible.size() / 3))
+	var x_end := _right
+	var x_start := maxf(_left, _right - _slot * float(span_bars))
+	var y_entry := clampf(_price_y(entry), _top, _price_bottom)
+	var y_stop := clampf(_price_y(stop), _top, _price_bottom)
+	var y_target := clampf(_price_y(target), _top, _price_bottom)
+	var w := maxf(4.0, x_end - x_start)
+
+	# Green Take-Profit reward box
+	var tp_top := minf(y_entry, y_target)
+	var tp_h := maxf(2.0, absf(y_target - y_entry))
+	draw_rect(Rect2(x_start, tp_top, w, tp_h),
+		Color(SmaUiTheme.POSITIVE.r, SmaUiTheme.POSITIVE.g, SmaUiTheme.POSITIVE.b, 0.16))
+	draw_line(Vector2(x_start, roundf(y_target)), Vector2(x_end, roundf(y_target)),
+		SmaUiTheme.POSITIVE, 1.5)
+
+	# Red Stop-Loss risk box
+	var sl_top := minf(y_entry, y_stop)
+	var sl_h := maxf(2.0, absf(y_stop - y_entry))
+	draw_rect(Rect2(x_start, sl_top, w, sl_h),
+		Color(SmaUiTheme.NEGATIVE.r, SmaUiTheme.NEGATIVE.g, SmaUiTheme.NEGATIVE.b, 0.18))
+	draw_line(Vector2(x_start, roundf(y_stop)), Vector2(x_end, roundf(y_stop)),
+		SmaUiTheme.NEGATIVE, 1.5)
+
+	# Crisp labels on the zone
+	var tp_pct := float(rr_plan.get("targetPct", 0.0))
+	var sl_pct := float(rr_plan.get("stopPct", 0.0))
+	var rr := float(rr_plan.get("rrRatio", 0.0))
+	draw_string(_font, Vector2(x_start + 6.0, tp_top + 12.0),
+		"TP %s (+%.1f%%)" % [SmaFormat.money(target), tp_pct],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, SmaUiTheme.POSITIVE)
+	draw_string(_font, Vector2(x_start + 6.0, sl_top + sl_h - 4.0),
+		"SL %s (-%.1f%%)" % [SmaFormat.money(stop), sl_pct],
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, SmaUiTheme.NEGATIVE)
+	if rr > 0.0:
+		var badge := "R:R 1 : %.2f" % rr
+		var bw := _font.get_string_size(badge, HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x + 10.0
+		var bx := x_end - bw - 4.0
+		var by := clampf(y_entry - 9.0, _top + 4.0, _price_bottom - 18.0)
+		var bcol := SmaUiTheme.POSITIVE if rr >= 2.0 else (SmaUiTheme.GOLD if rr >= 1.2 else SmaUiTheme.WARNING)
+		draw_rect(Rect2(roundf(bx), roundf(by), roundf(bw), 16.0), Color(0.05, 0.10, 0.18, 0.94))
+		draw_rect(Rect2(roundf(bx), roundf(by), roundf(bw), 16.0), bcol, false, 1.5)
+		draw_string(_font, Vector2(roundf(bx) + 5.0, roundf(by) + 12.0), badge,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, bcol)
 
 
 func _draw_user_hlines() -> void:

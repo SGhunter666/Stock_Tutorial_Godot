@@ -11,6 +11,10 @@ var _result: Dictionary = {}
 var _result_mode := ""
 var _factor_result: Dictionary = {}
 var _fields: Dictionary = {}
+var _bot_ticker := ""
+var _bot_strategy := "ma_cross"
+var _bot_budget := 10000.0
+var _bot_stop := 6.0
 
 
 func _build() -> void:
@@ -42,6 +46,7 @@ func refresh(_reason: String = "") -> void:
 			or int(game.get_day()) >= 10):
 		_render_locked()
 		return
+	_render_live_bots()
 	_render_modes()
 	_render_config()
 	_render_result()
@@ -703,3 +708,159 @@ func _render_ml() -> void:
 			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT]))
 	_body.add_child(picks_card)
 	_add_chart(_result["curve"], "quant.ml.chartTitle", "quant.ml.chartNote")
+
+
+func _render_live_bots() -> void:
+	var summary: Dictionary = game.quant_bots_summary()
+	var bots: Array = summary.get("bots", [])
+	var max_slots := int(summary.get("maxSlots", 1))
+	var total_pnl := float(summary.get("totalPnl", 0.0))
+
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel",
+		SmaUiTheme.panel_style(SmaUiTheme.PANEL_ALT, SmaUiTheme.ACCENT, 12, false))
+	var box := SmaKit.vbox(8)
+	card.add_child(box)
+
+	var head := SmaKit.hbox(8)
+	head.add_child(SmaKit.label(I18n.t("bots.title"), 15, SmaUiTheme.GOLD))
+	head.add_child(SmaKit.caption(I18n.t("bots.slotsBadge", {
+		"used": bots.size(), "max": max_slots,
+	})))
+	head.add_child(SmaKit.hspacer())
+	if bots.size() > 0:
+		head.add_child(SmaKit.label(I18n.t("bots.totalPnl", {
+			"pnl": SmaFormat.signed_money(total_pnl),
+			"trades": int(summary.get("totalTrades", 0)),
+		}), 12, SmaKit.value_color(total_pnl)))
+	box.add_child(head)
+
+	var sub := SmaKit.muted(I18n.t("bots.subtitle", {"max": max_slots}), 11)
+	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(sub)
+
+	# Deploy form
+	var form := SmaKit.flow(8)
+	var tickers: Array[String] = []
+	for tk in game.exchange.state.get("companies", {}).keys():
+		tickers.append(String(tk))
+	tickers.sort()
+	if _bot_ticker == "" or not tickers.has(_bot_ticker):
+		_bot_ticker = String(_draft.get("ticker", game.selected_ticker))
+		if not tickers.has(_bot_ticker) and not tickers.is_empty():
+			_bot_ticker = tickers[0]
+
+	var tk_sel := OptionButton.new()
+	tk_sel.custom_minimum_size.x = 110
+	for i in tickers.size():
+		tk_sel.add_item(tickers[i])
+		if tickers[i] == _bot_ticker:
+			tk_sel.selected = i
+	tk_sel.item_selected.connect(func(idx: int):
+		_bot_ticker = tk_sel.get_item_text(idx))
+	form.add_child(_field_box("bots.fieldTicker", tk_sel))
+
+	var strat_sel := OptionButton.new()
+	strat_sel.custom_minimum_size.x = 175
+	for i in SmaQuantBots.STRATEGIES.size():
+		var spec: Dictionary = SmaQuantBots.STRATEGIES[i]
+		strat_sel.add_item(I18n.t(String(spec["labelKey"])))
+		if String(spec["id"]) == _bot_strategy:
+			strat_sel.selected = i
+	strat_sel.item_selected.connect(func(idx: int):
+		_bot_strategy = String(SmaQuantBots.STRATEGIES[idx]["id"]))
+	form.add_child(_field_box("bots.fieldStrategy", strat_sel))
+
+	var bud_sel := OptionButton.new()
+	bud_sel.custom_minimum_size.x = 120
+	for i in SmaQuantBots.BUDGET_PRESETS.size():
+		var val := float(SmaQuantBots.BUDGET_PRESETS[i])
+		bud_sel.add_item(SmaFormat.money(val))
+		if is_equal_approx(val, _bot_budget):
+			bud_sel.selected = i
+	bud_sel.item_selected.connect(func(idx: int):
+		_bot_budget = float(SmaQuantBots.BUDGET_PRESETS[idx]))
+	form.add_child(_field_box("bots.fieldBudget", bud_sel))
+
+	var sl_sel := OptionButton.new()
+	sl_sel.custom_minimum_size.x = 96
+	for i in SmaQuantBots.STOP_LOSS_PRESETS.size():
+		var sv := float(SmaQuantBots.STOP_LOSS_PRESETS[i])
+		sl_sel.add_item("-%d%%" % int(sv))
+		if is_equal_approx(sv, _bot_stop):
+			sl_sel.selected = i
+	sl_sel.item_selected.connect(func(idx: int):
+		_bot_stop = float(SmaQuantBots.STOP_LOSS_PRESETS[idx]))
+	form.add_child(_field_box("bots.fieldStopLoss", sl_sel))
+
+	var deploy_btn := SmaKit.arcade_button(I18n.t("bots.deploy"), "buy", func():
+		var res: Dictionary = game.deploy_quant_bot(_bot_ticker, _bot_strategy, _bot_budget, _bot_stop)
+		if bool(res.get("ok", false)):
+			refresh("bot_deploy"))
+	deploy_btn.disabled = bots.size() >= max_slots
+	deploy_btn.size_flags_vertical = Control.SIZE_SHRINK_END
+	form.add_child(deploy_btn)
+	box.add_child(form)
+
+	if bots.is_empty():
+		box.add_child(SmaKit.muted(I18n.t("bots.empty"), 11))
+	else:
+		for bot in bots:
+			var bid := int(bot["id"])
+			var paused := bool(bot.get("paused", false))
+			var net_pnl := float(bot.get("totalPnl", 0.0))
+			var row_card := PanelContainer.new()
+			row_card.add_theme_stylebox_override("panel",
+				SmaUiTheme.panel_style(SmaUiTheme.PANEL, SmaUiTheme.BORDER, 8, false))
+			var rb := SmaKit.hbox(10)
+			row_card.add_child(rb)
+
+			var info := SmaKit.vbox(2)
+			info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var title_row := SmaKit.hbox(8)
+			title_row.add_child(SmaKit.label("#%d %s" % [bid, String(bot["ticker"])], 13, SmaUiTheme.GOLD))
+			title_row.add_child(SmaKit.label(I18n.t("bots.strategy.%s" % String(bot["strategy"])), 12, SmaUiTheme.ACCENT))
+			title_row.add_child(SmaKit.label(
+				I18n.t("bots.statePaused" if paused else "bots.stateLive"), 10,
+				SmaUiTheme.WARNING if paused else SmaUiTheme.POSITIVE))
+			info.add_child(title_row)
+
+			var hold := int(bot.get("holdingQty", 0))
+			var meta_txt := I18n.t("bots.rowMeta", {
+				"budget": SmaFormat.money(float(bot["budget"])),
+				"sl": "-%d%%" % int(round(float(bot["stopLossPct"]))),
+				"hold": hold,
+				"entry": SmaFormat.money(float(bot.get("entryPrice", 0.0))) if hold > 0 else "—",
+				"trades": int(bot.get("trades", 0)),
+				"winRate": SmaFormat.pct_plain(float(bot.get("winRatePct", 0.0)), 0),
+			})
+			info.add_child(SmaKit.caption(meta_txt))
+			rb.add_child(info)
+
+			var pnl_lbl := SmaKit.label(SmaFormat.signed_money(net_pnl), 14, SmaKit.value_color(net_pnl))
+			pnl_lbl.custom_minimum_size.x = 92
+			pnl_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			rb.add_child(pnl_lbl)
+
+			var step_btn := SmaKit.button(I18n.t("bots.checkNow"), func():
+				game.run_quant_bots_step(bid, true)
+				refresh("bot_step"), true)
+			step_btn.disabled = paused
+			SmaKit.set_small_font(step_btn, 10)
+			rb.add_child(step_btn)
+
+			var tog_btn := SmaKit.button(I18n.t("bots.resume" if paused else "bots.pause"), func():
+				game.toggle_quant_bot(bid)
+				refresh("bot_toggle"))
+			SmaKit.set_small_font(tog_btn, 10)
+			rb.add_child(tog_btn)
+
+			var rm_btn := SmaKit.button(I18n.t("bots.stopClose"), func():
+				game.remove_quant_bot(bid, true)
+				refresh("bot_remove"))
+			SmaKit.set_small_font(rm_btn, 10)
+			rb.add_child(rm_btn)
+
+			box.add_child(row_card)
+
+	_body.add_child(card)

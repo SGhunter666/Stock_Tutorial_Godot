@@ -132,3 +132,76 @@ func run() -> void:
 	eq(rsi_arr.size(), 60, "RSI series matches length")
 	check(float(rsi_arr[59]) > 60.0 and float(rsi_arr[59]) <= 100.0,
 		"RSI reflects persistent uptrend in [60, 100]")
+
+	describe("beta22-quant-bots")
+	var bot_store := SmaQuantBots.normalize_store({})
+	var dep1 := SmaQuantBots.deploy(bot_store, "NVDO", "ma_cross", 15000.0, 6.0, 1, 2)
+	check(bool(dep1["ok"]), "deploys first quant bot into slot 1")
+	bot_store = dep1["store"]
+	var dep2 := SmaQuantBots.deploy(bot_store, "MSFY", "rsi_rebound", 10000.0, 8.0, 1, 2)
+	eq(bool(dep2["ok"]), false, "enforces max bot slot cap")
+	var up_series: Array[float] = []
+	for i in 30:
+		up_series.append(100.0 + float(i) * 1.6)
+	var ma_sig := SmaQuantBots.evaluate_signal("ma_cross", up_series, 150.0, 0, 0.0, 6.0)
+	eq(String(ma_sig["signal"]), "buy", "EMA golden cross triggers buy signal")
+	var sl_sig := SmaQuantBots.evaluate_signal("ma_cross", up_series, 88.0, 50, 100.0, 6.0)
+	eq(String(sl_sig["signal"]), "stop_loss", "hard stop-loss triggers exit on -12% drop")
+	var ex_bot := SmaExchange.new("beta22-bot-run", 100000.0, 1.0)
+	# Force an uptrend tail on NVDO so ma_cross buys immediately on run_step
+	var nvdo_bars: Array = ex_bot.state["companies"]["NVDO"]["series"]["daily"]
+	var base_p := float(ex_bot.state["companies"]["NVDO"]["last"])
+	for k in range(maxi(0, nvdo_bars.size() - 25), nvdo_bars.size()):
+		var step_p := base_p * (0.82 + float(k - (nvdo_bars.size() - 25)) * 0.008)
+		nvdo_bars[k]["c"] = step_p
+	var step_res := SmaQuantBots.run_step(bot_store, ex_bot, 5, -1, true)
+	var bot_sum := SmaQuantBots.summary(step_res["store"], ex_bot.state["companies"])
+	eq(int(bot_sum["count"]), 1, "summary reports 1 bot")
+	check(int(bot_sum["bots"][0]["holdingQty"]) > 0, "live bot executed real market buy order")
+
+	describe("beta22-risk-sizer")
+	var rs_long := SmaRiskSizer.calculate(100.0, 95.0, 115.0, 100000.0, 2.0, "buy", 100000.0)
+	check(bool(rs_long["ok"]), "valid long R:R calculation succeeds")
+	eq(int(rs_long["qty"]), 400, "risk $2,000 / $5 stop = 400 shares")
+	approx(float(rs_long["rrRatio"]), 3.0, 0.01, "R:R is 1 : 3.0")
+	var rs_bad := SmaRiskSizer.calculate(100.0, 105.0, 115.0, 100000.0, 2.0, "buy", 100000.0)
+	eq(bool(rs_bad["ok"]), false, "rejects stop-loss above entry on long")
+	var rs_short := SmaRiskSizer.calculate(100.0, 104.0, 88.0, 100000.0, 1.0, "short", 100000.0)
+	check(bool(rs_short["ok"]), "valid short R:R calculation succeeds")
+	eq(int(rs_short["qty"]), 250, "short risk $1,000 / $4 stop = 250 shares")
+	approx(float(rs_short["rrRatio"]), 3.0, 0.01, "short R:R is 1 : 3.0")
+
+	describe("beta22-journal-and-office-perks")
+	var j_fills := [
+		{"day": 1, "orderId": "O1", "ticker": "NVDO", "action": "openLong", "second": 10, "realized": 0.0},
+		{"day": 2, "orderId": "O2", "ticker": "NVDO", "action": "closeLong", "second": 20, "realized": 820.0},
+		{"day": 3, "orderId": "O3", "ticker": "TSLO", "action": "closeLong", "second": 30, "realized": -340.0},
+	]
+	var j_store := {}
+	j_store = SmaJournal.set_entry(j_store, SmaJournal.fill_key(j_fills[0], 0), "dip_buy", "Support bounce")
+	j_store = SmaJournal.set_entry(j_store, SmaJournal.fill_key(j_fills[2], 2), "fomo", "Chased spike")
+	var j_sum := SmaJournal.summarize_by_tag(j_fills, j_store)
+	eq(int(j_sum["taggedCount"]), 2, "counts 2 explicit journal entries")
+	eq(String(j_sum["bestTag"]["id"]), "dip_buy", "inherits entry tag onto close fill & finds best edge")
+	approx(float(j_sum["bestTag"]["realizedPnl"]), 820.0, 0.01, "dip_buy attributes +$820 realized PnL")
+	eq(String(j_sum["worstTag"]["id"]), "fomo", "identifies fomo as biggest capital leak")
+	var off := SmaOffice.create_state()
+	eq(int(SmaOffice.active_perks(off)["botSlots"]), 1, "base office has 1 bot slot")
+	off["owned"] = ["espresso_bar", "research_board", "bloomberg_rig", "server_rack"]
+	var perks := SmaOffice.active_perks(off)
+	eq(int(perks["botSlots"]), 3, "server_rack + bloomberg_rig expands to 3 bot slots")
+	eq(int(perks["xpBonusPct"]), 25, "espresso_bar + research_board grants +25% XP")
+	check(bool(perks["hasDeskSentiment"]), "bloomberg_rig unlocks desk sentiment")
+	eq(SmaOffice.scaled_xp(off, 20), 25, "scaled_xp applies +25% bonus cleanly")
+
+	describe("beta22-flash-chart-trainer")
+	var fl_round := SmaFlashTrainer.generate_round(ex_bot.state["companies"], "flash-test", 0)
+	check(bool(fl_round["ok"]), "generates valid blind K-line round")
+	eq((fl_round["visibleBars"] as Array).size(), SmaFlashTrainer.VISIBLE_BARS, "provides 40 masked history bars")
+	eq((fl_round["futureBars"] as Array).size(), SmaFlashTrainer.FUTURE_BARS, "holds 15 hidden future bars")
+	var fl_stats := SmaFlashTrainer.normalize_stats({})
+	var pick := "long" if float(fl_round["rawReturnPct"]) >= 0.0 else "short"
+	var fl_res := SmaFlashTrainer.settle(fl_round, pick, fl_stats)
+	check(bool(fl_res["ok"]), "settles flash trainer choice cleanly")
+	eq(int(fl_res["stats"]["played"]), 1, "increments played count")
+	check(int(fl_res["xp"]) >= 8, "awards Academy XP without modifying cash")

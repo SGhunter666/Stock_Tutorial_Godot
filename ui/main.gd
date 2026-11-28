@@ -20,6 +20,7 @@ const NAV_ITEMS := [
 	["portfolio", "nav.portfolio"],
 	["academy", "nav.academy"],
 	["challenges", "nav.challenges"],
+	["flash_trainer", "nav.flashTrainer"],
 	["career", "nav.career"],
 	["fund", "nav.fund"],
 	["quant", "nav.quant"],
@@ -59,6 +60,7 @@ const NAV_GROUPS := [
 		["academy", "nav.academy"],
 		["story", "nav.story"],
 		["challenges", "nav.challenges"],
+		["flash_trainer", "nav.flashTrainer"],
 		["career", "nav.career"],
 	]},
 	{"id": "fund_lab", "titleKey": "nav.group.fundLab", "items": [
@@ -125,6 +127,7 @@ var _step_buttons: Array[Button] = []
 var _start_continue: Button
 var _brand_label: Label
 var _font_quick_btn: Button
+var _palette_btn: Button
 var _top_metrics: Dictionary = {}
 
 
@@ -556,6 +559,10 @@ func _build_topbar() -> Control:
 	var save_button := SmaKit.button(I18n.t("header.save"), func(): Game.save_game(true))
 	actions.add_child(save_button)
 
+	_palette_btn = SmaKit.button("⌘K", open_command_palette)
+	_palette_btn.tooltip_text = I18n.t("palette.title")
+	actions.add_child(_palette_btn)
+
 	_font_quick_btn = SmaKit.button("A+", _cycle_font_scale)
 	_font_quick_btn.tooltip_text = I18n.t("settings.fontScaleTitle")
 	actions.add_child(_font_quick_btn)
@@ -655,7 +662,7 @@ func _build_sidebar() -> Control:
 			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			button.custom_minimum_size.y = 32
 			if SmaUiTheme.is_pixel():
-				button.icon = SmaPixelArt.icon(screen_id)
+				button.icon = SmaPixelArt.icon("trade" if screen_id == "flash_trainer" else screen_id)
 			button.pressed.connect(func(): navigate(screen_id))
 			_nav_buttons[screen_id] = button
 			items_box.add_child(button)
@@ -694,6 +701,7 @@ func _build_screens() -> void:
 	_screens["portfolio"] = SmaPortfolioScreen.new()
 	_screens["academy"] = SmaAcademyScreen.new()
 	_screens["challenges"] = SmaChallengesScreen.new()
+	_screens["flash_trainer"] = SmaFlashTrainerScreen.new()
 	_screens["career"] = SmaCareerScreen.new()
 	_screens["fund"] = SmaFundScreen.new()
 	_screens["quant"] = SmaQuantScreen.new()
@@ -810,6 +818,11 @@ func _nav_badge_for(screen_id: String) -> String:
 		"news":
 			if Game.has_pending_market_event():
 				return I18n.t("nav.badge.event")
+		"quant":
+			var bsum: Dictionary = Game.quant_bots_summary()
+			var act_bots := int(bsum.get("activeCount", 0))
+			if act_bots > 0:
+				return I18n.t("nav.badge.bots", {"count": act_bots})
 		"story":
 			if Game.narrative != null and Game.narrative.is_active():
 				return "●"
@@ -921,7 +934,23 @@ func _on_office_hotspot(kind: String, payload: Dictionary) -> void:
 			_play_sound("pixel_coffee")
 			if _pixel_fx != null:
 				_pixel_fx.spawn_burst(payload.get("pos", size * 0.5), SmaUiTheme.GOLD, 8)
+			var perks: Dictionary = Game.office_perks()
+			if bool(perks.get("hasDailyCoffee", false)):
+				var cres: Dictionary = Game.claim_office_interaction("coffee")
+				if bool(cres.get("ok", false)):
+					show_toast(I18n.t("office.coffeeClaimed", {"xp": int(cres.get("xp", 20))}))
+					return
 			show_toast("♦ " + String(payload.get("quip", "")))
+		"visitor":
+			_play_sound("story")
+			if _pixel_fx != null:
+				_pixel_fx.spawn_burst(payload.get("pos", size * 0.5), SmaUiTheme.ACCENT, 10)
+			var vres: Dictionary = Game.claim_office_interaction("visitor")
+			var quip := String(payload.get("quip", ""))
+			if bool(vres.get("ok", false)):
+				show_toast("%s (+%d XP)" % [quip, int(vres.get("xp", 12))])
+			else:
+				show_toast(quip)
 		"ticker":
 			_play_sound("pixel_click")
 			var sym := String(payload.get("ticker", "APLA"))
@@ -934,6 +963,39 @@ func open_poster(daily_info: Dictionary = {}) -> SmaReportPoster:
 	add_child(poster)
 	poster.setup(Game, daily_info)
 	return poster
+
+
+func open_command_palette() -> SmaCommandPalette:
+	if not Game.started:
+		return null
+	for child in get_children():
+		if child is SmaCommandPalette:
+			return child as SmaCommandPalette
+	_play_sound("pixel_click")
+	var pal := SmaCommandPalette.new()
+	add_child(pal)
+	pal.ticker_selected.connect(func(tk: String):
+		open_ticker(tk, "etf" if SmaEtfs.is_etf(tk) else "trade"))
+	pal.screen_selected.connect(func(sid: String):
+		navigate(sid))
+	pal.action_selected.connect(_on_palette_action)
+	pal.setup(Game, NAV_ITEMS)
+	return pal
+
+
+func _on_palette_action(aid: String) -> void:
+	match aid:
+		"flash_trainer":
+			navigate("flash_trainer")
+		"office_shop":
+			_on_office_hotspot("shop", {})
+		"step_day":
+			_step_day()
+		"toggle_pause":
+			Game.toggle_pause()
+			_update_topbar()
+		"save":
+			Game.save_game(true)
 
 
 func _build_fast_forward_overlay() -> void:
@@ -1286,6 +1348,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if ctrl and key_event.keycode == KEY_S:
 		Game.save_game(true)
+		get_viewport().set_input_as_handled()
+		return
+	if ctrl and key_event.keycode == KEY_K:
+		open_command_palette()
 		get_viewport().set_input_as_handled()
 		return
 	if key_event.keycode == KEY_ESCAPE and _help_dialog != null \

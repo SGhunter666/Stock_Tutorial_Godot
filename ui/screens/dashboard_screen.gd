@@ -82,6 +82,21 @@ func _render_header() -> void:
 	title_box.add_child(SmaKit.muted(SmaCalendar.iso_date(game.get_day()), 12))
 	header.add_child(title_box)
 	header.add_child(SmaKit.hspacer())
+	var bsum: Dictionary = game.quant_bots_summary()
+	if int(bsum.get("count", 0)) > 0:
+		var bpnl := float(bsum.get("totalPnl", 0.0))
+		var bbtn := SmaKit.button(I18n.t("bots.dashboardChip", {
+			"active": int(bsum.get("activeCount", 0)),
+			"pnl": SmaFormat.signed_money(bpnl),
+		}), func():
+			var m := get_tree().get_first_node_in_group("main")
+			if m != null and m.has_method("navigate"):
+				m.navigate("quant"))
+		header.add_child(bbtn)
+	header.add_child(SmaKit.arcade_button(I18n.t("flash.quickBtn"), "amber", func():
+		var m := get_tree().get_first_node_in_group("main")
+		if m != null and m.has_method("navigate"):
+			m.navigate("flash_trainer")))
 	header.add_child(SmaKit.button(I18n.t("dashboard.openAcademy"),
 		_go_academy, true))
 	_body.add_child(header)

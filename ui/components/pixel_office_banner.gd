@@ -223,6 +223,10 @@ func _hit_test(pos: Vector2) -> Dictionary:
 	var coffee_rect := Rect2(float(left_desk_x * PX), float(22 * PX), float(58 * PX), size.y - float(26 * PX))
 	if coffee_rect.has_point(pos):
 		return {"zone": "coffee", "rect": coffee_rect}
+	# 5. Visiting Rival Chibi Zone in front of panoramic window
+	var vis_rect := Rect2(float((win_x + 4) * PX), float(24 * PX), float(34 * PX), size.y - float(26 * PX))
+	if vis_rect.has_point(pos):
+		return {"zone": "visitor", "rival": _current_visitor_id(), "rect": vis_rect}
 	return {"zone": ""}
 
 
@@ -244,6 +248,10 @@ func _gui_input(event: InputEvent) -> void:
 					tooltip_text = I18n.t("pixelOffice.hoverHonors")
 				"coffee":
 					tooltip_text = I18n.t("pixelOffice.hoverCoffee")
+				"visitor":
+					tooltip_text = I18n.t("pixelOffice.hoverVisitor", {
+						"name": I18n.t("rivals.%s.name" % _current_visitor_id()),
+					})
 				"ticker":
 					tooltip_text = I18n.t("pixelOffice.hoverTicker", {"ticker": sym})
 				_:
@@ -263,6 +271,16 @@ func _gui_input(event: InputEvent) -> void:
 			_quip_timer = 4.6
 			queue_redraw()
 			hotspot_clicked.emit("coffee", {"pos": get_global_transform_with_canvas() * event.position, "quip": _quip_text})
+		elif z == "visitor":
+			var rid := String(hit.get("rival", _current_visitor_id()))
+			_quip_text = _visitor_quip(rid)
+			_quip_timer = 5.4
+			queue_redraw()
+			hotspot_clicked.emit("visitor", {
+				"rival": rid,
+				"pos": get_global_transform_with_canvas() * event.position,
+				"quip": _quip_text,
+			})
 		elif z == "mentor":
 			hotspot_clicked.emit("mentor", {"mentor": String(hit.get("mentor", "lin_lan"))})
 		elif z == "honors":
@@ -683,10 +701,34 @@ func _draw_floor_actors(tier: int, win_x: int, w: int, floor_y: int, alert: bool
 				_px(cx + 1, cy + 1, 6, 5, Color("#f8fafc"))
 				_px(cx + 3, cy + 2, 1, 2, Color("#dc2626") if ci == 0 else Color("#1e293b"))
 				_px(cx + 4, cy + 3, 2, 1, Color("#1e293b"))
+	# Optional Research Strategy Whiteboard on left wall
+	if _has_prop("research_board") and win_x > 84:
+		var bx := 68
+		var by := 20
+		_px(bx, by, 18, 12, INK)
+		_px(bx + 1, by + 1, 16, 10, Color("#f1f5f9"))
+		_px(bx + 2, by + 8, 3, 2, Color("#22c55e"))
+		_px(bx + 6, by + 6, 3, 4, Color("#22c55e"))
+		_px(bx + 10, by + 4, 3, 6, Color("#38bdf8"))
+		_px(bx + 14, by + 3, 2, 7, Color("#f59e0b"))
 
 	# Left workstation (Player's desk — upgraded to Quad Rig if tier>=2 or bloomberg_rig owned)
 	var left_desk_x := maxi(26, win_x - 74)
 	_draw_workstation_left(left_desk_x, floor_y, tier >= 2 or _has_prop("bloomberg_rig"), alert)
+
+	# Rotating Visiting Rival Chibi (Gu Yan / Chen Xi / Lao Chen) in trading room!
+	if win_x + 36 < w - 30:
+		_draw_visiting_rival(win_x + 12, floor_y)
+
+	# Optional VIP Lounge Sofa near right floor
+	if _has_prop("vip_lounge") and w > 340:
+		var vx := w - 165
+		var vy := floor_y - 11
+		_px(vx, vy, 22, 11, INK)
+		_px(vx + 1, vy + 1, 20, 5, Color("#047857"))
+		_px(vx + 1, vy + 6, 20, 3, Color("#10b981"))
+		_px(vx + 2, vy + 9, 2, 2, Color("#78350f"))
+		_px(vx + 18, vy + 9, 2, 2, Color("#78350f"))
 
 	# Quant Server Rack OR Potted plant separating left wall & window
 	if _has_prop("server_rack") and win_x + 4 < w - 30:
@@ -925,8 +967,60 @@ func _draw_text_and_mentor_overlay(tier: int, win_x: int, win_total_w: int, aler
 			SmaUiTheme.ACCENT if mentor_hovered else SmaUiTheme.GOLD, false, 2.0)
 
 	# Subtle pixel hover indicator ring on hovered interactive floor zones
-	if _hover_zone in ["shop", "honors", "coffee", "ticker"]:
+	if _hover_zone in ["shop", "honors", "coffee", "visitor", "ticker"]:
 		var h_info := _hit_test(get_local_mouse_position())
 		if h_info.has("rect"):
 			var r: Rect2 = h_info["rect"]
 			draw_rect(r.grow(-1.0), Color(0.37, 0.92, 0.83, 0.65), false, 2.0)
+
+
+func _current_visitor_id() -> String:
+	var day := int(game.get_day()) if (game != null and game.started) else 0
+	var roster := ["gu_yan", "chen_xi", "lao_chen"]
+	return String(roster[day % roster.size()])
+
+
+func _draw_visiting_rival(gx: int, floor_y: int) -> void:
+	var rid := _current_visitor_id()
+	var bob := -1 if ((_frame / 4) % 2 == 1) else 0
+	var blink := (_frame == 11)
+	if rid == "chen_xi":
+		var pal := {
+			"k": INK,
+			"H": Color("#0f172a"), "h": Color("#1e3a8a"),
+			"s": Color("#fde2cc"),
+			"w": Color("#fde2cc") if blink else Color("#ffffff"),
+			"m": Color("#d97777"),
+			"B": Color("#38bdf8"), "b": Color("#7dd3fc"),
+			"t": Color("#0284c7"),
+			"C": Color("#1e293b"), "d": Color("#0f172a"),
+		}
+		_draw_sprite(gx, floor_y - 20 + bob, ANALYST_FEMALE, pal)
+	else:
+		var tie_c := Color("#ef4444") if rid == "gu_yan" else Color("#22c55e")
+		var hair_c := Color("#3f2d21") if rid == "gu_yan" else Color("#94a3b8")
+		var pal := {
+			"k": INK,
+			"H": hair_c, "h": hair_c.lightened(0.2),
+			"s": Color("#f5cba7"),
+			"w": Color("#f5cba7") if blink else Color("#ffffff"),
+			"m": Color("#9a5b44"),
+			"W": Color("#f8fafc"), "T": tie_c, "d": Color("#1e293b"),
+		}
+		_draw_sprite(gx, floor_y - 19 + bob, ANALYST_MALE, pal)
+	# Floating golden "!" chat badge above visiting rival
+	var bx := gx + 5
+	var by := floor_y - 26 + bob
+	_px(bx, by, 5, 5, INK)
+	_px(bx + 1, by + 1, 3, 3, Color("#fbbf24"))
+	_px(bx + 2, by + 1, 1, 2, INK)
+
+
+func _visitor_quip(rid: String) -> String:
+	if game != null and game.started:
+		for entry in game.rival_leaderboard():
+			if String(entry.get("id", "")) == rid:
+				var qk := String(entry.get("quoteKey", ""))
+				if qk != "" and I18n.has_key(qk):
+					return "%s：%s" % [I18n.t("rivals.%s.name" % rid), I18n.t(qk)]
+	return I18n.t("pixelOffice.visitorFallback.%s" % rid)

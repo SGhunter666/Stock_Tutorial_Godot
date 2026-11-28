@@ -12,6 +12,7 @@ const ITEMS := [
 		"id": "espresso_bar",
 		"titleKey": "office.item.espresso_bar.title",
 		"descKey": "office.item.espresso_bar.desc",
+		"perkKey": "office.perk.espresso_bar",
 		"cost": 120,
 		"minRank": 1,
 	},
@@ -19,13 +20,23 @@ const ITEMS := [
 		"id": "lucky_cat",
 		"titleKey": "office.item.lucky_cat.title",
 		"descKey": "office.item.lucky_cat.desc",
+		"perkKey": "office.perk.lucky_cat",
 		"cost": 140,
+		"minRank": 1,
+	},
+	{
+		"id": "research_board",
+		"titleKey": "office.item.research_board.title",
+		"descKey": "office.item.research_board.desc",
+		"perkKey": "office.perk.research_board",
+		"cost": 180,
 		"minRank": 1,
 	},
 	{
 		"id": "bloomberg_rig",
 		"titleKey": "office.item.bloomberg_rig.title",
 		"descKey": "office.item.bloomberg_rig.desc",
+		"perkKey": "office.perk.bloomberg_rig",
 		"cost": 240,
 		"minRank": 1,
 	},
@@ -33,6 +44,7 @@ const ITEMS := [
 		"id": "world_clocks",
 		"titleKey": "office.item.world_clocks.title",
 		"descKey": "office.item.world_clocks.desc",
+		"perkKey": "office.perk.world_clocks",
 		"cost": 300,
 		"minRank": 2,
 	},
@@ -40,17 +52,61 @@ const ITEMS := [
 		"id": "server_rack",
 		"titleKey": "office.item.server_rack.title",
 		"descKey": "office.item.server_rack.desc",
+		"perkKey": "office.perk.server_rack",
 		"cost": 380,
 		"minRank": 2,
+	},
+	{
+		"id": "vip_lounge",
+		"titleKey": "office.item.vip_lounge.title",
+		"descKey": "office.item.vip_lounge.desc",
+		"perkKey": "office.perk.vip_lounge",
+		"cost": 460,
+		"minRank": 3,
 	},
 	{
 		"id": "bull_statue",
 		"titleKey": "office.item.bull_statue.title",
 		"descKey": "office.item.bull_statue.desc",
+		"perkKey": "office.perk.bull_statue",
 		"cost": 520,
 		"minRank": 3,
 	},
 ]
+
+
+## Computes active non-cash gameplay perks granted by owned office furnishings.
+## Never mutates trading cash so portfolio return % remains 100% pure.
+static func active_perks(state: Dictionary) -> Dictionary:
+	var has_espresso := is_owned(state, "espresso_bar")
+	var has_cat := is_owned(state, "lucky_cat")
+	var has_board := is_owned(state, "research_board")
+	var has_bloomberg := is_owned(state, "bloomberg_rig")
+	var has_clocks := is_owned(state, "world_clocks")
+	var has_server := is_owned(state, "server_rack")
+	var has_vip := is_owned(state, "vip_lounge")
+	var has_bull := is_owned(state, "bull_statue")
+	var bot_slots := 1 + (1 if has_server else 0) + (1 if has_bloomberg else 0)
+	var xp_bonus := (10 if has_espresso else 0) + (15 if has_board else 0) \
+		+ (10 if has_clocks else 0) + (15 if has_vip else 0)
+	return {
+		"botSlots": bot_slots,
+		"xpBonusPct": xp_bonus,
+		"hasDailyCoffee": has_espresso,
+		"hasLuckyMood": has_cat,
+		"hasJournalBoost": has_board,
+		"hasDeskSentiment": has_bloomberg,
+		"hasGlobalEdge": has_clocks,
+		"hasVisitorBonus": has_vip,
+		"hasGoldSeal": has_bull,
+	}
+
+
+static func scaled_xp(state: Dictionary, base_xp: int) -> int:
+	if base_xp <= 0:
+		return 0
+	var bonus := int(active_perks(state).get("xpBonusPct", 0))
+	return maxi(base_xp, int(round(float(base_xp) * (1.0 + float(bonus) / 100.0))))
 
 
 static func create_state() -> Dictionary:

@@ -19,8 +19,11 @@ var _long_box: VBoxContainer
 var _short_box: VBoxContainer
 var _other_box: VBoxContainer
 var _fills_box: VBoxContainer
+var _journal_summary_box: FlowContainer
+var _journal_highlight: Label
 var _status_label: Label
 var _last_rebuild := 0
+var _fills_sig := ""
 
 
 func _build() -> void:
@@ -144,10 +147,28 @@ func _build() -> void:
 	other_wrap.add_child(_other_box)
 	content.add_child(other_card)
 
-	var fills_section := _table_section("portfolio.trades", ["common.day", "market.ticker", "common.side",
-		"common.qty", "common.price", "portfolio.realized"], [0.9, 0.8, 0.9, 0.9, 0.9, 1.2], true)
-	content.add_child(fills_section["card"])
-	_fills_box = fills_section["body"]
+	var fills_card := SmaKit.card(10)
+	var fills_wrap := SmaKit.vbox(6)
+	fills_card.add_child(fills_wrap)
+	var fills_head := SmaKit.hbox(8)
+	fills_head.add_child(SmaKit.label(I18n.t("journal.title"), 14, SmaUiTheme.GOLD))
+	fills_head.add_child(SmaKit.hspacer())
+	_journal_highlight = SmaKit.caption("")
+	fills_head.add_child(_journal_highlight)
+	fills_wrap.add_child(fills_head)
+	_journal_summary_box = SmaKit.flow(6)
+	fills_wrap.add_child(_journal_summary_box)
+	var fills_header := SmaKit.header_row(["common.day", "market.ticker", "common.side",
+		"common.qty", "common.price", "portfolio.realized", "journal.colSetup"],
+		[0.8, 0.7, 0.7, 0.7, 0.8, 1.0, 2.2])
+	fills_header.custom_minimum_size.y = 24
+	fills_wrap.add_child(fills_header)
+	var fills_scroll := SmaKit.scroll(210)
+	_fills_box = SmaKit.vbox(4)
+	_fills_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fills_scroll.add_child(_fills_box)
+	fills_wrap.add_child(fills_scroll)
+	content.add_child(fills_card)
 
 
 func _table_section(title_key: String, columns: Array, ratios: Array, expand: bool) -> Dictionary:
@@ -495,14 +516,24 @@ func _update_other_assets() -> void:
 
 
 func _update_fills() -> void:
-	SmaKit.clear_children(_fills_box)
 	var fills: Array = game.exchange.state["account"]["trades"]
+	var jmap: Dictionary = game.journal_entries()
+	var sig := "%d|%d" % [fills.size(), jmap.hash()]
+	if sig == _fills_sig:
+		return
+	_fills_sig = sig
+	_update_journal_summary()
+	SmaKit.clear_children(_fills_box)
 	if fills.is_empty():
 		_fills_box.add_child(SmaKit.muted(I18n.t("portfolio.no_trades")))
 		return
 	var start := maxi(0, fills.size() - 12)
 	for index in range(fills.size() - 1, start - 1, -1):
 		var fill: Dictionary = fills[index]
+		var fk := SmaJournal.fill_key(fill, index)
+		var jentry: Dictionary = jmap.get(fk, {})
+		var cur_tag := String(jentry.get("tag", ""))
+		var cur_note := String(jentry.get("note", ""))
 		var side := String(fill.get("action", fill.get("side", "")))
 		var labels := {
 			"openLong": I18n.t("trade.buy"), "closeLong": I18n.t("trade.sell"),
@@ -510,14 +541,92 @@ func _update_fills() -> void:
 		}
 		var side_text: String = String(labels.get(side, side))
 		var side_color: Color = SmaUiTheme.POSITIVE if side == "openLong" or side == "closeShort" else SmaUiTheme.NEGATIVE
-		_fills_box.add_child(SmaKit.data_row([
+		var row := SmaKit.hbox(6)
+		var data := SmaKit.data_row([
 			"%s %s" % [String(fill.get("date", "")).substr(5), String(fill.get("time", "")).substr(0, 5)],
 			String(fill.get("ticker", "")), side_text,
 			SmaFormat.quantity(float(fill.get("qty", 0))),
 			SmaFormat.num(float(fill.get("price", 0.0)), 2),
 			SmaFormat.signed_money(float(fill.get("realized", 0.0))),
-		], [0.9, 0.8, 0.9, 0.9, 0.9, 1.2], [
+		], [0.8, 0.7, 0.7, 0.7, 0.8, 1.0], [
 			SmaUiTheme.MUTED, SmaUiTheme.ACCENT, side_color, SmaUiTheme.TEXT,
 			SmaUiTheme.TEXT, SmaKit.value_color(float(fill.get("realized", 0.0))),
 		], [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_LEFT,
-			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT]))
+			HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT, HORIZONTAL_ALIGNMENT_RIGHT])
+		data.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		data.size_flags_stretch_ratio = 4.7
+		row.add_child(data)
+
+		var jbox := SmaKit.hbox(4)
+		jbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		jbox.size_flags_stretch_ratio = 2.2
+		var tag_sel := OptionButton.new()
+		tag_sel.custom_minimum_size.x = 112
+		tag_sel.add_item(I18n.t("journal.tagNone"))
+		tag_sel.selected = 0
+		for ti in SmaJournal.TAGS.size():
+			var tdef: Dictionary = SmaJournal.TAGS[ti]
+			tag_sel.add_item(I18n.t(String(tdef["labelKey"])))
+			if String(tdef["id"]) == cur_tag:
+				tag_sel.selected = ti + 1
+		var note_edit := LineEdit.new()
+		note_edit.text = cur_note
+		note_edit.placeholder_text = I18n.t("journal.notePlaceholder")
+		note_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		note_edit.custom_minimum_size.x = 110
+		tag_sel.item_selected.connect(func(sel_idx: int):
+			var chosen := "" if sel_idx <= 0 else String(SmaJournal.TAGS[sel_idx - 1]["id"])
+			game.set_journal_entry(fk, chosen, note_edit.text)
+			_fills_sig = ""
+			_update_journal_summary())
+		note_edit.text_submitted.connect(func(txt: String):
+			var chosen := "" if tag_sel.selected <= 0 else String(SmaJournal.TAGS[tag_sel.selected - 1]["id"])
+			game.set_journal_entry(fk, chosen, txt)
+			_fills_sig = ""
+			_update_journal_summary())
+		note_edit.focus_exited.connect(func():
+			var chosen := "" if tag_sel.selected <= 0 else String(SmaJournal.TAGS[tag_sel.selected - 1]["id"])
+			if note_edit.text != cur_note:
+				game.set_journal_entry(fk, chosen, note_edit.text)
+				_fills_sig = ""
+				_update_journal_summary())
+		jbox.add_child(tag_sel)
+		jbox.add_child(note_edit)
+		row.add_child(jbox)
+		_fills_box.add_child(row)
+
+
+func _update_journal_summary() -> void:
+	if _journal_summary_box == null or game == null:
+		return
+	SmaKit.clear_children(_journal_summary_box)
+	var sum: Dictionary = game.journal_summary()
+	var rows: Array = sum.get("rows", [])
+	if rows.is_empty():
+		_journal_highlight.text = I18n.t("journal.emptyHint")
+		return
+	var best: Dictionary = sum.get("bestTag", {})
+	var worst: Dictionary = sum.get("worstTag", {})
+	var parts: Array[String] = []
+	if not best.is_empty():
+		parts.append(I18n.t("journal.bestEdge", {
+			"tag": I18n.t(String(best["labelKey"])),
+			"pnl": SmaFormat.signed_money(float(best["realizedPnl"])),
+		}))
+	if not worst.is_empty():
+		parts.append(I18n.t("journal.worstLeak", {
+			"tag": I18n.t(String(worst["labelKey"])),
+			"pnl": SmaFormat.signed_money(float(worst["realizedPnl"])),
+		}))
+	_journal_highlight.text = " · ".join(parts) if not parts.is_empty() else I18n.t("journal.taggedCount", {
+		"count": int(sum.get("taggedCount", 0)),
+	})
+	for r in rows:
+		var rpnl := float(r["realizedPnl"])
+		var txt := "%s (%d) %s" % [
+			I18n.t(String(r["labelKey"])),
+			int(r["count"]),
+			SmaFormat.signed_money(rpnl),
+		]
+		var col := SmaKit.value_color(rpnl) if not is_zero_approx(rpnl) else SmaUiTheme.ACCENT
+		_journal_summary_box.add_child(SmaKit.badge(txt, SmaUiTheme.PANEL_ALT, col))

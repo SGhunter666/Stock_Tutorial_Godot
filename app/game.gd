@@ -262,6 +262,7 @@ func _advance_steps(steps: int, sample_quotes: bool = true) -> void:
 			toast_requested.emit(I18n.t("toast.earningsToday", {
 				"count": earnings_count}))
 		_finalize_session_recap(day_after, paid)
+		run_quant_bots_step(-1, false)
 		if not sandbox_mode and day_after in [2, 4, 6, 8, 12]:
 			toast_requested.emit(I18n.t("toast.seatUpgrade.day%d" % day_after))
 			academy_changed.emit()
@@ -1335,6 +1336,207 @@ func resolve_market_event(choice_id: String) -> Dictionary:
 	academy_changed.emit()
 	state_changed.emit("market_event")
 	return result
+
+
+func office_perks() -> Dictionary:
+	return SmaOffice.active_perks(office)
+
+
+func claim_office_interaction(kind: String) -> Dictionary:
+	if not started or exchange == null:
+		return {"ok": false}
+	var day := int(exchange.state["dayIndex"])
+	var milestones: Dictionary = academy.get("milestones", {})
+	var checkins: Dictionary = milestones.get("officeCheckins", {}) \
+		if typeof(milestones.get("officeCheckins")) == TYPE_DICTIONARY else {}
+	var key := "%s:%d" % [kind, day]
+	if bool(checkins.get(key, false)):
+		return {"ok": false, "alreadyClaimed": true, "xp": 0}
+	var perks := office_perks()
+	var base_xp := 20 if kind == "coffee" else (18 if bool(perks.get("hasVisitorBonus", false)) else 12)
+	var gained := SmaOffice.scaled_xp(office, base_xp)
+	checkins[key] = true
+	milestones["officeCheckins"] = checkins
+	academy["milestones"] = milestones
+	academy["xp"] = int(academy.get("xp", 0)) + gained
+	save_game(false)
+	academy_changed.emit()
+	return {"ok": true, "alreadyClaimed": false, "xp": gained}
+
+
+func _quant_bots_store() -> Dictionary:
+	var milestones: Dictionary = academy.get("milestones", {})
+	return SmaQuantBots.normalize_store(milestones.get("quantBots", {}))
+
+
+func _save_quant_bots_store(store: Dictionary) -> void:
+	var milestones: Dictionary = academy.get("milestones", {})
+	milestones["quantBots"] = store
+	academy["milestones"] = milestones
+
+
+func quant_bots_summary() -> Dictionary:
+	var store := _quant_bots_store()
+	var companies: Dictionary = exchange.state.get("companies", {}) if exchange != null else {}
+	var summary := SmaQuantBots.summary(store, companies)
+	summary["maxSlots"] = int(office_perks().get("botSlots", 1))
+	return summary
+
+
+func deploy_quant_bot(ticker: String, strategy: String, budget: float,
+		stop_loss_pct: float) -> Dictionary:
+	if not started or exchange == null:
+		return {"ok": false, "error": "game.notStarted"}
+	var store := _quant_bots_store()
+	var max_slots := int(office_perks().get("botSlots", 1))
+	var res := SmaQuantBots.deploy(store, ticker, strategy, budget, stop_loss_pct,
+		max_slots, int(exchange.state["dayIndex"]))
+	if not bool(res.get("ok", false)):
+		last_error = String(res.get("error", "bots.errorSlots"))
+		order_rejected.emit(last_error)
+		return res
+	_save_quant_bots_store(res["store"])
+	save_game(false)
+	toast_requested.emit(I18n.t("bots.deployedToast", {
+		"ticker": String(res["bot"]["ticker"]),
+		"strategy": I18n.t("bots.strategy.%s" % String(res["bot"]["strategy"])),
+	}))
+	state_changed.emit("quant_bots")
+	return res
+
+
+func toggle_quant_bot(bot_id: int) -> bool:
+	if not started:
+		return false
+	var store := _quant_bots_store()
+	var bots: Array = store["bots"]
+	for i in bots.size():
+		if int(bots[i]["id"]) == bot_id:
+			bots[i]["paused"] = not bool(bots[i]["paused"])
+			store["bots"] = bots
+			_save_quant_bots_store(store)
+			save_game(false)
+			state_changed.emit("quant_bots")
+			return true
+	return false
+
+
+func remove_quant_bot(bot_id: int, liquidate: bool = true) -> bool:
+	if not started or exchange == null:
+		return false
+	var store := _quant_bots_store()
+	var bots: Array = store["bots"]
+	var kept: Array = []
+	var found := false
+	for bot in bots:
+		if int(bot["id"]) == bot_id:
+			found = true
+			var hold := int(bot.get("holdingQty", 0))
+			if liquidate and hold > 0:
+				var tk := String(bot["ticker"])
+				var sell_qty := mini(hold, exchange.available_shares(tk))
+				if sell_qty > 0:
+					exchange.submit_order({"ticker": tk, "side": "sell", "type": "market", "qty": sell_qty})
+			continue
+		kept.append(bot)
+	if not found:
+		return false
+	store["bots"] = kept
+	_save_quant_bots_store(store)
+	save_game(false)
+	state_changed.emit("quant_bots")
+	return true
+
+
+func run_quant_bots_step(target_bot_id: int = -1, force_same_day: bool = false) -> Array:
+	if not started or exchange == null:
+		return []
+	var store := _quant_bots_store()
+	if (store["bots"] as Array).is_empty():
+		return []
+	var res := SmaQuantBots.run_step(store, exchange, int(exchange.state["dayIndex"]),
+		target_bot_id, force_same_day)
+	_save_quant_bots_store(res["store"])
+	var evts: Array = res.get("events", [])
+	for ev in evts:
+		var act := String(ev.get("action", "buy"))
+		if act == "buy":
+			toast_requested.emit(I18n.t("bots.buyToast", {
+				"ticker": String(ev["ticker"]),
+				"qty": int(ev["qty"]),
+				"price": SmaFormat.money(float(ev["price"])),
+			}))
+		else:
+			toast_requested.emit(I18n.t("bots.sellToast", {
+				"ticker": String(ev["ticker"]),
+				"qty": int(ev["qty"]),
+				"pnl": SmaFormat.signed_money(float(ev["pnl"])),
+			}))
+	if not evts.is_empty() or target_bot_id > 0:
+		save_game(false)
+		state_changed.emit("quant_bots")
+	return evts
+
+
+func journal_entries() -> Dictionary:
+	var milestones: Dictionary = academy.get("milestones", {})
+	return SmaJournal.normalize_store(milestones.get("tradeJournal", {}))
+
+
+func set_journal_entry(fill_key: String, tag: String, note: String) -> void:
+	if not started:
+		return
+	var milestones: Dictionary = academy.get("milestones", {})
+	var cur := SmaJournal.normalize_store(milestones.get("tradeJournal", {}))
+	var had := cur.has(fill_key)
+	var updated := SmaJournal.set_entry(cur, fill_key, tag, note)
+	milestones["tradeJournal"] = updated
+	academy["milestones"] = milestones
+	if not had and updated.has(fill_key):
+		var bonus_xp := 10 if bool(office_perks().get("hasJournalBoost", false)) else 5
+		academy["xp"] = int(academy.get("xp", 0)) + bonus_xp
+		academy_changed.emit()
+	save_game(false)
+	state_changed.emit("journal")
+
+
+func journal_summary() -> Dictionary:
+	if exchange == null:
+		return {"taggedCount": 0, "rows": [], "bestTag": {}, "worstTag": {}}
+	var account: Dictionary = exchange.state["account"]
+	var fills: Array = account.get("trades", account.get("fills", []))
+	return SmaJournal.summarize_by_tag(fills, journal_entries())
+
+
+func flash_trainer_stats() -> Dictionary:
+	var milestones: Dictionary = academy.get("milestones", {})
+	return SmaFlashTrainer.normalize_stats(milestones.get("flashTrainer", {}))
+
+
+func flash_trainer_next_round(round_offset: int = 0) -> Dictionary:
+	if exchange == null:
+		return {"ok": false}
+	var stats := flash_trainer_stats()
+	var seed_txt := String(exchange.state.get("seed", "sma-seed"))
+	return SmaFlashTrainer.generate_round(exchange.state.get("companies", {}),
+		seed_txt, int(stats["roundIndex"]) + round_offset)
+
+
+func flash_trainer_submit(round_data: Dictionary, choice: String) -> Dictionary:
+	if not started or exchange == null:
+		return {"ok": false}
+	var stats := flash_trainer_stats()
+	var res := SmaFlashTrainer.settle(round_data, choice, stats)
+	var gained_xp := SmaOffice.scaled_xp(office, int(res.get("xp", 0)))
+	res["xp"] = gained_xp
+	var milestones: Dictionary = academy.get("milestones", {})
+	milestones["flashTrainer"] = res["stats"]
+	academy["milestones"] = milestones
+	academy["xp"] = int(academy.get("xp", 0)) + gained_xp
+	save_game(false)
+	academy_changed.emit()
+	state_changed.emit("flash_trainer")
+	return res
 
 
 func review_timeline(limit: int = 12) -> Array:
